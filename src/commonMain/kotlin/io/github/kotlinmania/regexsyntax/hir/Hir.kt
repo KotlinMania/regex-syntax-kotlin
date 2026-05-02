@@ -26,6 +26,7 @@ to its simplified structure.
 
 import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.hir.interval.Interval
+import io.github.kotlinmania.regexsyntax.hir.interval.IntervalFactory
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSet
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSetIter
 import io.github.kotlinmania.regexsyntax.unicode.CaseFoldError
@@ -739,7 +740,7 @@ sealed class Class {
 
 /** A set of characters represented by Unicode scalar values. */
 class ClassUnicode internal constructor(
-    private val set: IntervalSet<ClassUnicodeRange>,
+    private val set: IntervalSet<ClassUnicodeRange, Int>,
 ) {
     companion object {
         /**
@@ -750,7 +751,7 @@ class ClassUnicode internal constructor(
          * non-overlapping order.
          */
         fun new(ranges: Iterable<ClassUnicodeRange>): ClassUnicode =
-            ClassUnicode(IntervalSet.new(ranges))
+            ClassUnicode(IntervalSet.new(ClassUnicodeRange.Companion, ranges))
 
         /** Create a new class with no ranges. An empty class matches nothing. */
         fun empty(): ClassUnicode = new(emptyList())
@@ -858,11 +859,12 @@ class ClassUnicodeIter internal constructor(
 data class ClassUnicodeRange(
     internal var start: Int,
     internal var end: Int,
-) : Comparable<ClassUnicodeRange>, Interval<Int> {
+) : Interval<ClassUnicodeRange, Int> {
     override fun lower(): Int = start
     override fun upper(): Int = end
     override fun setLower(bound: Int) { start = bound }
     override fun setUpper(bound: Int) { end = bound }
+    override fun factory(): IntervalFactory<ClassUnicodeRange, Int> = ClassUnicodeRange.Companion
 
     /**
      * Apply simple case folding to this Unicode scalar value range.
@@ -883,7 +885,7 @@ data class ClassUnicodeRange(
         return Result.success(Unit)
     }
 
-    companion object {
+    companion object : IntervalFactory<ClassUnicodeRange, Int> {
         /**
          * Create a new Unicode scalar value range for a character class.
          *
@@ -893,6 +895,25 @@ data class ClassUnicodeRange(
         fun new(start: Int, end: Int): ClassUnicodeRange {
             val (a, b) = if (start <= end) start to end else end to start
             return ClassUnicodeRange(a, b)
+        }
+
+        override fun create(lower: Int, upper: Int): ClassUnicodeRange = new(lower, upper)
+        override fun minBound(): Int = 0x00
+        override fun maxBound(): Int = 0x10FFFF
+        override fun boundAsInt(b: Int): Int = b
+        override fun increment(b: Int): Int = when (b) {
+            0xD7FF -> 0xE000
+            else -> {
+                check(b < 0x10FFFF) { "ClassUnicodeRange::increment overflow" }
+                b + 1
+            }
+        }
+        override fun decrement(b: Int): Int = when (b) {
+            0xE000 -> 0xD7FF
+            else -> {
+                check(b > 0) { "ClassUnicodeRange::decrement underflow" }
+                b - 1
+            }
         }
     }
 
@@ -913,12 +934,12 @@ data class ClassUnicodeRange(
 
 /** A set of characters represented by arbitrary bytes. */
 class ClassBytes internal constructor(
-    private val set: IntervalSet<ClassBytesRange>,
+    private val set: IntervalSet<ClassBytesRange, Byte>,
 ) {
     companion object {
         /** Create a new class from a sequence of ranges. */
         fun new(ranges: Iterable<ClassBytesRange>): ClassBytes =
-            ClassBytes(IntervalSet.new(ranges))
+            ClassBytes(IntervalSet.new(ClassBytesRange.Companion, ranges))
 
         /** Create a new class with no ranges. */
         fun empty(): ClassBytes = new(emptyList())
@@ -1004,11 +1025,12 @@ class ClassBytesIter internal constructor(
 data class ClassBytesRange(
     internal var start: Byte,
     internal var end: Byte,
-) : Comparable<ClassBytesRange>, Interval<Byte> {
+) : Interval<ClassBytesRange, Byte> {
     override fun lower(): Byte = start
     override fun upper(): Byte = end
     override fun setLower(bound: Byte) { start = bound }
     override fun setUpper(bound: Byte) { end = bound }
+    override fun factory(): IntervalFactory<ClassBytesRange, Byte> = ClassBytesRange.Companion
 
     /**
      * Apply simple case folding to this byte range. Only ASCII case mappings
@@ -1030,12 +1052,27 @@ data class ClassBytesRange(
         return Result.success(Unit)
     }
 
-    companion object {
+    companion object : IntervalFactory<ClassBytesRange, Byte> {
         /** Create a new byte range for a character class. */
         fun new(start: Byte, end: Byte): ClassBytesRange {
             val sI = start.toInt() and 0xFF
             val eI = end.toInt() and 0xFF
             return if (sI <= eI) ClassBytesRange(start, end) else ClassBytesRange(end, start)
+        }
+
+        override fun create(lower: Byte, upper: Byte): ClassBytesRange = new(lower, upper)
+        override fun minBound(): Byte = 0
+        override fun maxBound(): Byte = -1 // 0xFF as signed Byte
+        override fun boundAsInt(b: Byte): Int = b.toInt() and 0xFF
+        override fun increment(b: Byte): Byte {
+            val v = b.toInt() and 0xFF
+            check(v < 0xFF) { "ClassBytesRange::increment overflow" }
+            return (v + 1).toByte()
+        }
+        override fun decrement(b: Byte): Byte {
+            val v = b.toInt() and 0xFF
+            check(v > 0) { "ClassBytesRange::decrement underflow" }
+            return (v - 1).toByte()
         }
     }
 
@@ -1050,14 +1087,6 @@ data class ClassBytesRange(
         val s = start.toInt() and 0xFF
         val e = end.toInt() and 0xFF
         return e - s + 1
-    }
-
-    private fun isIntersectionEmpty(other: ClassBytesRange): Boolean {
-        val sa = start.toInt() and 0xFF
-        val ea = end.toInt() and 0xFF
-        val sb = other.start.toInt() and 0xFF
-        val eb = other.end.toInt() and 0xFF
-        return ea < sb || eb < sa
     }
 
     override fun compareTo(other: ClassBytesRange): Int {
