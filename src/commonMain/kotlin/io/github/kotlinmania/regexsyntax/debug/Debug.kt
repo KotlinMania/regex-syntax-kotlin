@@ -10,7 +10,7 @@ package io.github.kotlinmania.regexsyntax.debug
  * A type that wraps a single byte with a convenient debug rendering that
  * escapes the byte.
  */
-internal class Byte(val value: Byte) {
+internal class Byte(val value: kotlin.Byte) {
     override fun toString(): String {
         // Special case ASCII space. It's too hard to read otherwise, so
         // put quotes around it. I sometimes wonder whether just '\x20' would
@@ -79,7 +79,7 @@ internal sealed class Utf8Decoded {
     /** Successfully decoded codepoint. */
     class Ok(val codepoint: Int) : Utf8Decoded()
     /** Bad byte; the value is the offending byte. */
-    class Failed(val byte: Byte) : Utf8Decoded()
+    class Failed(val byte: kotlin.Byte) : Utf8Decoded()
 }
 
 /**
@@ -91,7 +91,7 @@ internal sealed class Utf8Decoded {
  * This returns null if and only if `bytes` is empty.
  */
 internal fun utf8Decode(bytes: ByteArray): Utf8Decoded? {
-    fun len(byte: Byte): Int? {
+    fun len(byte: kotlin.Byte): Int? {
         val b = byte.toInt() and 0xFF
         return when {
             b <= 0x7F -> 1
@@ -138,7 +138,7 @@ internal fun Int.len(): Int {
  * Replicates Rust's `core::ascii::escape_default` byte iterator: for any byte, produce the
  * escape sequence that an ASCII-debug formatter would emit.
  */
-internal fun asciiEscapeDefault(b: Byte): ByteArray {
+internal fun asciiEscapeDefault(b: kotlin.Byte): ByteArray {
     val v = b.toInt() and 0xFF
     return when {
         v == 0x09 -> "\\t".encodeToByteArray()
@@ -161,7 +161,7 @@ internal fun asciiEscapeDefault(b: Byte): ByteArray {
 }
 
 /** Format a byte as two lowercase hex characters. */
-internal fun byteToHex2(b: Byte): String {
+internal fun byteToHex2(b: kotlin.Byte): String {
     val v = b.toInt() and 0xFF
     val hex = "0123456789abcdef"
     return charArrayOf(hex[v ushr 4], hex[v and 0xF]).concatToString()
