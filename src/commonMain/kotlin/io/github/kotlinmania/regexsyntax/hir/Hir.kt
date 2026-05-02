@@ -30,7 +30,7 @@ import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSet
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSetIter
 import io.github.kotlinmania.regexsyntax.unicode.CaseFoldError
 import io.github.kotlinmania.regexsyntax.unicode.SimpleCaseFolder
-import io.github.kotlinmania.regexsyntax.debug.Byte as DebugByte
+import io.github.kotlinmania.regexsyntax.debug.byteDebug
 import io.github.kotlinmania.regexsyntax.debug.utf8Decode
 import io.github.kotlinmania.regexsyntax.debug.Utf8Decoded
 import io.github.kotlinmania.regexsyntax.debug.len
@@ -1070,7 +1070,7 @@ data class ClassBytesRange(
     }
 
     override fun toString(): String =
-        "ClassBytesRange(start=${DebugByte(start)}, end=${DebugByte(end)})"
+        "ClassBytesRange(start=${byteDebug(start)}, end=${byteDebug(end)})"
 }
 
 /**
