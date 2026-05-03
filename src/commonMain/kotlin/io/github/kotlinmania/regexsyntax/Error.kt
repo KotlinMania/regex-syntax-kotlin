@@ -1,5 +1,5 @@
 // port-lint: source src/error.rs
-package io.github.kotlinmania.regexsyntax.error
+package io.github.kotlinmania.regexsyntax
 
 /*
  * Copyright (c) The rust-lang regex contributors.
@@ -38,9 +38,9 @@ sealed class Error {
     }
 
     companion object {
-        fun from(err: AstError): Error = Parse(err)
+        fun fromAstError(err: AstError): Error = Parse(err)
 
-        fun from(err: HirError): Error = Translate(err)
+        fun fromHirError(err: HirError): Error = Translate(err)
     }
 }
 
