@@ -10,7 +10,7 @@ package io.github.kotlinmania.regexsyntax.ast
 Defines an abstract syntax for regular expressions.
 */
 
-import io.github.kotlinmania.regexsyntax.error.Formatter as ErrorFormatter
+import io.github.kotlinmania.regexsyntax.Formatter as ErrorFormatter
 
 /**
  * An error that occurred while parsing a regular expression into an abstract
@@ -188,7 +188,7 @@ sealed class ErrorKind {
      * The nest limit was exceeded. The limit stored here is the limit
      * configured in the parser.
      */
-    data class NestLimitExceeded(val limit: Int) : ErrorKind()
+    data class NestLimitExceeded(val limit: UInt) : ErrorKind()
 
     /**
      * The range provided in a counted repetition operator is invalid. The
@@ -593,8 +593,12 @@ data class Literal(
     val span: Span,
     /** The kind of this literal. */
     val kind: LiteralKind,
-    /** The Unicode scalar value corresponding to this literal. */
-    val c: Char,
+    /**
+     * The Unicode scalar value corresponding to this literal, stored as a
+     * codepoint in the range `U+0000..=U+10FFFF` (a single `Int`, since
+     * astral codepoints do not fit in a Kotlin `Char`).
+     */
+    val c: Int,
 ) {
     /**
      * If this literal was written as a `\x` hex escape, then this returns
@@ -602,8 +606,7 @@ data class Literal(
      */
     fun byte(): UByte? = when (kind) {
         is LiteralKind.HexFixed -> if (kind.value == HexLiteralKind.X) {
-            val code = c.code
-            if (code in 0..0xFF) code.toUByte() else null
+            if (c in 0..0xFF) c.toUByte() else null
         } else null
         else -> null
     }
@@ -865,8 +868,12 @@ data class ClassUnicode(
 
 /** The available forms of Unicode character classes. */
 sealed class ClassUnicodeKind {
-    /** A one letter abbreviated class, e.g., `\pN`. */
-    data class OneLetter(val value: Char) : ClassUnicodeKind()
+    /**
+     * A one letter abbreviated class, e.g., `\pN`. The letter is a Unicode
+     * scalar value stored as a codepoint (`Int`), since astral codepoints do
+     * not fit in a Kotlin `Char`.
+     */
+    data class OneLetter(val value: Int) : ClassUnicodeKind()
 
     /**
      * A binary property, general category or script. The string may be
@@ -1022,7 +1029,7 @@ data class ClassSetRange(
      * The only case where a range is invalid is if its start is greater than
      * its end.
      */
-    fun isValid(): Boolean = start.c <= end.c
+    fun isValid(): Boolean = start.c.toUInt() <= end.c.toUInt()
 }
 
 /** A union of items inside a character class set. */
@@ -1192,13 +1199,13 @@ sealed class RepetitionKind {
 /** A range repetition operator. */
 sealed class RepetitionRange {
     /** `{m}` */
-    data class Exactly(val value: Int) : RepetitionRange()
+    data class Exactly(val value: UInt) : RepetitionRange()
 
     /** `{m,}` */
-    data class AtLeast(val value: Int) : RepetitionRange()
+    data class AtLeast(val value: UInt) : RepetitionRange()
 
     /** `{m,n}` */
-    data class Bounded(val start: Int, val end: Int) : RepetitionRange()
+    data class Bounded(val start: UInt, val end: UInt) : RepetitionRange()
 
     /**
      * Returns true if and only if this repetition range is valid.
@@ -1248,7 +1255,7 @@ data class Group(
      *
      * This returns a capture index precisely when [isCapturing] is `true`.
      */
-    fun captureIndex(): Int? = when (kind) {
+    fun captureIndex(): UInt? = when (kind) {
         is GroupKind.CaptureIndex -> kind.value
         is GroupKind.CaptureName -> kind.name.index
         is GroupKind.NonCapturing -> null
@@ -1258,7 +1265,7 @@ data class Group(
 /** The kind of a group. */
 sealed class GroupKind {
     /** `(a)` */
-    data class CaptureIndex(val value: Int) : GroupKind()
+    data class CaptureIndex(val value: UInt) : GroupKind()
 
     /** `(?<name>a)` or `(?P<name>a)` */
     data class CaptureName(
@@ -1284,7 +1291,7 @@ data class CaptureName(
     /** The capture name. */
     val name: String,
     /** The capture index. */
-    val index: Int,
+    val index: UInt,
 )
 
 /** A group of flags that is not applied to a particular regular expression. */
