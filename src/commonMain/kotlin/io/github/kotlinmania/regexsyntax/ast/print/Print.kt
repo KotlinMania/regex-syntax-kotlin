@@ -143,6 +143,21 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
 
     private fun writeChar(c: Char): Result<Unit> = runCatching { wtr.append(c); Unit }
 
+    private fun writeCodepoint(codepoint: Int): Result<Unit> = runCatching {
+        require(codepoint in 0..0x10FFFF) { "Invalid Unicode scalar value: $codepoint" }
+        require(codepoint !in 0xD800..0xDFFF) { "Invalid Unicode scalar value (surrogate): $codepoint" }
+        if (codepoint <= 0xFFFF) {
+            wtr.append(codepoint.toChar())
+        } else {
+            val u = codepoint - 0x10000
+            val high = 0xD800 + (u ushr 10)
+            val low = 0xDC00 + (u and 0x3FF)
+            wtr.append(high.toChar())
+            wtr.append(low.toChar())
+        }
+        Unit
+    }
+
     private fun fmtGroupPre(ast: Group): Result<Unit> {
         return when (val k = ast.kind) {
             is GroupKind.CaptureIndex -> writeStr("(")
@@ -196,10 +211,14 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
     }
 
     private fun fmtLiteral(ast: Literal): Result<Unit> {
-        val cu = ast.c.code
+        val cu = ast.c
         return when (val k = ast.kind) {
-            is LiteralKind.Verbatim -> writeChar(ast.c)
-            is LiteralKind.Meta, is LiteralKind.Superfluous -> writeStr("\\${ast.c}")
+            is LiteralKind.Verbatim -> writeCodepoint(ast.c)
+            is LiteralKind.Meta, is LiteralKind.Superfluous -> {
+                val r0 = writeStr("\\")
+                if (r0.isFailure) return r0
+                writeCodepoint(ast.c)
+            }
             is LiteralKind.Octal -> writeStr("\\${cu.toString(8)}")
             is LiteralKind.HexFixed -> when (k.value) {
                 HexLiteralKind.X -> writeStr("\\x" + hexFixed(cu, 2))
@@ -314,7 +333,7 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
         val r0 = if (ast.negated) writeStr("\\P") else writeStr("\\p")
         if (r0.isFailure) return r0
         return when (val k = ast.kind) {
-            is ClassUnicodeKind.OneLetter -> writeChar(k.value)
+            is ClassUnicodeKind.OneLetter -> writeCodepoint(k.value)
             is ClassUnicodeKind.Named -> writeStr("{${k.value}}")
             is ClassUnicodeKind.NamedValue -> when (k.op) {
                 ClassUnicodeOpKind.Equal -> writeStr("{${k.name}=${k.value}}")
