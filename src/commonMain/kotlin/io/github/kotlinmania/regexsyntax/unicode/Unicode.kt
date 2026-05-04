@@ -234,7 +234,8 @@ class SimpleCaseFolder private constructor(
  * possible values were a binary property.
  *
  * In all circumstances, property names and values are normalized and
- * canonicalized. That is, `GC == gc == GeneralCategory == general_category`.
+ * canonicalized: short, long, abbreviated, and underscored forms all
+ * collapse to the same canonical entry per UTS#44 alias rules.
  */
 sealed class ClassQuery {
     /**
@@ -314,22 +315,20 @@ sealed class ClassQuery {
     private fun canonicalBinary(name: String): Result<CanonicalClassQuery> {
         val norm = symbolicNameNormalize(name)
 
-        // This is a special case where 'cf' refers to the 'Format' general
-        // category, but where the 'cf' abbreviation is also an abbreviation
-        // for the 'Case_Folding' property. But we want to treat it as
-        // a general category. (Currently, we don't even support the
-        // 'Case_Folding' property. But if we do in the future, users will be
-        // required to spell it out.)
+        // The abbreviation `cf` is ambiguous: it abbreviates the Format
+        // general category and the case-folding property at the same time.
+        // We resolve it as the general category here. The case-folding
+        // property is not currently supported; if it ever is, callers will
+        // have to spell it out.
         //
-        // Also 'sc' refers to the 'Currency_Symbol' general category, but is
-        // also the abbreviation for the 'Script' property. So we avoid calling
-        // [canonicalProp] for it too, which would erroneously normalize it
-        // to 'Script'.
+        // `sc` is ambiguous in the same way between the currency-symbol
+        // general category and the script property. We skip [canonicalProp]
+        // for it so it does not normalize to a script name.
         //
-        // Another case: 'lc' is an abbreviation for the 'Cased_Letter'
-        // general category, but is also an abbreviation for the 'Lowercase_Mapping'
-        // property. We don't currently support the latter, so as with 'cf'
-        // above, we treat 'lc' as 'Cased_Letter'.
+        // `lc` is ambiguous between the cased-letter general category and
+        // the lowercase-mapping property. The latter is not supported, so
+        // we resolve `lc` as the cased-letter category, mirroring the `cf`
+        // resolution above.
         if (norm != "cf" && norm != "sc" && norm != "lc") {
             val r = canonicalProp(norm)
             if (r.isFailure) return Result.failure(r.exceptionOrNull()!!)
@@ -378,8 +377,8 @@ internal sealed class CanonicalClassQuery {
      * have been canonicalized.
      *
      * Note that by construction, the property name of [ByValue] will never
-     * be `General_Category` or `Script`. Those two cases are subsumed by the
-     * eponymous variants.
+     * be the general-category property or the script property. Those two
+     * cases are subsumed by the eponymous variants.
      */
     data class ByValue(
         /** The canonical property name. */
@@ -785,10 +784,11 @@ internal fun symbolicNameNormalizeBytes(slice: ByteArray): Int {
             nextWrite += 1
         }
     }
-    // Special case: ISO_Comment has a 'isc' abbreviation. Since we generally
-    // ignore 'is' prefixes, the 'isc' abbreviation gets caught in the cross
-    // fire and ends up creating an alias for 'c' to 'ISO_Comment', but it
-    // is actually an alias for the 'Other' general category.
+    // Special case: the iso-comment property has the `isc` abbreviation.
+    // Since we generally ignore `is` prefixes, the `isc` abbreviation gets
+    // caught in the cross fire and ends up creating an alias for `c` to the
+    // iso-comment property, but it is actually an alias for the Other
+    // general category.
     if (startsWithIs && nextWrite == 1 && slice[0] == 'c'.code.toByte()) {
         slice[0] = 'i'.code.toByte()
         slice[1] = 's'.code.toByte()
@@ -798,7 +798,7 @@ internal fun symbolicNameNormalizeBytes(slice: ByteArray): Int {
     return nextWrite
 }
 
-// --- Binary search helpers (mirroring Rust's `slice::binary_search_by`) ---
+// --- Binary search helpers ---
 
 internal sealed class BinarySearchResult {
     data class Ok(val index: Int) : BinarySearchResult()
@@ -806,7 +806,8 @@ internal sealed class BinarySearchResult {
 }
 
 /**
- * Mirrors Rust's `slice::binary_search_by`.
+ * Binary search over an indexed sequence of [size] entries using a caller-
+ * supplied comparator.
  *
  * `compare(i)` should return a value < 0 if `slice[i] < target`,
  * 0 if equal, and > 0 if `slice[i] > target`.
@@ -826,7 +827,11 @@ internal inline fun binarySearchBy(size: Int, compare: (Int) -> Int): BinarySear
     return BinarySearchResult.Err(lo)
 }
 
-/** Mirrors Rust's `slice::binary_search_by_key`. */
+/**
+ * Binary search by extracted key over an indexed sequence of [size] entries.
+ * Returns [BinarySearchResult.Ok] at the matching index or
+ * [BinarySearchResult.Err] at the insertion point.
+ */
 internal inline fun <K : Comparable<K>> binarySearchByKey(
     size: Int,
     key: K,
