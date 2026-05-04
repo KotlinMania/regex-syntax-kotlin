@@ -1358,8 +1358,9 @@ data class Properties internal constructor(internal val inner: PropertiesI) {
             // prefix and suffix is empty. Otherwise, it is the intersection of all
             // prefixes and suffixes (respectively) of the branches.
             val fix = if (!firstSeen) LookSet.empty() else LookSet.full()
-            // We re-iterate from the start to compute static_explicit_captures_len
-            // off the first element. Use a helper.
+            // We re-iterate from the start to compute the
+            // [staticExplicitCapturesLen] field off the first element.
+            // Use a helper.
             val all = propsList.toList()
             val staticInit = all.firstOrNull()?.staticExplicitCapturesLen()
             val out = PropertiesI(
@@ -1888,7 +1889,9 @@ private fun liftCommonPrefix(hirs: List<Hir>): LiftResult {
     return LiftResult.Success(Hir.concat(total))
 }
 
-// ---- Saturating arithmetic helpers (Rust's usize::saturating_add/mul, checked_add/mul) ----
+// ---- Saturating + checked Int arithmetic helpers ----
+// Saturating helpers clamp to Int.MAX_VALUE on overflow; checked helpers
+// return null instead.
 
 private fun saturatingAdd(a: Int, b: Int): Int {
     val r = a + b
