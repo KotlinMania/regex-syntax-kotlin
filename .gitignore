@@ -43,3 +43,4 @@ java_pid*.hprof
 .DS_Store
 /.android-sdk/.knownPackages
 /.android-sdk/
+.ast_distance_config.json
