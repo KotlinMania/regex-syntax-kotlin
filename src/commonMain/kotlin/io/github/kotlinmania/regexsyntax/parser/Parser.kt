@@ -7,8 +7,8 @@ package io.github.kotlinmania.regexsyntax.parser
  */
 
 import io.github.kotlinmania.regexsyntax.Error
-import io.github.kotlinmania.regexsyntax.ast.parse.AstParserBuilder
-import io.github.kotlinmania.regexsyntax.ast.parse.AstParser
+import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder as AstParserBuilder
+import io.github.kotlinmania.regexsyntax.ast.parse.Parser as AstParser
 import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.hir.translate.Translator
 import io.github.kotlinmania.regexsyntax.hir.translate.TranslatorBuilder
@@ -77,7 +77,7 @@ data class ParserBuilder(
      * used in a granular way.
      */
     fun nestLimit(limit: Int): ParserBuilder {
-        ast.nestLimit(limit)
+        ast.nestLimit(limit.toUInt())
         return this
     }
 

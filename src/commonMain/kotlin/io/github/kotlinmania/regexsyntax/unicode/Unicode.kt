@@ -49,7 +49,6 @@ import io.github.kotlinmania.regexsyntax.unicodetables.wordbreak.BY_NAME as WB_B
  *
  * In the Kotlin port a range is encoded as an `IntArray` of size 2: `[start, end]`.
  */
-internal typealias UnicodeRangeTable = Array<IntArray>
 
 /**
  * An error that occurs when dealing with Unicode.

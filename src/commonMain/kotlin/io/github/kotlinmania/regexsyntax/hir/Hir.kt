@@ -872,14 +872,14 @@ data class ClassUnicodeRange(
      * Additional ranges are appended to the given list. Canonical ordering
      * is *not* maintained in the given list.
      */
-    override fun caseFoldSimple(ranges: MutableList<ClassUnicodeRange>): Result<Unit> {
+    override fun caseFoldSimple(intervals: MutableList<ClassUnicodeRange>): Result<Unit> {
         val folder = SimpleCaseFolder.new()
         if (folder.isFailure) return Result.failure(folder.exceptionOrNull()!!)
         val f = folder.getOrThrow()
         if (!f.overlaps(start, end)) return Result.success(Unit)
         for (cp in start..end) {
             for (cpFolded in f.mapping(cp)) {
-                ranges.add(ClassUnicodeRange(cpFolded, cpFolded))
+                intervals.add(ClassUnicodeRange(cpFolded, cpFolded))
             }
         }
         return Result.success(Unit)
@@ -1036,18 +1036,18 @@ data class ClassBytesRange(
      * Apply simple case folding to this byte range. Only ASCII case mappings
      * (for a-z) are applied.
      */
-    override fun caseFoldSimple(ranges: MutableList<ClassBytesRange>): Result<Unit> {
+    override fun caseFoldSimple(intervals: MutableList<ClassBytesRange>): Result<Unit> {
         val sInt = start.toInt() and 0xFF
         val eInt = end.toInt() and 0xFF
         if (!ClassBytesRange(0x61, 0x7A).isIntersectionEmpty(this)) { // 'a'..'z'
             val lower = maxOf(sInt, 0x61)
             val upper = minOf(eInt, 0x7A)
-            ranges.add(ClassBytesRange((lower - 32).toByte(), (upper - 32).toByte()))
+            intervals.add(ClassBytesRange((lower - 32).toByte(), (upper - 32).toByte()))
         }
         if (!ClassBytesRange(0x41, 0x5A).isIntersectionEmpty(this)) { // 'A'..'Z'
             val lower = maxOf(sInt, 0x41)
             val upper = minOf(eInt, 0x5A)
-            ranges.add(ClassBytesRange((lower + 32).toByte(), (upper + 32).toByte()))
+            intervals.add(ClassBytesRange((lower + 32).toByte(), (upper + 32).toByte()))
         }
         return Result.success(Unit)
     }
@@ -1308,6 +1308,7 @@ sealed class Dot {
  * All methods on a [Properties] value take constant time and are meant to
  * be cheap to call.
  */
+@ConsistentCopyVisibility
 data class Properties internal constructor(internal val inner: PropertiesI) {
     /** Returns the length (in bytes) of the smallest string matched by this HIR. */
     fun minimumLen(): Int? = inner.minimumLen
