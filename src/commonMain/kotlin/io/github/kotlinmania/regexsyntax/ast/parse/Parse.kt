@@ -1543,7 +1543,7 @@ internal class ParserI(
             set = set.copy()
         ))
         
-        var currentUnion = ClassSetUnion(span(), mutableListOf())
+        var currentUnion = union
 
         while (true) {
             bumpSpace()

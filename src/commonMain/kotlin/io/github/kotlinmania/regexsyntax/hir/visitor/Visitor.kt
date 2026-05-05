@@ -1,26 +1,21 @@
 // port-lint: source src/hir/visitor.rs
 package io.github.kotlinmania.regexsyntax.hir.visitor
 
-/*
- * Copyright (c) The rust-lang regex contributors.
- * Licensed under either of Apache-2.0 OR MIT.
- */
-
 import io.github.kotlinmania.regexsyntax.hir.Capture
 import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.hir.HirKind
 import io.github.kotlinmania.regexsyntax.hir.Repetition
 
 /**
- * A trait for visiting the high-level IR (HIR) in depth first order.
+ * An interface for visiting the high-level IR (HIR) in depth first order.
  *
- * The principle aim of this trait is to enable callers to perform case
+ * The principle aim of this interface is to enable callers to perform case
  * analysis on a high-level intermediate representation of a regular
  * expression without necessarily using recursion. In particular, this permits
  * callers to do case analysis with constant stack usage, which can be
  * important since the size of an HIR may be proportional to end user input.
  *
- * Typical usage of this trait involves providing an implementation and then
+ * Typical usage of this interface involves providing an implementation and then
  * running it using the [visit] function.
  */
 interface Visitor<Output, Err> {
@@ -56,7 +51,7 @@ interface Visitor<Output, Err> {
  * Executes an implementation of [Visitor] in constant stack space.
  *
  * This function will visit every node in the given [Hir] while calling
- * appropriate methods provided by the [Visitor] trait.
+ * appropriate methods provided by the [Visitor] interface.
  *
  * The primary use case for this method is when one wants to perform case
  * analysis over an [Hir] without using a stack size proportional to the depth
@@ -69,7 +64,7 @@ interface Visitor<Output, Err> {
  * the error is returned.
  */
 fun <Output, Err> visit(hir: Hir, visitor: Visitor<Output, Err>): Result<Output> {
-    return HeapVisitor().visit(hir, visitor)
+    return HeapVisitor.new().visit(hir, visitor)
 }
 
 /**
@@ -82,6 +77,10 @@ private class HeapVisitor {
      * used in a typical recursive visitor.
      */
     private val stack: MutableList<Pair<Hir, Frame>> = mutableListOf()
+
+    companion object {
+        fun new(): HeapVisitor = HeapVisitor()
+    }
 
     fun <Output, Err> visit(start: Hir, visitor: Visitor<Output, Err>): Result<Output> {
         stack.clear()

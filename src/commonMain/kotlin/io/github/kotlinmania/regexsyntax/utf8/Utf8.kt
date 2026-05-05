@@ -1,4 +1,4 @@
-// port-lint: source src/utf8.rs
+// port-lint: source utf8.rs
 package io.github.kotlinmania.regexsyntax.utf8
 
 /*
@@ -6,84 +6,85 @@ package io.github.kotlinmania.regexsyntax.utf8
  * Licensed under either of Apache-2.0 OR MIT.
  */
 
-/*!
-Converts ranges of Unicode scalar values to equivalent ranges of UTF-8 bytes.
-
-This is sub-module is useful for constructing byte based automatons that need
-to embed UTF-8 decoding. The most common use of this module is in conjunction
-with the `ClassUnicodeRange` type from `regex-syntax`'s HIR.
-
-See the documentation on the [Utf8Sequences] iterator for more details and
-an example.
-
-# Wait, what is this?
-
-This is simplest to explain with an example. Let's say you wanted to test
-whether a particular byte sequence was a Cyrillic character. One possible
-scalar value range is `[0400-04FF]`. The set of allowed bytes for this
-range can be expressed as a sequence of byte ranges:
-
-```text
-[D0-D3][80-BF]
-```
-
-This is simple enough: simply encode the boundaries, `0400` encodes to
-`D0 80` and `04FF` encodes to `D3 BF`, and create ranges from each
-corresponding pair of bytes: `D0` to `D3` and `80` to `BF`.
-
-However, what if you wanted to add the Cyrillic Supplementary characters to
-your range? Your range might then become `[0400-052F]`. The same procedure
-as above doesn't quite work because `052F` encodes to `D4 AF`. The byte ranges
-you'd get from the previous transformation would be `[D0-D4][80-AF]`. However,
-this isn't quite correct because this range doesn't capture many characters,
-for example, `04FF` (because its last byte, `BF` isn't in the range `80-AF`).
-
-Instead, you need multiple sequences of byte ranges:
-
-```text
-[D0-D3][80-BF]  # matches codepoints 0400-04FF
-[D4][80-AF]     # matches codepoints 0500-052F
-```
-
-This gets even more complicated if you want bigger ranges, particularly if
-they naively contain surrogate codepoints. For example, the sequence of byte
-ranges for the basic multilingual plane (`[0000-FFFF]`) look like this:
-
-```text
-[0-7F]
-[C2-DF][80-BF]
-[E0][A0-BF][80-BF]
-[E1-EC][80-BF][80-BF]
-[ED][80-9F][80-BF]
-[EE-EF][80-BF][80-BF]
-```
-
-Note that the byte ranges above will *not* match any erroneous encoding of
-UTF-8, including encodings of surrogate codepoints.
-
-And, of course, for all of Unicode (`[000000-10FFFF]`):
-
-```text
-[0-7F]
-[C2-DF][80-BF]
-[E0][A0-BF][80-BF]
-[E1-EC][80-BF][80-BF]
-[ED][80-9F][80-BF]
-[EE-EF][80-BF][80-BF]
-[F0][90-BF][80-BF][80-BF]
-[F1-F3][80-BF][80-BF][80-BF]
-[F4][80-8F][80-BF][80-BF]
-```
-
-This module automates the process of creating these byte ranges from ranges of
-Unicode scalar values.
-
-# Lineage
-
-The idea and general implementation strategy come from Russ Cox's article on
-regexps and from RE2. Russ Cox got it from Ken Thompson's `grep` (no source,
-folk lore?). The same trick is also used by Apache Lucene's UTF32ToUTF8.
-*/
+/**
+ * Converts ranges of Unicode scalar values to equivalent ranges of UTF-8 bytes.
+ *
+ * This sub-module is useful for constructing byte based automatons that need
+ * to embed UTF-8 decoding. The most common use of this module is in conjunction
+ * with the [io.github.kotlinmania.regexsyntax.hir.ClassUnicodeRange] type from
+ * this crate's HIR.
+ *
+ * See the documentation on the [Utf8Sequences] iterator for more details and
+ * an example.
+ *
+ * # Wait, what is this?
+ *
+ * This is simplest to explain with an example. Let's say you wanted to test
+ * whether a particular byte sequence was a Cyrillic character. One possible
+ * scalar value range is `[0400-04FF]`. The set of allowed bytes for this
+ * range can be expressed as a sequence of byte ranges:
+ *
+ * ```text
+ * [D0-D3][80-BF]
+ * ```
+ *
+ * This is simple enough: simply encode the boundaries, `0400` encodes to
+ * `D0 80` and `04FF` encodes to `D3 BF`, and create ranges from each
+ * corresponding pair of bytes: `D0` to `D3` and `80` to `BF`.
+ *
+ * However, what if you wanted to add the Cyrillic Supplementary characters to
+ * your range? Your range might then become `[0400-052F]`. The same procedure
+ * as above doesn't quite work because `052F` encodes to `D4 AF`. The byte ranges
+ * you'd get from the previous transformation would be `[D0-D4][80-AF]`. However,
+ * this isn't quite correct because this range doesn't capture many characters,
+ * for example, `04FF` (because its last byte, `BF` isn't in the range `80-AF`).
+ *
+ * Instead, you need multiple sequences of byte ranges:
+ *
+ * ```text
+ * [D0-D3][80-BF]  # matches codepoints 0400-04FF
+ * [D4][80-AF]     # matches codepoints 0500-052F
+ * ```
+ *
+ * This gets even more complicated if you want bigger ranges, particularly if
+ * they naively contain surrogate codepoints. For example, the sequence of byte
+ * ranges for the basic multilingual plane (`[0000-FFFF]`) look like this:
+ *
+ * ```text
+ * [0-7F]
+ * [C2-DF][80-BF]
+ * [E0][A0-BF][80-BF]
+ * [E1-EC][80-BF][80-BF]
+ * [ED][80-9F][80-BF]
+ * [EE-EF][80-BF][80-BF]
+ * ```
+ *
+ * Note that the byte ranges above will *not* match any erroneous encoding of
+ * UTF-8, including encodings of surrogate codepoints.
+ *
+ * And, of course, for all of Unicode (`[000000-10FFFF]`):
+ *
+ * ```text
+ * [0-7F]
+ * [C2-DF][80-BF]
+ * [E0][A0-BF][80-BF]
+ * [E1-EC][80-BF][80-BF]
+ * [ED][80-9F][80-BF]
+ * [EE-EF][80-BF][80-BF]
+ * [F0][90-BF][80-BF][80-BF]
+ * [F1-F3][80-BF][80-BF][80-BF]
+ * [F4][80-8F][80-BF][80-BF]
+ * ```
+ *
+ * This module automates the process of creating these byte ranges from ranges of
+ * Unicode scalar values.
+ *
+ * # Lineage
+ *
+ * The idea and general implementation strategy come from Russ Cox's article on
+ * regexps and from RE2. Russ Cox got it from Ken Thompson's `grep` (no source,
+ * folk lore?). The same trick is also used by Apache Lucene's UTF32ToUTF8.
+ */
 
 private const val MAX_UTF8_BYTES: Int = 4
 
@@ -373,7 +374,7 @@ internal data class ScalarRange(var start: Int, var end: Int) {
         } else null
     }
 
-    /** is_valid returns true if and only if start <= end. */
+    /** isValid returns true if and only if start <= end. */
     fun isValid(): Boolean = start <= end
 
     /**
@@ -387,13 +388,13 @@ internal data class ScalarRange(var start: Int, var end: Int) {
     }
 
     /**
-     * `isAscii` returns true if the range is ASCII only (i.e., takes a single
+     * isAscii returns true if the range is ASCII only (i.e., takes a single
      * byte to encode any scalar value).
      */
     fun isAscii(): Boolean = isValid() && end <= 0x7f
 
     /**
-     * `encode` writes the UTF-8 encoding of the start and end of this range
+     * encode writes the UTF-8 encoding of the start and end of this range
      * to the corresponding destination arrays, and returns the number of
      * bytes written.
      *
@@ -419,7 +420,6 @@ private fun maxScalarValue(nbytes: Int): Int {
 
 /**
  * Encode a Unicode codepoint as UTF-8 into [dest], returning the number of bytes written.
- * Mirrors Rust's `char::encode_utf8`.
  */
 private fun encodeUtf8(codepoint: Int, dest: ByteArray): Int {
     return when {

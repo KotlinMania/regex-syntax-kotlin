@@ -148,3 +148,18 @@ mavenPublishing {
         }
     }
 }
+
+tasks.register("test") {
+    val hasAndroidSdk = androidSdkDir != null && file(androidSdkDir).exists()
+    if (hasAndroidSdk) {
+        dependsOn("allTests")
+    } else {
+        listOf(
+            "jsNodeTest",
+            "wasmJsNodeTest",
+            "macosArm64Test",
+        ).forEach { taskName ->
+            tasks.findByName(taskName)?.let { dependsOn(it) }
+        }
+    }
+}

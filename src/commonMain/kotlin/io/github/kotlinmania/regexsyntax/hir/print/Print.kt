@@ -16,6 +16,16 @@ import io.github.kotlinmania.regexsyntax.hir.visitor.visit
 import io.github.kotlinmania.regexsyntax.isMetaCharacter
 
 /**
+ * A builder for constructing a printer.
+ *
+ * Note that since a printer doesn't have any configuration knobs, this type
+ * remains unexported.
+ */
+private class PrinterBuilder {
+    fun build(): Printer = Printer()
+}
+
+/**
  * A printer for a regular expression's high-level intermediate
  * representation.
  *
@@ -44,6 +54,11 @@ class Printer {
      */
     fun print(hir: Hir, wtr: Appendable): Result<Unit> =
         visit(hir, Writer(wtr))
+
+    companion object {
+        /** Create a new printer. */
+        fun new(): Printer = PrinterBuilder().build()
+    }
 }
 
 private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {

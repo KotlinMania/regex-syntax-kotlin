@@ -6,9 +6,9 @@ package io.github.kotlinmania.regexsyntax.ast
  * Licensed under either of Apache-2.0 OR MIT.
  */
 
-/*!
-Defines an abstract syntax for regular expressions.
-*/
+/**
+ * Defines an abstract syntax for regular expressions.
+ */
 
 import io.github.kotlinmania.regexsyntax.Formatter as ErrorFormatter
 
@@ -45,6 +45,11 @@ data class Error(
 
     /** Return the span at which this error occurred. */
     fun span(): Span = spanValue
+
+    fun fmt(wtr: Appendable): Result<Unit> {
+        wtr.append(toString())
+        return Result.success(Unit)
+    }
 
     /**
      * Return an auxiliary span. This span exists only for some errors that
@@ -256,52 +261,62 @@ sealed class ErrorKind {
      */
     object UnsupportedLookAround : ErrorKind()
 
-    override fun toString(): String = when (this) {
-        CaptureLimitExceeded -> "exceeded the maximum number of " +
-            "capturing groups (${UInt.MAX_VALUE})"
-        ClassEscapeInvalid -> "invalid escape sequence found in character class"
-        ClassRangeInvalid -> "invalid character class range, " +
-            "the start must be <= the end"
-        ClassRangeLiteral -> "invalid range boundary, must be a literal"
-        ClassUnclosed -> "unclosed character class"
-        DecimalEmpty -> "decimal literal empty"
-        DecimalInvalid -> "decimal literal invalid"
-        EscapeHexEmpty -> "hexadecimal literal empty"
-        EscapeHexInvalid -> "hexadecimal literal is not a Unicode scalar value"
-        EscapeHexInvalidDigit -> "invalid hexadecimal digit"
-        EscapeUnexpectedEof -> "incomplete escape sequence, " +
-            "reached end of pattern prematurely"
-        EscapeUnrecognized -> "unrecognized escape sequence"
-        FlagDanglingNegation -> "dangling flag negation operator"
-        is FlagDuplicate -> "duplicate flag"
-        is FlagRepeatedNegation -> "flag negation operator repeated"
-        FlagUnexpectedEof -> "expected flag but got end of regex"
-        FlagUnrecognized -> "unrecognized flag"
-        is GroupNameDuplicate -> "duplicate capture group name"
-        GroupNameEmpty -> "empty capture group name"
-        GroupNameInvalid -> "invalid capture group character"
-        GroupNameUnexpectedEof -> "unclosed capture group name"
-        GroupUnclosed -> "unclosed group"
-        GroupUnopened -> "unopened group"
-        is NestLimitExceeded -> "exceed the maximum number of " +
-            "nested parentheses/brackets ($limit)"
-        RepetitionCountInvalid -> "invalid repetition count range, " +
-            "the start must be <= the end"
-        RepetitionCountDecimalEmpty -> "repetition quantifier expects a valid decimal"
-        RepetitionCountUnclosed -> "unclosed counted repetition"
-        RepetitionMissing -> "repetition operator missing expression"
-        SpecialWordBoundaryUnclosed -> "special word boundary assertion is either " +
-            "unclosed or contains an invalid character"
-        SpecialWordBoundaryUnrecognized -> "unrecognized special word boundary assertion, " +
-            "valid choices are: start, end, start-half " +
-            "or end-half"
-        SpecialWordOrRepetitionUnexpectedEof -> "found either the beginning of a special word " +
-            "boundary or a bounded repetition on a \\b with " +
-            "an opening brace, but no closing brace"
-        UnicodeClassInvalid -> "invalid Unicode character class"
-        UnsupportedBackreference -> "backreferences are not supported"
-        UnsupportedLookAround -> "look-around, including look-ahead and look-behind, " +
-            "is not supported"
+    fun fmt(wtr: Appendable): Result<Unit> {
+        val message = when (this) {
+            CaptureLimitExceeded -> "exceeded the maximum number of " +
+                "capturing groups (${UInt.MAX_VALUE})"
+            ClassEscapeInvalid -> "invalid escape sequence found in character class"
+            ClassRangeInvalid -> "invalid character class range, " +
+                "the start must be <= the end"
+            ClassRangeLiteral -> "invalid range boundary, must be a literal"
+            ClassUnclosed -> "unclosed character class"
+            DecimalEmpty -> "decimal literal empty"
+            DecimalInvalid -> "decimal literal invalid"
+            EscapeHexEmpty -> "hexadecimal literal empty"
+            EscapeHexInvalid -> "hexadecimal literal is not a Unicode scalar value"
+            EscapeHexInvalidDigit -> "invalid hexadecimal digit"
+            EscapeUnexpectedEof -> "incomplete escape sequence, " +
+                "reached end of pattern prematurely"
+            EscapeUnrecognized -> "unrecognized escape sequence"
+            FlagDanglingNegation -> "dangling flag negation operator"
+            is FlagDuplicate -> "duplicate flag"
+            is FlagRepeatedNegation -> "flag negation operator repeated"
+            FlagUnexpectedEof -> "expected flag but got end of regex"
+            FlagUnrecognized -> "unrecognized flag"
+            is GroupNameDuplicate -> "duplicate capture group name"
+            GroupNameEmpty -> "empty capture group name"
+            GroupNameInvalid -> "invalid capture group character"
+            GroupNameUnexpectedEof -> "unclosed capture group name"
+            GroupUnclosed -> "unclosed group"
+            GroupUnopened -> "unopened group"
+            is NestLimitExceeded -> "exceed the maximum number of " +
+                "nested parentheses/brackets ($limit)"
+            RepetitionCountInvalid -> "invalid repetition count range, " +
+                "the start must be <= the end"
+            RepetitionCountDecimalEmpty -> "repetition quantifier expects a valid decimal"
+            RepetitionCountUnclosed -> "unclosed counted repetition"
+            RepetitionMissing -> "repetition operator missing expression"
+            SpecialWordBoundaryUnclosed -> "special word boundary assertion is either " +
+                "unclosed or contains an invalid character"
+            SpecialWordBoundaryUnrecognized -> "unrecognized special word boundary assertion, " +
+                "valid choices are: start, end, start-half " +
+                "or end-half"
+            SpecialWordOrRepetitionUnexpectedEof -> "found either the beginning of a special word " +
+                "boundary or a bounded repetition on a \\b with " +
+                "an opening brace, but no closing brace"
+            UnicodeClassInvalid -> "invalid Unicode character class"
+            UnsupportedBackreference -> "backreferences are not supported"
+            UnsupportedLookAround -> "look-around, including look-ahead and look-behind, " +
+                "is not supported"
+        }
+        wtr.append(message)
+        return Result.success(Unit)
+    }
+
+    final override fun toString(): String {
+        val dst = StringBuilder()
+        fmt(dst).getOrThrow()
+        return dst.toString()
     }
 }
 
@@ -317,12 +332,21 @@ data class Span(
     /** The end byte offset. */
     val end: Position,
 ) : Comparable<Span> {
+    fun fmt(wtr: Appendable): Result<Unit> {
+        wtr.append(toString())
+        return Result.success(Unit)
+    }
+
     override fun toString(): String = "Span($start, $end)"
 
-    override fun compareTo(other: Span): Int {
+    fun cmp(other: Span): Int {
         val c = start.compareTo(other.start)
         return if (c != 0) c else end.compareTo(other.end)
     }
+
+    fun partialCmp(other: Span): Int? = cmp(other)
+
+    override fun compareTo(other: Span): Int = cmp(other)
 
     /** Create a new span by replacing the starting the position with the one given. */
     fun withStart(pos: Position): Span = Span(pos, end)
@@ -365,9 +389,18 @@ data class Position(
     /** The approximate column number, starting at `1`. */
     val column: Int,
 ) : Comparable<Position> {
+    fun fmt(wtr: Appendable): Result<Unit> {
+        wtr.append(toString())
+        return Result.success(Unit)
+    }
+
     override fun toString(): String = "Position(o: $offset, l: $line, c: $column)"
 
-    override fun compareTo(other: Position): Int = offset.compareTo(other.offset)
+    fun cmp(other: Position): Int = offset.compareTo(other.offset)
+
+    fun partialCmp(other: Position): Int? = cmp(other)
+
+    override fun compareTo(other: Position): Int = cmp(other)
 
     companion object {
         /**
@@ -498,6 +531,15 @@ sealed class Ast {
         is Group,
         is Alternation,
         is Concat -> true
+    }
+
+    fun fmt(wtr: Appendable): Result<Unit> =
+        io.github.kotlinmania.regexsyntax.ast.print.Printer.new().print(this, wtr)
+
+    final override fun toString(): String {
+        val dst = StringBuilder()
+        fmt(dst).getOrThrow()
+        return dst.toString()
     }
 
     companion object {

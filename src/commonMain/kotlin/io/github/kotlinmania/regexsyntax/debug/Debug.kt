@@ -7,27 +7,31 @@ package io.github.kotlinmania.regexsyntax.debug
  */
 
 /**
- * Render a single byte with a convenient debug rendering that
+ * A type that wraps a single byte with a convenient debug rendering that
  * escapes the byte.
  */
-internal fun byteDebug(value: Byte): String {
-    // Special case ASCII space. It's too hard to read otherwise, so
-    // put quotes around it. I sometimes wonder whether just '\x20' would
-    // be better...
-    if (value == ' '.code.toByte()) {
-        return "' '"
-    }
-    // 10 bytes is enough to cover any output from ASCII escape default.
-    val out = StringBuilder()
-    for ((i, raw) in asciiEscapeDefault(value).withIndex()) {
-        var b = raw
-        // capitalize \xab to \xAB
-        if (i >= 2 && b in 'a'.code.toByte()..'f'.code.toByte()) {
-            b = (b - 32).toByte()
+internal data class Byte(val value: kotlin.Byte) {
+    fun fmt(): String = toString()
+
+    override fun toString(): String {
+        // Special case ASCII space. It's too hard to read otherwise, so
+        // put quotes around it. I sometimes wonder whether just "\u005Cx20" would
+        // be better...
+        if (value == ' '.code.toByte()) {
+            return "' '"
         }
-        out.append(b.toInt().toChar())
+        // 10 bytes is enough to cover any output from asciiEscapeDefault.
+        val out = StringBuilder()
+        for ((i, raw) in asciiEscapeDefault(value).withIndex()) {
+            var b = raw
+            // capitalize \xab to \xAB
+            if (i >= 2 && b in 'a'.code.toByte()..'f'.code.toByte()) {
+                b = (b - 32).toByte()
+            }
+            out.append(b.toInt().toChar())
+        }
+        return out.toString()
     }
-    return out.toString()
 }
 
 /**
@@ -39,6 +43,8 @@ internal fun byteDebug(value: Byte): String {
  * N.B. This is copied nearly verbatim from regex-automata. Sigh.
  */
 internal class Bytes(val bytes: ByteArray) {
+    fun fmt(): String = toString()
+
     override fun toString(): String {
         val out = StringBuilder()
         out.append('"')
@@ -77,7 +83,7 @@ internal sealed class Utf8Decoded {
     /** Successfully decoded codepoint. */
     class Ok(val codepoint: Int) : Utf8Decoded()
     /** Bad byte; the value is the offending byte. */
-    class Failed(val byte: Byte) : Utf8Decoded()
+    class Failed(val byte: kotlin.Byte) : Utf8Decoded()
 }
 
 /**
@@ -89,7 +95,7 @@ internal sealed class Utf8Decoded {
  * This returns null if and only if `bytes` is empty.
  */
 internal fun utf8Decode(bytes: ByteArray): Utf8Decoded? {
-    fun len(byte: Byte): Int? {
+    fun len(byte: kotlin.Byte): Int? {
         val b = byte.toInt() and 0xFF
         return when {
             b <= 0x7F -> 1
@@ -120,8 +126,9 @@ internal fun utf8Decode(bytes: ByteArray): Utf8Decoded? {
 }
 
 /**
- * The byte length of a Unicode codepoint when encoded as UTF-8 (mirrors Rust's
- * `char::len_utf8`).
+ * The byte length of a Unicode codepoint when encoded as UTF-8.
+ *
+ * This is the Kotlin equivalent of Rust's `char.lenUtf8()`.
  */
 internal fun Int.len(): Int {
     return when {
@@ -133,10 +140,10 @@ internal fun Int.len(): Int {
 }
 
 /**
- * Replicates Rust's `core::ascii::escape_default` byte iterator: for any byte, produce the
- * escape sequence that an ASCII-debug formatter would emit.
+ * Replicates Rust's ASCII "escape default" behavior: for any byte, produce the
+ * escape sequence that a debug formatter would emit.
  */
-internal fun asciiEscapeDefault(b: Byte): ByteArray {
+internal fun asciiEscapeDefault(b: kotlin.Byte): ByteArray {
     val v = b.toInt() and 0xFF
     return when {
         v == 0x09 -> "\\t".encodeToByteArray()
@@ -159,13 +166,13 @@ internal fun asciiEscapeDefault(b: Byte): ByteArray {
 }
 
 /** Format a byte as two lowercase hex characters. */
-internal fun byteToHex2(b: Byte): String {
+internal fun byteToHex2(b: kotlin.Byte): String {
     val v = b.toInt() and 0xFF
     val hex = "0123456789abcdef"
     return charArrayOf(hex[v ushr 4], hex[v and 0xF]).concatToString()
 }
 
-/** Replicates Rust's `char::escape_debug`: produce the human-readable escape for a codepoint. */
+/** Replicates Rust's "escape debug" behavior: produce the human-readable escape for a codepoint. */
 internal fun charEscapeDebug(codepoint: Int): String {
     return when (codepoint) {
         '\t'.code -> "\\t"

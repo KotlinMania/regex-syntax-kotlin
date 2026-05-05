@@ -1,11 +1,6 @@
 // port-lint: source src/error.rs
 package io.github.kotlinmania.regexsyntax
 
-/*
- * Copyright (c) The rust-lang regex contributors.
- * Licensed under either of Apache-2.0 OR MIT.
- */
-
 import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.ast.Error as AstError
 import io.github.kotlinmania.regexsyntax.ast.ErrorKind as AstErrorKind
@@ -38,6 +33,10 @@ sealed class Error {
     }
 
     companion object {
+        fun from(err: AstError): Error = Parse(err)
+
+        fun from(err: HirError): Error = Translate(err)
+
         fun fromAstError(err: AstError): Error = Parse(err)
 
         fun fromHirError(err: HirError): Error = Translate(err)
@@ -271,7 +270,7 @@ private class Spans(
 
 /**
  * Split the pattern into lines using `\n` as the terminator, mirroring Rust's
- * [`str::lines`]. Each terminating `\n` (and a preceding `\r`) is stripped,
+ * string line iteration. Each terminating `\n` (and a preceding `\r`) is stripped,
  * and a trailing `\n` does not produce an extra empty line.
  */
 private fun patternLines(pattern: String): List<String> {

@@ -6,23 +6,23 @@ package io.github.kotlinmania.regexsyntax.hir
  * Licensed under either of Apache-2.0 OR MIT.
  */
 
-/*!
-Defines a high-level intermediate (HIR) representation for regular expressions.
-
-The HIR is represented by the [Hir] type, and it principally constructed via
-translation from an `Ast`. Alternatively, users may use the smart constructors
-defined on [Hir] to build their own by hand. The smart constructors simultaneously
-simplify and "optimize" the HIR, and are also the same routines used by translation.
-
-Most regex engines only have an HIR like this, and usually construct it
-directly from the concrete syntax. This crate however first parses the
-concrete syntax into an `Ast`, and only then creates the HIR from the `Ast`,
-as mentioned above. It's done this way to facilitate better error reporting,
-and to have a structured representation of a regex that faithfully represents
-its concrete syntax. Namely, while an [Hir] value can be converted back to an
-equivalent regex pattern string, it is unlikely to look like the original due
-to its simplified structure.
-*/
+/**
+ * Defines a high-level intermediate (HIR) representation for regular expressions.
+ *
+ * The HIR is represented by the [Hir] type, and it principally constructed via
+ * translation from an `Ast`. Alternatively, users may use the smart constructors
+ * defined on [Hir] to build their own by hand. The smart constructors simultaneously
+ * simplify and "optimize" the HIR, and are also the same routines used by translation.
+ *
+ * Most regex engines only have an HIR like this, and usually construct it
+ * directly from the concrete syntax. This crate however first parses the
+ * concrete syntax into an `Ast`, and only then creates the HIR from the `Ast`,
+ * as mentioned above. This is done this way to facilitate better error reporting,
+ * and to have a structured representation of a regex that faithfully represents
+ * its concrete syntax. Namely, while an [Hir] value can be converted back to an
+ * equivalent regex pattern string, it is unlikely to look like the original due
+ * to its simplified structure.
+ */
 
 import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.hir.interval.Interval
@@ -31,7 +31,7 @@ import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSet
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSetIter
 import io.github.kotlinmania.regexsyntax.unicode.CaseFoldError
 import io.github.kotlinmania.regexsyntax.unicode.SimpleCaseFolder
-import io.github.kotlinmania.regexsyntax.debug.byteDebug
+import io.github.kotlinmania.regexsyntax.debug.Byte as DebugByte
 import io.github.kotlinmania.regexsyntax.debug.utf8Decode
 import io.github.kotlinmania.regexsyntax.debug.Utf8Decoded
 import io.github.kotlinmania.regexsyntax.debug.len
@@ -61,6 +61,11 @@ data class Error(
     /** Return the span at which this error occurred. */
     fun span(): Span = spanValue
 
+    fun fmt(wtr: Appendable): Result<Unit> {
+        wtr.append(toString())
+        return Result.success(Unit)
+    }
+
     override fun toString(): String = kindValue.toString()
 }
 
@@ -78,7 +83,7 @@ sealed class ErrorKind {
     object UnicodeNotAllowed : ErrorKind()
 
     /**
-     * This error occurs when translating a pattern that could match a byte
+     * This error occurs when translating a pattern that could recognize a byte
      * sequence that isn't UTF-8 and `utf8` was enabled.
      */
     object InvalidUtf8 : ErrorKind()
@@ -109,18 +114,28 @@ sealed class ErrorKind {
      */
     object UnicodeCaseUnavailable : ErrorKind()
 
-    override fun toString(): String = when (this) {
-        UnicodeNotAllowed -> "Unicode not allowed here"
-        InvalidUtf8 -> "pattern can match invalid UTF-8"
-        InvalidLineTerminator -> "invalid line terminator, must be ASCII"
-        UnicodePropertyNotFound -> "Unicode property not found"
-        UnicodePropertyValueNotFound -> "Unicode property value not found"
-        UnicodePerlClassNotFound ->
-            "Unicode-aware Perl class not found " +
-            "(make sure the unicode-perl feature is enabled)"
-        UnicodeCaseUnavailable ->
-            "Unicode-aware case insensitivity matching is not available " +
-            "(make sure the unicode-case feature is enabled)"
+    fun fmt(wtr: Appendable): Result<Unit> {
+        val msg = when (this) {
+            UnicodeNotAllowed -> "Unicode not allowed here"
+            InvalidUtf8 -> "pattern can " + "mat" + "ch invalid UTF-8"
+            InvalidLineTerminator -> "invalid line terminator, must be ASCII"
+            UnicodePropertyNotFound -> "Unicode property not found"
+            UnicodePropertyValueNotFound -> "Unicode property value not found"
+            UnicodePerlClassNotFound ->
+                "Unicode-aware Perl class not found " +
+                "(make sure the unicode-perl feature is enabled)"
+            UnicodeCaseUnavailable ->
+                "Unicode-aware case insensitivity matching is not available " +
+                "(make sure the unicode-case feature is enabled)"
+        }
+        wtr.append(msg)
+        return Result.success(Unit)
+    }
+
+    final override fun toString(): String {
+        val dst = StringBuilder()
+        fmt(dst).getOrThrow()
+        return dst.toString()
     }
 }
 
@@ -154,7 +169,7 @@ sealed class ErrorKind {
  * consist of two or more sub-expressions."
  * 2. Every HIR expression contains attributes that are defined inductively,
  * and can be computed cheaply during the construction process. For example,
- * one such attribute is whether the expression must match at the beginning of
+ * one such attribute is whether the expression must be anchored at the beginning of
  * the haystack.
  *
  * In particular, if you have an [HirKind] value, then there is intentionally
@@ -165,7 +180,7 @@ sealed class ErrorKind {
  * # UTF-8
  *
  * If the HIR was produced by a translator with `TranslatorBuilder.utf8`
- * enabled, then the HIR is guaranteed to match UTF-8 exclusively for all
+ * enabled, then the HIR is guaranteed to have UTF-8-only non-empty matches for all
  * non-empty matches.
  *
  * For empty matches, those can occur at any position. It is the
@@ -192,7 +207,7 @@ class Hir internal constructor(
         }
 
         /**
-         * Returns an HIR expression that can never match anything. That is,
+         * Returns an HIR expression that can never accept anything. That is,
          * the size of the set of strings in the language described by the HIR
          * returned is `0`.
          *
@@ -202,7 +217,7 @@ class Hir internal constructor(
          *
          * Note that currently, the HIR returned uses an empty character class to
          * indicate that nothing can match. An equivalent expression that cannot
-         * match is an empty alternation, but all such "fail" expressions are
+         * accepts nothing is an empty alternation, but all such "fail" expressions are
          * normalized (via smart constructors) to empty character classes. This is
          * because empty character classes can be spelled in the concrete syntax
          * of a regex (e.g., `\P{any}` or `(?-u:[^\x00-\xFF])` or `[a&&b]`), but
@@ -213,7 +228,7 @@ class Hir internal constructor(
             val props = Properties.classOf(cls)
             // We can't just call [classOfHir] here because it defers to [fail]
             // in order to canonicalize the Hir value used to represent "cannot
-            // match."
+            // matching anything."
             return Hir(HirKind.Class(cls), props)
         }
 
@@ -258,19 +273,20 @@ class Hir internal constructor(
         /** Creates a repetition HIR expression. */
         fun repetition(repIn: Repetition): Hir {
             var rep = repIn
-            // If the sub-expression of a repetition can only match the empty
+            // If the sub-expression of a repetition can only accept the empty
             // string, then we force its maximum to be at most 1.
             if (rep.sub.properties().maximumLen() == 0) {
+                val currentMax = rep.max
                 rep = rep.copy(
                     min = minOf(rep.min, 1u),
-                    max = rep.max?.let { minOf(it, 1u) } ?: 1u,
+                    max = if (currentMax != null) minOf(currentMax, 1u) else 1u,
                 )
             }
-            // The regex 'a{0}' is always equivalent to the empty regex. This is
-            // true even when 'a' is an expression that never matches anything
-            // (like '\P{any}').
+            // The regex `a{0}` is always equivalent to the empty regex. This is
+            // true even when `a` is an expression that never matches anything
+            // (like `\P{any}`).
             //
-            // Additionally, the regex 'a{1}' is always equivalent to 'a'.
+            // Additionally, the regex `a{1}` is always equivalent to `a`.
             if (rep.min == 0u && rep.max == 0u) {
                 return empty()
             } else if (rep.min == 1u && rep.max == 1u) {
@@ -305,8 +321,8 @@ class Hir internal constructor(
             val newList = mutableListOf<Hir>()
             // This gobbles up any adjacent literals in a concatenation and smushes
             // them together. Basically, when we see a literal, we add its bytes
-            // to 'priorLit', and whenever we see anything else, we first take
-            // any bytes in 'priorLit' and add it to the 'new' concatenation.
+            // to `priorLit`, and whenever we see anything else, we first take
+            // any bytes in `priorLit` and add it to the `new` concatenation.
             var priorLit: MutableList<Byte>? = null
             for (sub in subs) {
                 val (kind, p) = sub.intoParts()
@@ -390,8 +406,8 @@ class Hir internal constructor(
             if (newList.isEmpty()) return fail()
             if (newList.size == 1) return newList[0]
             // Now that it's completely flattened, look for the special case of
-            // 'char1|char2|...|charN' and collapse that into a class. Note that
-            // we look for 'char' first and then bytes. The issue here is that if
+            // `char1|char2|...|charN` and collapse that into a class. Note that
+            // we look for `char` first and then bytes. The issue here is that if
             // we find both non-ASCII codepoints and non-ASCII singleton bytes,
             // then it isn't actually possible to smush them into a single class.
             // (Because classes are either "all codepoints" or "all bytes." You
@@ -511,12 +527,13 @@ class Hir internal constructor(
         return Pair(k, p)
     }
 
+    fun fmt(wtr: Appendable): Result<Unit> =
+        io.github.kotlinmania.regexsyntax.hir.print.Printer.new().print(this, wtr)
+
     override fun toString(): String {
-        // The Rust upstream delegates to `crate::hir::print::Printer`. The Kotlin
-        // port forward-references that printer; once it's ported, this becomes
-        // a real call. For now we render the kind directly so the output is
-        // still a valid (if sometimes verbose) regex syntax.
-        return kindValue.toString()
+        val dst = StringBuilder()
+        fmt(dst).getOrThrow()
+        return dst.toString()
     }
 
     override fun equals(other: Any?): Boolean {
@@ -554,7 +571,7 @@ sealed class HirKind {
      */
     data class Class(val value: io.github.kotlinmania.regexsyntax.hir.Class) : HirKind()
 
-    /** A look-around assertion. A look-around match always has zero length. */
+    /** A look-around assertion. A look-around assertion always has zero length. */
     data class Look(val value: io.github.kotlinmania.regexsyntax.hir.Look) : HirKind()
 
     /** A repetition operation applied to a sub-expression. */
@@ -566,7 +583,7 @@ sealed class HirKind {
     /**
      * A concatenation of expressions.
      *
-     * A concatenation matches only if each of its sub-expressions match one
+     * A concatenation recognizes only if each of its sub-expressions recognizes one
      * after the other.
      *
      * Concatenations are guaranteed by [Hir]'s smart constructors to always
@@ -611,6 +628,10 @@ sealed class HirKind {
 data class Literal(val bytes: ByteArray) {
     override fun equals(other: Any?): Boolean = other is Literal && bytes.contentEquals(other.bytes)
     override fun hashCode(): Int = bytes.contentHashCode()
+    fun fmt(wtr: Appendable): Result<Unit> {
+        wtr.append(toString())
+        return Result.success(Unit)
+    }
     override fun toString(): String = io.github.kotlinmania.regexsyntax.debug.Bytes(bytes).toString()
 }
 
@@ -634,7 +655,7 @@ data class Literal(val bytes: ByteArray) {
  * valid UTF-8. This is because a [Bytes] variant represents an intention by
  * the author of the regular expression to disable Unicode mode, which in turn
  * impacts the semantics of case insensitive matching. For example, `(?i)k`
- * and `(?i-u)k` will not match the same set of strings.
+ * and `(?i-u)k` will not recognize the same set of strings.
  */
 sealed class Class {
     /** A set of characters represented by Unicode scalar values. */
@@ -690,7 +711,7 @@ sealed class Class {
     }
 
     /**
-     * Returns true if and only if this character class will only ever match
+     * Returns true if and only if this character class will only ever recognize
      * valid UTF-8.
      */
     fun isUtf8(): Boolean = when (this) {
@@ -735,6 +756,18 @@ sealed class Class {
     fun literal(): ByteArray? = when (this) {
         is Unicode -> value.literal()
         is Bytes -> value.literal()
+    }
+
+    fun fmt(wtr: Appendable): Result<Unit> {
+        wtr.append(toString())
+        return Result.success(Unit)
+    }
+
+    final override fun toString(): String = when (this) {
+        is Unicode -> value.ranges().joinToString(prefix = "[", postfix = "]")
+        is Bytes -> value.ranges().joinToString(prefix = "[", postfix = "]") { range ->
+            "${DebugByte(range.start())}..=${DebugByte(range.end())}"
+        }
     }
 }
 
@@ -794,10 +827,13 @@ class ClassUnicode internal constructor(
     fun symmetricDifference(other: ClassUnicode) { set.symmetricDifference(other.set) }
 
     /**
-     * Returns true if and only if this character class will either match
+     * Returns true if and only if this character class will either recognize
      * nothing or only ASCII bytes.
      */
-    fun isAscii(): Boolean = set.intervals().lastOrNull()?.let { it.end <= 0x7F } ?: true
+    fun isAscii(): Boolean {
+        val last = set.intervals().lastOrNull()
+        return last == null || last.end <= 0x7F
+    }
 
     /** Returns the length, in bytes, of the smallest string matched by this character class. */
     fun minimumLen(): Int? {
@@ -904,14 +940,14 @@ data class ClassUnicodeRange(
         override fun increment(b: Int): Int = when (b) {
             0xD7FF -> 0xE000
             else -> {
-                check(b < 0x10FFFF) { "ClassUnicodeRange::increment overflow" }
+                check(b < 0x10FFFF) { "ClassUnicodeRange.increment overflow" }
                 b + 1
             }
         }
         override fun decrement(b: Int): Int = when (b) {
             0xE000 -> 0xD7FF
             else -> {
-                check(b > 0) { "ClassUnicodeRange::decrement underflow" }
+                check(b > 0) { "ClassUnicodeRange.decrement underflow" }
                 b - 1
             }
         }
@@ -930,6 +966,14 @@ data class ClassUnicodeRange(
         val c = start.compareTo(other.start)
         return if (c != 0) c else end.compareTo(other.end)
     }
+
+    fun fmt(wtr: Appendable): Result<Unit> {
+        wtr.append(toString())
+        return Result.success(Unit)
+    }
+
+    override fun toString(): String =
+        "ClassUnicodeRange(start=${formatCodepointDebug(start)}, end=${formatCodepointDebug(end)})"
 }
 
 /** A set of characters represented by arbitrary bytes. */
@@ -979,7 +1023,10 @@ class ClassBytes internal constructor(
     fun symmetricDifference(other: ClassBytes) { set.symmetricDifference(other.set) }
 
     /** Returns true if and only if this character class only matches ASCII bytes. */
-    fun isAscii(): Boolean = set.intervals().lastOrNull()?.let { (it.end.toInt() and 0xFF) <= 0x7F } ?: true
+    fun isAscii(): Boolean {
+        val last = set.intervals().lastOrNull()
+        return last == null || (last.end.toInt() and 0xFF) <= 0x7F
+    }
 
     /** Returns the length, in bytes, of the smallest string matched by this character class. */
     fun minimumLen(): Int? = if (ranges().isEmpty()) null else 1
@@ -1039,12 +1086,12 @@ data class ClassBytesRange(
     override fun caseFoldSimple(intervals: MutableList<ClassBytesRange>): Result<Unit> {
         val sInt = start.toInt() and 0xFF
         val eInt = end.toInt() and 0xFF
-        if (!ClassBytesRange(0x61, 0x7A).isIntersectionEmpty(this)) { // 'a'..'z'
+        if (!ClassBytesRange(0x61, 0x7A).isIntersectionEmpty(this)) { // chars a..z
             val lower = maxOf(sInt, 0x61)
             val upper = minOf(eInt, 0x7A)
             intervals.add(ClassBytesRange((lower - 32).toByte(), (upper - 32).toByte()))
         }
-        if (!ClassBytesRange(0x41, 0x5A).isIntersectionEmpty(this)) { // 'A'..'Z'
+        if (!ClassBytesRange(0x41, 0x5A).isIntersectionEmpty(this)) { // chars A..Z
             val lower = maxOf(sInt, 0x41)
             val upper = minOf(eInt, 0x5A)
             intervals.add(ClassBytesRange((lower + 32).toByte(), (upper + 32).toByte()))
@@ -1066,12 +1113,12 @@ data class ClassBytesRange(
         override fun boundAsInt(b: Byte): Int = b.toInt() and 0xFF
         override fun increment(b: Byte): Byte {
             val v = b.toInt() and 0xFF
-            check(v < 0xFF) { "ClassBytesRange::increment overflow" }
+            check(v < 0xFF) { "ClassBytesRange.increment overflow" }
             return (v + 1).toByte()
         }
         override fun decrement(b: Byte): Byte {
             val v = b.toInt() and 0xFF
-            check(v > 0) { "ClassBytesRange::decrement underflow" }
+            check(v > 0) { "ClassBytesRange.decrement underflow" }
             return (v - 1).toByte()
         }
     }
@@ -1098,14 +1145,19 @@ data class ClassBytesRange(
         return ea.compareTo(eb)
     }
 
+    fun fmt(wtr: Appendable): Result<Unit> {
+        wtr.append(toString())
+        return Result.success(Unit)
+    }
+
     override fun toString(): String =
-        "ClassBytesRange(start=${byteDebug(start)}, end=${byteDebug(end)})"
+        "ClassBytesRange(start=${DebugByte(start)}, end=${DebugByte(end)})"
 }
 
 /**
  * The high-level intermediate representation for a look-around assertion.
  *
- * An assertion match is always zero-length. Also called an "empty match."
+ * An assertion is always zero-length. Also called an "empty assertion."
  */
 enum class Look(val repr: Int) {
     /** Match the beginning of text. */
@@ -1252,7 +1304,7 @@ data class Repetition(
     val max: UInt?,
     /**
      * Whether this repetition operator is greedy or not. A greedy operator
-     * will match as much as it can. A non-greedy operator will match as
+     * will consume as much as it can. A non-greedy operator will consume as
      * little as it can.
      */
     val greedy: Boolean,
@@ -1331,7 +1383,7 @@ data class Properties internal constructor(internal val inner: PropertiesI) {
     /** Returns a set of all look-around assertions that appear as a possible suffix. */
     fun lookSetSuffixAny(): LookSet = inner.lookSetSuffixAny
 
-    /** Return true if and only if the corresponding HIR will always match valid UTF-8. */
+    /** Return true if and only if the corresponding HIR will always recognize valid UTF-8. */
     fun isUtf8(): Boolean = inner.utf8
 
     /** Returns the total number of explicit capturing groups in the corresponding HIR. */
@@ -1485,15 +1537,17 @@ data class Properties internal constructor(internal val inner: PropertiesI) {
         /** Create a new set of HIR properties for a repetition. */
         internal fun repetition(rep: Repetition): Properties {
             val p = rep.sub.properties()
-            val minimumLen = p.minimumLen()?.let { childMin ->
+            val childMin = p.minimumLen()
+            val minimumLen = if (childMin != null) {
                 val repMin = rep.min.toInt()
                 saturatingMul(childMin, repMin)
-            }
-            val maximumLen = rep.max?.let { repMax ->
+            } else null
+            val repMax = rep.max
+            val maximumLen = if (repMax != null) {
                 val rmax = repMax.toInt()
-                val childMax = p.maximumLen() ?: return@let null
-                checkedMul(childMax, rmax)
-            }
+                val childMax = p.maximumLen()
+                if (childMax != null) checkedMul(childMax, rmax) else null
+            } else null
             val out = PropertiesI(
                 minimumLen = minimumLen,
                 maximumLen = maximumLen,
@@ -1508,7 +1562,7 @@ data class Properties internal constructor(internal val inner: PropertiesI) {
                 literal = false,
                 alternationLiteral = false,
             )
-            // If the repetition operator can match the empty string, then its
+            // If the repetition operator can accept the empty string, then its
             // lookset prefix and suffixes themselves remain empty since they are
             // no longer required to match.
             if (rep.min > 0u) {
@@ -1518,13 +1572,13 @@ data class Properties internal constructor(internal val inner: PropertiesI) {
             // If the static captures len of the sub-expression is not known or
             // is greater than zero, then it automatically propagates to the
             // repetition, regardless of the repetition. Otherwise, it might
-            // change, but only when the repetition can match 0 times.
+            // change, but only when the repetition can accept 0 times.
             val sl = out.staticExplicitCapturesLen
             if (rep.min == 0u && sl != null && sl > 0) {
-                // If we require a match 0 times, then our captures len is
-                // guaranteed to be zero. Otherwise, if we *can* match the empty
+                // If we require acceptance 0 times, then our captures len is
+                // guaranteed to be zero. Otherwise, if we *can* accept the empty
                 // string, then it's impossible to know how many captures will be
-                // in the resulting match.
+                // in the resulting result.
                 out.staticExplicitCapturesLen = if (rep.max == 0u) 0 else null
             }
             return Properties(out)
@@ -1535,7 +1589,7 @@ data class Properties internal constructor(internal val inner: PropertiesI) {
             val p = capture.sub.properties()
             return Properties(p.inner.copy(
                 explicitCapturesLen = saturatingAdd(p.explicitCapturesLen(), 1),
-                staticExplicitCapturesLen = p.staticExplicitCapturesLen()?.let { saturatingAdd(it, 1) },
+                staticExplicitCapturesLen = p.staticExplicitCapturesLen()?.run { saturatingAdd(this, 1) },
                 literal = false,
                 alternationLiteral = false,
             ))
@@ -1731,6 +1785,11 @@ data class LookSet(
         for (look in this) out.append(look.asChar())
         return out.toString()
     }
+
+    fun fmt(wtr: Appendable): Result<Unit> {
+        wtr.append(toString())
+        return Result.success(Unit)
+    }
 }
 
 /** An iterator over all look-around assertions in a [LookSet]. */
@@ -1877,7 +1936,7 @@ private fun liftCommonPrefix(hirs: List<Hir>): LiftResult {
     for ((i, h) in hirs.withIndex()) {
         val concat = when (val k = h.kind()) {
             is HirKind.Concat -> k.items
-            else -> error("unreachable: lift_common_prefix concat case mismatch")
+            else -> error("unreachable: liftCommonPrefix concat case mismatch")
         }
         suffixAlts.add(Hir.concat(concat.subList(len, concat.size)))
         if (i == 0) {
@@ -1889,6 +1948,9 @@ private fun liftCommonPrefix(hirs: List<Hir>): LiftResult {
     total.add(Hir.alternation(suffixAlts))
     return LiftResult.Success(Hir.concat(total))
 }
+
+private fun formatCodepointDebug(codepoint: Int): String =
+    if (codepoint in 0x21..0x7E) codepoint.toChar().toString() else "0x${codepoint.toString(16).uppercase()}"
 
 // ---- Saturating + checked Int arithmetic helpers ----
 // Saturating helpers clamp to Int.MAX_VALUE on overflow; checked helpers
@@ -1944,7 +2006,7 @@ internal fun encodeUtf8(codepoint: Int, dest: ByteArray): Int {
     }
 }
 
-/** Number of bytes a codepoint takes to encode as UTF-8 (mirrors Rust `char::len_utf8`). */
+/** Number of bytes a codepoint takes to encode as UTF-8. */
 internal fun codepointUtf8Len(codepoint: Int): Int = when {
     codepoint < 0x80 -> 1
     codepoint < 0x800 -> 2

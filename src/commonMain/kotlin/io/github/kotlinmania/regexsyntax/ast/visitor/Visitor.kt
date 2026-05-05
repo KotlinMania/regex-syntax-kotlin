@@ -1,11 +1,6 @@
 // port-lint: source src/ast/visitor.rs
 package io.github.kotlinmania.regexsyntax.ast.visitor
 
-/*
- * Copyright (c) The rust-lang regex contributors.
- * Licensed under either of Apache-2.0 OR MIT.
- */
-
 import io.github.kotlinmania.regexsyntax.ast.Alternation
 import io.github.kotlinmania.regexsyntax.ast.Ast
 import io.github.kotlinmania.regexsyntax.ast.ClassBracketed
@@ -18,7 +13,7 @@ import io.github.kotlinmania.regexsyntax.ast.Group
 import io.github.kotlinmania.regexsyntax.ast.Repetition
 
 /**
- * A trait for visiting an abstract syntax tree (AST) in depth first order.
+ * An interface for visiting an abstract syntax tree (AST) in depth first order.
  *
  * The principle aim of this trait is to enable callers to perform case
  * analysis on an abstract syntax tree without necessarily using recursion.
@@ -26,13 +21,13 @@ import io.github.kotlinmania.regexsyntax.ast.Repetition
  * usage, which can be important since the size of an abstract syntax tree
  * may be proportional to end user input.
  *
- * Typical usage of this trait involves providing an implementation and then
+ * Typical usage of this interface involves providing an implementation and then
  * running it using the [visit] function.
  *
  * Note that the abstract syntax tree for a regular expression is quite
  * complex. Unless you specifically need it, you might be able to use the much
  * simpler [high-level intermediate representation][io.github.kotlinmania.regexsyntax.hir.Hir] and its
- * [corresponding `Visitor` trait][io.github.kotlinmania.regexsyntax.hir.visitor.Visitor] instead.
+ * [corresponding `Visitor` interface][io.github.kotlinmania.regexsyntax.hir.visitor.Visitor] instead.
  */
 interface Visitor<Output, Err> {
     /**
@@ -97,7 +92,7 @@ interface Visitor<Output, Err> {
  * Executes an implementation of [Visitor] in constant stack space.
  *
  * This function will visit every node in the given [Ast] while calling the
- * appropriate methods provided by the [Visitor] trait.
+ * appropriate methods provided by the [Visitor] interface.
  *
  * The primary use case for this method is when one wants to perform case
  * analysis over an [Ast] without using a stack size proportional to the depth
@@ -110,7 +105,7 @@ interface Visitor<Output, Err> {
  * the error is returned.
  */
 fun <Output, Err> visit(ast: Ast, visitor: Visitor<Output, Err>): Result<Output> {
-    return HeapVisitor().visit(ast, visitor)
+    return HeapVisitor.new().visit(ast, visitor)
 }
 
 /**
@@ -130,6 +125,10 @@ private class HeapVisitor {
      * recursive syntax.
      */
     private val stackClass: MutableList<Pair<ClassInduct, ClassFrame>> = mutableListOf()
+
+    companion object {
+        fun new(): HeapVisitor = HeapVisitor()
+    }
 
     fun <Output, Err> visit(start: Ast, visitor: Visitor<Output, Err>): Result<Output> {
         stack.clear()

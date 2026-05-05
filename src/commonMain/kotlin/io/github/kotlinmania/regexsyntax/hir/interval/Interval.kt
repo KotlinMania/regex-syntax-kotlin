@@ -40,12 +40,11 @@ package io.github.kotlinmania.regexsyntax.hir.interval
  * ([negate] in particular) need to fabricate intervals out of the bound
  * type's min/max values without an existing interval to dispatch through.
  *
- * The Rust source associates the bound type to [Interval] itself; Kotlin has
- * no associated types, so the factory carries the bound-side helpers
+ * The upstream source associates the bound type to [Interval] itself; Kotlin
+ * has no associated types, so the factory carries the bound-side helpers
  * ([IntervalFactory.minBound], [IntervalFactory.maxBound],
  * [IntervalFactory.increment], [IntervalFactory.decrement],
- * [IntervalFactory.boundAsInt]) that the Rust [Bound] trait exposed via
- * `Self::Bound::*`.
+ * [IntervalFactory.boundAsInt]) that [Bound] exposed as bound-type operations.
  */
 class IntervalSet<I : Interval<I, B>, B> internal constructor(
     private val factory: IntervalFactory<I, B>,
@@ -94,7 +93,7 @@ class IntervalSet<I : Interval<I, B>, B> internal constructor(
 
     /** Add a new interval to this set. */
     fun push(interval: I) {
-        // TODO: This could be faster. e.g., Push the interval such that
+        // Future work: This could be faster. e.g., Push the interval such that
         // it preserves canonicalization.
         ranges.add(interval)
         canonicalize()
@@ -299,7 +298,7 @@ class IntervalSet<I : Interval<I, B>, B> internal constructor(
      * but will not contain any elements that are in both sets.
      */
     fun symmetricDifference(other: IntervalSet<I, B>) {
-        // TODO(burntsushi): Fix this so that it amortizes allocation.
+        // Future work (burntsushi): Fix this so that it amortizes allocation.
         val intersection = IntervalSet(factory, ranges.toMutableList(), folded)
         intersection.intersect(other)
         union(other)
@@ -404,7 +403,7 @@ class IntervalSet<I : Interval<I, B>, B> internal constructor(
     }
 
     // PartialEq is implemented manually so that we don't consider the set's
-    // internal 'folded' property to be part of its identity. The 'folded'
+    // internal `folded` property to be part of its identity. The `folded`
     // property is strictly an optimization.
     override fun equals(other: Any?): Boolean =
         other is IntervalSet<*, *> && ranges == other.ranges
@@ -423,12 +422,13 @@ class IntervalSetIter<I> internal constructor(
 }
 
 /**
- * Carries the bound-type-static operations the Rust [Bound] trait exposed
+ * Carries the bound-type-static operations [Bound] exposes
  * (min/max value, increment, decrement, the unsigned-32 view) along with
  * a smart constructor for intervals over that bound. Each [Interval]
  * implementation supplies one of these so that [IntervalSet] can fabricate
- * intervals out of bounds without holding a sample interval — the case Rust
- * handled with `Self::create(I::Bound::min_value(), I::Bound::max_value())`.
+ * intervals out of bounds without holding a sample interval — the case handled
+ * by [IntervalFactory.create] with [IntervalFactory.minBound] and
+ * [IntervalFactory.maxBound].
  *
  * [boundAsInt] returns the bound as its u32 representation; all bound
  * comparisons in this module flow through [cmp] (which compares u32 views)
@@ -450,12 +450,11 @@ interface IntervalFactory<I : Interval<I, B>, B> {
 }
 
 /**
- * The Kotlin port of Rust's `Interval` trait.
+ * Kotlin interface corresponding to the upstream `Interval` abstraction.
  *
- * The trait is F-bounded (`I : Interval<I, B>`) so that overrides of
+ * The interface is F-bounded (`I : Interval<I, B>`) so that overrides of
  * [caseFoldSimple] can take a `MutableList<I>` of the concrete self-type.
- * The bound-type-static operations the Rust trait expressed as
- * `I::Bound::*` are reachable via [factory].
+ * The bound-type-static operations are reachable via [factory].
  */
 interface Interval<I : Interval<I, B>, B> : Comparable<I> {
     fun lower(): B
@@ -501,15 +500,14 @@ interface Interval<I : Interval<I, B>, B> : Comparable<I> {
      * If subtraction would result in an empty range, then no ranges are
      * returned.
      */
-    @Suppress("UNCHECKED_CAST")
     fun difference(other: I): Pair<I?, I?> {
+        val f = factory()
         if (isSubset(other)) {
             return Pair(null, null)
         }
         if (isIntersectionEmpty(other)) {
-            return Pair(this as I, null)
+            return Pair(f.create(lower(), upper()), null)
         }
-        val f = factory()
         val addLower = f.cmp(other.lower(), lower()) > 0
         val addUpper = f.cmp(other.upper(), upper()) < 0
         // We know this because !this.isSubset(other) and the ranges have
@@ -576,13 +574,14 @@ interface Interval<I : Interval<I, B>, B> : Comparable<I> {
 }
 
 /**
- * The Kotlin port of Rust's `Bound` trait.
+ * Kotlin interface corresponding to the upstream `Bound` abstraction.
  *
- * Rust expressed the bound-type-static operations as a separate trait so that
- * `Self::Bound::min_value()` etc. could be called from generic interval code.
- * Kotlin lacks associated types, so [IntervalFactory] folds these operations
- * in alongside the interval smart constructor — but the [Bound] surface is
- * preserved here for callers that want to operate on a bound type alone.
+ * The upstream source expressed the bound-type-static operations as a separate
+ * abstraction so generic interval code could request min/max values for the
+ * bound type. Kotlin lacks associated types, so [IntervalFactory] folds these
+ * operations in alongside the interval smart constructor — but the [Bound]
+ * surface is preserved here for callers that want to operate on a bound type
+ * alone.
  */
 interface Bound<B> {
     fun minValue(): B
@@ -601,13 +600,13 @@ object ByteBound : Bound<Byte> {
 
     override fun increment(b: Byte): Byte {
         val v = b.toInt() and 0xFF
-        check(v < 0xFF) { "Byte::increment overflow" }
+        check(v < 0xFF) { "ByteBound.increment overflow" }
         return (v + 1).toByte()
     }
 
     override fun decrement(b: Byte): Byte {
         val v = b.toInt() and 0xFF
-        check(v > 0) { "Byte::decrement underflow" }
+        check(v > 0) { "ByteBound.decrement underflow" }
         return (v - 1).toByte()
     }
 }
@@ -615,10 +614,10 @@ object ByteBound : Bound<Byte> {
 /**
  * Bound implementation for a Unicode scalar value.
  *
- * Rust's `impl Bound for char` lives here; Kotlin's [Char] is a UTF-16 code
- * unit, not a Unicode scalar value, so the port stores codepoints in [Int]
+ * The upstream character-bound implementation lives here. Kotlin's [Char] is
+ * a UTF-16 code unit, not a Unicode scalar value, so the port stores codepoints in [Int]
  * and skips the surrogate gap (U+D800..U+DFFF) on increment/decrement just as
- * the Rust source does.
+ * the upstream source does.
  */
 object CharBound : Bound<Int> {
     override fun minValue(): Int = 0x00
@@ -629,7 +628,7 @@ object CharBound : Bound<Int> {
     override fun increment(b: Int): Int = when (b) {
         0xD7FF -> 0xE000
         else -> {
-            check(b < 0x10FFFF) { "Char::increment overflow" }
+            check(b < 0x10FFFF) { "CharBound.increment overflow" }
             b + 1
         }
     }
@@ -637,7 +636,7 @@ object CharBound : Bound<Int> {
     override fun decrement(b: Int): Int = when (b) {
         0xE000 -> 0xD7FF
         else -> {
-            check(b > 0) { "Char::decrement underflow" }
+            check(b > 0) { "CharBound.decrement underflow" }
             b - 1
         }
     }

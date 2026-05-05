@@ -4,14 +4,14 @@ Based on AST analysis, here are the concrete next steps.
 
 ## Summary
 
-- **Files Present:** 31/33 (93.9%)
-- **Function parity:** 380/758 matched (target 572) — 50.1%
-- **Class/type parity:** 104/134 matched (target 249) — 77.6%
-- **Combined symbol parity:** 484/892 matched (target 821) — 54.3%
-- **Average inline-code cosine:** 0.71 (function body across 27 matched files)
-- **Average documentation cosine:** 0.42 (doc text across 27 matched files)
-- **Cheat-zeroed Files:** 7
-- **Critical Issues:** 13 files with <0.60 function similarity
+- **Files Present:** 31/34 (91.2%)
+- **Function parity:** 442/765 matched (target 669) — 57.8%
+- **Class/type parity:** 108/134 matched (target 260) — 80.6%
+- **Combined symbol parity:** 550/899 matched (target 929) — 61.2%
+- **Average inline-code cosine:** 0.81 (function body across 29 matched files)
+- **Average documentation cosine:** 0.45 (doc text across 29 matched files)
+- **Cheat-zeroed Files:** 2
+- **Critical Issues:** 8 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -27,35 +27,51 @@ No missing high-value files detected.
 
 Every matched file is listed below with function and type symbol parity.
 
-### 1. unicode
+### 1. parser
 
-- **Target:** `unicode.Unicode`
-- **Similarity:** 0.21
-- **Dependents:** 1
-- **Priority Score:** 1154707.9
-- **Functions:** 27/39 matched (target 32)
-- **Missing functions:** `fmt`, `class`, `imp`, `simple_fold_ok`, `contains_case_map`, `simple_fold_k`, `simple_fold_a`, `simple_fold_disabled`, `range_contains`, `regression_466`, `sym_normalize`, `valid_utf8_symbolic`
-- **Types:** 5/8 matched (target 15)
-- **Missing types:** `Range`, `Error`, `PropertyValues`
-- **Tests:** 0/9 matched
-
-### 2. parser
-
-- **Target:** `parser.Parser [PROVENANCE-FALLBACK]`
+- **Target:** `parser.Parser`
 - **Similarity:** 0.92
-- **Dependents:** 1
-- **Priority Score:** 1001600.8
+- **Dependents:** 2
+- **Priority Score:** 2001600.8
 - **Functions:** 14/14 matched (target 16)
 - **Missing functions:** _none_
 - **Types:** 2/2 matched
 - **Missing types:** _none_
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/parser.rs` vs expected `parser.rs`
-- **Proposed provenance header:** `// port-lint: source parser.rs` (current: `// port-lint: source src/parser.rs`)
+
+### 2. unicode
+
+- **Target:** `unicode.Unicode [PROVENANCE-FALLBACK]`
+- **Similarity:** 0.27
+- **Dependents:** 1
+- **Priority Score:** 1094707.2
+- **Functions:** 33/39 matched (target 40)
+- **Missing functions:** `fmt`, `class`, `imp`, `simple_fold_ok`, `contains_case_map`, `simple_fold_disabled`
+- **Types:** 5/8 matched (target 16)
+- **Missing types:** `Range`, `Error`, `PropertyValues`
+- **Tests:** 6/9 matched
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode.rs` vs expected `unicode.rs`
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode.rs` vs expected `unicode.rs`
+- **Proposed provenance header:** `// port-lint: source unicode.rs` (current: `// port-lint: source unicode.rs`)
+- **Proposed provenance header:** `// port-lint: source unicode.rs` (current: `// port-lint: source unicode.rs`)
+- **Lint issues:** 2
+
+### 3. unicode_tables.property_values
+
+- **Target:** `propertyvalues.PropertyValues [PROVENANCE-FALLBACK]`
+- **Similarity:** 1.00
+- **Dependents:** 1
+- **Priority Score:** 1000000.0
+- **Functions:** 0/0 matched
+- **Missing functions:** _none_
+- **Types:** 0/0 matched
+- **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/property_values.rs` vs expected `unicode_tables/property_values.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/property_values.rs` (current: `// port-lint: source unicode_tables/property_values.rs`)
 - **Lint issues:** 1
 
-### 3. unicode_tables.property_names
+### 4. unicode_tables.property_names
 
-- **Target:** `propertynames.PropertyNames`
+- **Target:** `propertynames.PropertyNames [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 1
 - **Priority Score:** 1000000.0
@@ -63,21 +79,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
-
-### 4. unicode_tables.age
-
-- **Target:** `age.Age`
-- **Similarity:** 1.00
-- **Dependents:** 1
-- **Priority Score:** 1000000.0
-- **Functions:** 0/0 matched
-- **Missing functions:** _none_
-- **Types:** 0/0 matched
-- **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/property_names.rs` vs expected `unicode_tables/property_names.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/property_names.rs` (current: `// port-lint: source unicode_tables/property_names.rs`)
+- **Lint issues:** 1
 
 ### 5. unicode_tables.perl_word
 
-- **Target:** `perlword.PerlWord`
+- **Target:** `perlword.PerlWord [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 1
 - **Priority Score:** 1000000.0
@@ -85,10 +93,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/perl_word.rs` vs expected `unicode_tables/perl_word.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/perl_word.rs` (current: `// port-lint: source unicode_tables/perl_word.rs`)
+- **Lint issues:** 1
 
-### 6. unicode_tables.property_values
+### 6. unicode_tables.age
 
-- **Target:** `propertyvalues.PropertyValues`
+- **Target:** `age.Age [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 1
 - **Priority Score:** 1000000.0
@@ -96,10 +107,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/age.rs` vs expected `unicode_tables/age.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/age.rs` (current: `// port-lint: source unicode_tables/age.rs`)
+- **Lint issues:** 1
 
 ### 7. hir.translate
 
-- **Target:** `translate.Translate [PROVENANCE-FALLBACK]`
+- **Target:** `translate.Translate`
 - **Similarity:** 0.31
 - **Dependents:** 0
 - **Priority Score:** 904906.9
@@ -108,192 +122,160 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 5/9 matched (target 16)
 - **Missing types:** `Result`, `Output`, `Err`, `TestError`
 - **Tests:** 0/83 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/hir/translate.rs` vs expected `hir/translate.rs`
-- **Proposed provenance header:** `// port-lint: source hir/translate.rs` (current: `// port-lint: source src/hir/translate.rs`)
-- **Lint issues:** 3
+- **Lint issues:** 2
 
 ### 8. ast.parse
 
-- **Target:** `parse.Parse [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.32
+- **Target:** `parse.Parse`
+- **Similarity:** 0.41
 - **Dependents:** 0
-- **Priority Score:** 743306.8
-- **Functions:** 55/122 matched (target 59)
-- **Missing functions:** `is_hex`, `is_capture_char`, `default`, `parse_group`, `parse_capture_name`, `parse_flags`, `parse_flag`, `parse_primitive`, `parse_escape`, `maybe_parse_special_word_boundary`, `parse_octal`, `parse_hex`, `parse_hex_digits`, `parse_hex_brace`, `parse_decimal`, `parse_set_class`, `parse_set_class_range`, `parse_set_class_item`, `parse_set_class_open`, `maybe_parse_ascii_class`, `parse_unicode_class`, `parse_perl_class`, `specialize_err`, `eq`, `s`, `parser_octal`, `parser_empty_min_range`, `parser_nest_limit`, `parser_ignore_whitespace`, `nspan`, `npos`, `span_range`, `lit`, `meta_lit`, `lit_with`, `concat`, `concat_with`, `alt`, `group`, `flag_set`, `parse_nest_limit`, `parse_comments`, `parse_holistic`, `parse_ignore_whitespace`, `parse_newlines`, `parse_alternate`, `parse_unsupported_lookaround`, `parse_primitive_non_escape`, `parse_unsupported_backreference`, `parse_hex_two`, `parse_hex_four`, `parse_hex_eight`, `union`, `intersection`, `difference`, `symdifference`, `itemset`, `item_ascii`, `item_unicode`, `item_perl`, `item_bracket`, `empty`, `range`, `alnum`, `lower`, `regression_454_nest_too_big`, `regression_455_trailing_dash_ignore_whitespace`
-- **Types:** 5/11 matched (target 15)
-- **Missing types:** `Result`, `ParserI`, `NestLimiter`, `Output`, `Err`, `TestError`
+- **Priority Score:** 513305.8
+- **Functions:** 76/122 matched (target 81)
+- **Missing functions:** `is_hex`, `default`, `eq`, `s`, `parser_octal`, `parser_empty_min_range`, `parser_nest_limit`, `parser_ignore_whitespace`, `nspan`, `npos`, `span_range`, `lit`, `meta_lit`, `lit_with`, `concat`, `concat_with`, `alt`, `group`, `flag_set`, `parse_nest_limit`, `parse_comments`, `parse_holistic`, `parse_ignore_whitespace`, `parse_newlines`, `parse_alternate`, `parse_unsupported_lookaround`, `parse_primitive_non_escape`, `parse_unsupported_backreference`, `parse_hex_two`, `parse_hex_four`, `parse_hex_eight`, `union`, `intersection`, `difference`, `symdifference`, `itemset`, `item_ascii`, `item_unicode`, `item_perl`, `item_bracket`, `empty`, `range`, `alnum`, `lower`, `regression_454_nest_too_big`, `regression_455_trailing_dash_ignore_whitespace`
+- **Types:** 7/11 matched (target 18)
+- **Missing types:** `Result`, `Output`, `Err`, `TestError`
 - **Tests:** 0/44 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/ast/parse.rs` vs expected `ast/parse.rs`
-- **Proposed provenance header:** `// port-lint: source ast/parse.rs` (current: `// port-lint: source src/ast/parse.rs`)
-- **Lint issues:** 3
+- **Lint issues:** 2
 
 ### 9. hir.mod
 
-- **Target:** `hir.Hir [STUB] [PROVENANCE-FALLBACK]`
+- **Target:** `hir.Hir [STUB]`
 - **Similarity:** 0.00
 - **Dependents:** 0
-- **Priority Score:** 484510.0
-- **Functions:** 78/123 matched (target 176)
-- **Missing functions:** `fmt`, `class`, `drop`, `set_insert`, `set_remove`, `set_subtract`, `set_union`, `set_intersect`, `uclass`, `bclass`, `uranges`, `ucasefold`, `uunion`, `uintersect`, `udifference`, `usymdifference`, `unegate`, `branges`, `bcasefold`, `bunion`, `bintersect`, `bdifference`, `bsymdifference`, `bnegate`, `class_range_canonical_unicode`, `class_range_canonical_bytes`, `class_canonicalize_unicode`, `class_canonicalize_bytes`, `class_case_fold_unicode`, `class_case_fold_unicode_disabled`, `class_case_fold_unicode_disabled_panics`, `class_case_fold_bytes`, `class_negate_unicode`, `class_negate_bytes`, `class_union_unicode`, `class_union_bytes`, `class_intersect_unicode`, `class_intersect_bytes`, `class_difference_unicode`, `class_difference_bytes`, `class_symmetric_difference_unicode`, `class_symmetric_difference_bytes`, `no_stack_overflow_on_drop`, `look_set_iter`, `look_set_debug`
+- **Priority Score:** 474510.0
+- **Functions:** 79/123 matched (target 187)
+- **Missing functions:** `class`, `drop`, `set_insert`, `set_remove`, `set_subtract`, `set_union`, `set_intersect`, `uclass`, `bclass`, `uranges`, `ucasefold`, `uunion`, `uintersect`, `udifference`, `usymdifference`, `unegate`, `branges`, `bcasefold`, `bunion`, `bintersect`, `bdifference`, `bsymdifference`, `bnegate`, `class_range_canonical_unicode`, `class_range_canonical_bytes`, `class_canonicalize_unicode`, `class_canonicalize_bytes`, `class_case_fold_unicode`, `class_case_fold_unicode_disabled`, `class_case_fold_unicode_disabled_panics`, `class_case_fold_bytes`, `class_negate_unicode`, `class_negate_bytes`, `class_union_unicode`, `class_union_bytes`, `class_intersect_unicode`, `class_intersect_bytes`, `class_difference_unicode`, `class_difference_bytes`, `class_symmetric_difference_unicode`, `class_symmetric_difference_bytes`, `no_stack_overflow_on_drop`, `look_set_iter`, `look_set_debug`
 - **Types:** 20/22 matched (target 43)
 - **Missing types:** `Item`, `Bound`
 - **Tests:** 0/37 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/hir/mod.rs` vs expected `hir/mod.rs`
-- **Proposed provenance header:** `// port-lint: source hir/mod.rs` (current: `// port-lint: source src/hir/mod.rs`)
-- **Lint issues:** 1
 
-### 10. hir.print
+### 10. utf8
 
-- **Target:** `print.Print [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.21
+- **Target:** `utf8.Utf8 [PROVENANCE-FALLBACK]`
+- **Similarity:** 0.61
 - **Dependents:** 0
-- **Priority Score:** 192907.9
-- **Functions:** 8/24 matched (target 14)
-- **Missing functions:** `default`, `new`, `build`, `roundtrip`, `roundtrip_bytes`, `roundtrip_with`, `print_literal`, `print_class`, `print_anchor`, `print_word_boundary`, `print_repetition`, `print_group`, `print_alternation`, `regression_repetition_concat`, `regression_repetition_alternation`, `regression_alternation_concat`
-- **Types:** 2/5 matched (target 2)
-- **Missing types:** `PrinterBuilder`, `Output`, `Err`
-- **Tests:** 0/13 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/hir/print.rs` vs expected `hir/print.rs`
-- **Proposed provenance header:** `// port-lint: source hir/print.rs` (current: `// port-lint: source src/hir/print.rs`)
-- **Lint issues:** 1
-
-### 11. ast.print
-
-- **Target:** `kotlin.io.github.kotlinmania.regexsyntax.ast.print.Print [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.48
-- **Dependents:** 0
-- **Priority Score:** 144105.2
-- **Functions:** 24/36 matched (target 28)
-- **Missing functions:** `default`, `roundtrip`, `roundtrip_with`, `print_literal`, `print_dot`, `print_concat`, `print_alternation`, `print_assertion`, `print_repetition`, `print_flags`, `print_group`, `print_class`
-- **Types:** 3/5 matched (target 3)
-- **Missing types:** `Output`, `Err`
-- **Tests:** 0/11 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/ast/print.rs` vs expected `ast/print.rs`
-- **Proposed provenance header:** `// port-lint: source ast/print.rs` (current: `// port-lint: source src/ast/print.rs`)
-- **Lint issues:** 1
-
-### 12. utf8
-
-- **Target:** `utf8.Utf8 [ZERO] [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.00
-- **Dependents:** 0
-- **Priority Score:** 102910.0
-- **Functions:** 15/23 matched (target 30)
-- **Missing functions:** `into_iter`, `fmt`, `rutf8`, `never_accepts_surrogate_codepoints`, `codepoints_no_surrogates`, `single_codepoint_one_sequence`, `bmp`, `encode_surrogate`
-- **Types:** 4/6 matched (target 8)
+- **Priority Score:** 72903.9
+- **Functions:** 18/23 matched (target 39)
+- **Missing functions:** `into_iter`, `fmt`, `rutf8`, `never_accepts_surrogate_codepoints`, `encode_surrogate`
+- **Types:** 4/6 matched (target 9)
 - **Missing types:** `IntoIter`, `Item`
-- **Tests:** 0/6 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/utf8.rs` vs expected `utf8.rs`
-- **Proposed provenance header:** `// port-lint: source utf8.rs` (current: `// port-lint: source src/utf8.rs`)
-- **Lint issues:** 1
+- **Tests:** 3/6 matched
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `utf8.rs` vs expected `utf8.rs`
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `utf8.rs` vs expected `utf8.rs`
+- **Proposed provenance header:** `// port-lint: source utf8.rs` (current: `// port-lint: source utf8.rs`)
+- **Proposed provenance header:** `// port-lint: source utf8.rs` (current: `// port-lint: source utf8.rs`)
+- **Lint issues:** 2
 
-### 13. ast.mod
+### 11. hir.print
 
-- **Target:** `ast.Ast [STUB] [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.00
+- **Target:** `print.Print`
+- **Similarity:** 0.76
 - **Dependents:** 0
-- **Priority Score:** 88710.0
-- **Functions:** 38/46 matched (target 53)
-- **Missing functions:** `fmt`, `cmp`, `partial_cmp`, `arbitrary`, `size_hint`, `drop`, `no_stack_overflow_on_drop`, `ast_size`
-- **Types:** 41/41 matched (target 104)
-- **Missing types:** _none_
-- **Tests:** 0/2 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/ast/mod.rs` vs expected `ast/mod.rs`
-- **Proposed provenance header:** `// port-lint: source ast/mod.rs` (current: `// port-lint: source src/ast/mod.rs`)
-- **Lint issues:** 1
+- **Priority Score:** 62902.4
+- **Functions:** 20/24 matched (target 29)
+- **Missing functions:** `default`, `roundtrip`, `roundtrip_bytes`, `roundtrip_with`
+- **Types:** 3/5 matched (target 4)
+- **Missing types:** `Output`, `Err`
+- **Tests:** 10/13 matched
 
-### 14. error
+### 12. ast.print
 
-- **Target:** `regexsyntax.Error [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.38
+- **Target:** `commonMain.kotlin.io.github.kotlinmania.regexsyntax.ast.print.Print`
+- **Similarity:** 0.77
 - **Dependents:** 0
-- **Priority Score:** 51506.2
-- **Functions:** 7/12 matched (target 14)
-- **Missing functions:** `from`, `fmt`, `assert_panic_message`, `regression_464`, `repetition_quantifier_expects_a_valid_decimal`
-- **Types:** 3/3 matched (target 5)
-- **Missing types:** _none_
-- **Tests:** 0/3 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/error.rs` vs expected `error.rs`
-- **Proposed provenance header:** `// port-lint: source error.rs` (current: `// port-lint: source src/error.rs`)
-- **Lint issues:** 1
+- **Priority Score:** 54102.3
+- **Functions:** 33/36 matched (target 39)
+- **Missing functions:** `default`, `roundtrip`, `roundtrip_with`
+- **Types:** 3/5 matched (target 4)
+- **Missing types:** `Output`, `Err`
+- **Tests:** 9/11 matched
 
-### 15. lib
+### 13. lib
 
-- **Target:** `regexsyntax.WordCharacter [STUB] [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.00
+- **Target:** `regexsyntax.MetaCharacter [PROVENANCE-FALLBACK]`
+- **Similarity:** 0.37
 - **Dependents:** 0
-- **Priority Score:** 51210.0
+- **Priority Score:** 51206.3
 - **Functions:** 7/12 matched (target 7)
 - **Missing functions:** `escape_meta`, `word_byte`, `word_char`, `word_char_disabled_panic`, `word_char_disabled_error`
 - **Types:** 0/0 matched
 - **Missing types:** _none_
 - **Tests:** 0/5 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/lib.rs` vs expected `lib.rs`
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/lib.rs` vs expected `lib.rs`
-- **Proposed provenance header:** `// port-lint: source lib.rs` (current: `// port-lint: source src/lib.rs`)
-- **Proposed provenance header:** `// port-lint: source lib.rs` (current: `// port-lint: source src/lib.rs`)
-- **Lint issues:** 2
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `lib.rs` vs expected `lib.rs`
+- **Proposed provenance header:** `// port-lint: source lib.rs` (current: `// port-lint: source lib.rs`)
+- **Lint issues:** 1
 
-### 16. hir.interval
+### 14. ast.mod
 
-- **Target:** `interval.Interval [STUB] [PROVENANCE-FALLBACK]`
+- **Target:** `ast.Ast [STUB]`
 - **Similarity:** 0.00
 - **Dependents:** 0
-- **Priority Score:** 42810.0
+- **Priority Score:** 48710.0
+- **Functions:** 42/46 matched (target 65)
+- **Missing functions:** `arbitrary`, `size_hint`, `drop`, `ast_size`
+- **Types:** 41/41 matched (target 105)
+- **Missing types:** _none_
+- **Tests:** 1/2 matched
+
+### 15. hir.interval
+
+- **Target:** `interval.Interval`
+- **Similarity:** 0.59
+- **Dependents:** 0
+- **Priority Score:** 42804.1
 - **Functions:** 20/23 matched (target 34)
 - **Missing functions:** `eq`, `create`, `as_u32`
 - **Types:** 4/5 matched (target 7)
 - **Missing types:** `Item`
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/hir/interval.rs` vs expected `hir/interval.rs`
-- **Proposed provenance header:** `// port-lint: source hir/interval.rs` (current: `// port-lint: source src/hir/interval.rs`)
-- **TODOs:** 2
-- **Lint issues:** 1
+
+### 16. error
+
+- **Target:** `regexsyntax.Error`
+- **Similarity:** 0.63
+- **Dependents:** 0
+- **Priority Score:** 21503.7
+- **Functions:** 10/12 matched (target 19)
+- **Missing functions:** `fmt`, `assert_panic_message`
+- **Types:** 3/3 matched (target 6)
+- **Missing types:** _none_
+- **Tests:** 2/3 matched
 
 ### 17. ast.visitor
 
-- **Target:** `kotlin.io.github.kotlinmania.regexsyntax.ast.visitor.Visitor [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.72
+- **Target:** `commonMain.kotlin.io.github.kotlinmania.regexsyntax.ast.visitor.Visitor`
+- **Similarity:** 0.74
 - **Dependents:** 0
-- **Priority Score:** 22802.8
-- **Functions:** 21/23 matched (target 25)
-- **Missing functions:** `new`, `fmt`
+- **Priority Score:** 12802.6
+- **Functions:** 22/23 matched (target 26)
+- **Missing functions:** `fmt`
 - **Types:** 5/5 matched (target 15)
 - **Missing types:** _none_
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/ast/visitor.rs` vs expected `ast/visitor.rs`
-- **Proposed provenance header:** `// port-lint: source ast/visitor.rs` (current: `// port-lint: source src/ast/visitor.rs`)
-- **Lint issues:** 1
 
-### 18. debug
+### 18. hir.visitor
 
-- **Target:** `debug.Debug [ZERO] [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.00
+- **Target:** `visitor.Visitor`
+- **Similarity:** 0.73
 - **Dependents:** 0
-- **Priority Score:** 20510.0
-- **Functions:** 2/3 matched (target 9)
-- **Missing functions:** `fmt`
-- **Types:** 1/2 matched (target 4)
-- **Missing types:** `Byte`
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/debug.rs` vs expected `debug.rs`
-- **Proposed provenance header:** `// port-lint: source debug.rs` (current: `// port-lint: source src/debug.rs`)
-- **Lint issues:** 1
-
-### 19. hir.visitor
-
-- **Target:** `visitor.Visitor [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.67
-- **Dependents:** 0
-- **Priority Score:** 11303.3
-- **Functions:** 9/10 matched
-- **Missing functions:** `new`
+- **Priority Score:** 1302.7
+- **Functions:** 10/10 matched (target 11)
+- **Missing functions:** _none_
 - **Types:** 3/3 matched (target 7)
 - **Missing types:** _none_
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/hir/visitor.rs` vs expected `hir/visitor.rs`
-- **Proposed provenance header:** `// port-lint: source hir/visitor.rs` (current: `// port-lint: source src/hir/visitor.rs`)
-- **Lint issues:** 1
+
+### 19. debug
+
+- **Target:** `debug.Debug`
+- **Similarity:** 0.35
+- **Dependents:** 0
+- **Priority Score:** 506.5
+- **Functions:** 3/3 matched (target 11)
+- **Missing functions:** _none_
+- **Types:** 2/2 matched (target 5)
+- **Missing types:** _none_
 
 ### 20. either
 
-- **Target:** `either.Either [PROVENANCE-FALLBACK]`
+- **Target:** `either.Either`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 100.0
@@ -301,27 +283,24 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 1/1 matched (target 3)
 - **Missing types:** _none_
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/either.rs` vs expected `either.rs`
-- **Proposed provenance header:** `// port-lint: source either.rs` (current: `// port-lint: source src/either.rs`)
-- **Lint issues:** 1
 
 ### 21. rank
 
-- **Target:** `rank.Rank [ZERO] [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.00
+- **Target:** `rank.Rank [PROVENANCE-FALLBACK]`
+- **Similarity:** 1.00
 - **Dependents:** 0
-- **Priority Score:** 10.0
+- **Priority Score:** 0.0
 - **Functions:** 0/0 matched
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/rank.rs` vs expected `rank.rs`
-- **Proposed provenance header:** `// port-lint: source rank.rs` (current: `// port-lint: source src/rank.rs`)
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `rank.rs` vs expected `rank.rs`
+- **Proposed provenance header:** `// port-lint: source rank.rs` (current: `// port-lint: source rank.rs`)
 - **Lint issues:** 1
 
 ### 22. unicode_tables.script
 
-- **Target:** `script.Script`
+- **Target:** `script.Script [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -329,10 +308,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/script.rs` vs expected `unicode_tables/script.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/script.rs` (current: `// port-lint: source unicode_tables/script.rs`)
+- **Lint issues:** 1
 
-### 23. unicode_tables.word_break
+### 23. unicode_tables.perl_space
 
-- **Target:** `wordbreak.WordBreak`
+- **Target:** `perlspace.PerlSpace [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -340,10 +322,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/perl_space.rs` vs expected `unicode_tables/perl_space.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/perl_space.rs` (current: `// port-lint: source unicode_tables/perl_space.rs`)
+- **Lint issues:** 1
 
-### 24. unicode_tables.grapheme_cluster_break
+### 24. unicode_tables.word_break
 
-- **Target:** `graphemeclusterbreak.GraphemeClusterBreak`
+- **Target:** `wordbreak.WordBreak [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -351,10 +336,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/word_break.rs` vs expected `unicode_tables/word_break.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/word_break.rs` (current: `// port-lint: source unicode_tables/word_break.rs`)
+- **Lint issues:** 1
 
-### 25. unicode_tables.case_folding_simple
+### 25. unicode_tables.perl_decimal
 
-- **Target:** `casefoldingsimple.CaseFoldingSimple`
+- **Target:** `perldecimal.PerlDecimal [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -362,10 +350,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/perl_decimal.rs` vs expected `unicode_tables/perl_decimal.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/perl_decimal.rs` (current: `// port-lint: source unicode_tables/perl_decimal.rs`)
+- **Lint issues:** 1
 
-### 26. unicode_tables.general_category
+### 26. unicode_tables.property_bool
 
-- **Target:** `generalcategory.GeneralCategory`
+- **Target:** `propertybool.PropertyBool [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -373,10 +364,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/property_bool.rs` vs expected `unicode_tables/property_bool.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/property_bool.rs` (current: `// port-lint: source unicode_tables/property_bool.rs`)
+- **Lint issues:** 1
 
-### 27. unicode_tables.script_extension
+### 27. unicode_tables.sentence_break
 
-- **Target:** `scriptextension.ScriptExtension`
+- **Target:** `sentencebreak.SentenceBreak [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -384,10 +378,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/sentence_break.rs` vs expected `unicode_tables/sentence_break.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/sentence_break.rs` (current: `// port-lint: source unicode_tables/sentence_break.rs`)
+- **Lint issues:** 1
 
-### 28. unicode_tables.perl_space
+### 28. unicode_tables.general_category
 
-- **Target:** `perlspace.PerlSpace`
+- **Target:** `generalcategory.GeneralCategory [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -395,10 +392,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/general_category.rs` vs expected `unicode_tables/general_category.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/general_category.rs` (current: `// port-lint: source unicode_tables/general_category.rs`)
+- **Lint issues:** 1
 
-### 29. unicode_tables.perl_decimal
+### 29. unicode_tables.script_extension
 
-- **Target:** `perldecimal.PerlDecimal`
+- **Target:** `scriptextension.ScriptExtension [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -406,10 +406,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/script_extension.rs` vs expected `unicode_tables/script_extension.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/script_extension.rs` (current: `// port-lint: source unicode_tables/script_extension.rs`)
+- **Lint issues:** 1
 
-### 30. unicode_tables.sentence_break
+### 30. unicode_tables.case_folding_simple
 
-- **Target:** `sentencebreak.SentenceBreak`
+- **Target:** `casefoldingsimple.CaseFoldingSimple [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -417,10 +420,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/case_folding_simple.rs` vs expected `unicode_tables/case_folding_simple.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/case_folding_simple.rs` (current: `// port-lint: source unicode_tables/case_folding_simple.rs`)
+- **Lint issues:** 1
 
-### 31. unicode_tables.property_bool
+### 31. unicode_tables.grapheme_cluster_break
 
-- **Target:** `propertybool.PropertyBool`
+- **Target:** `graphemeclusterbreak.GraphemeClusterBreak [PROVENANCE-FALLBACK]`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
@@ -428,6 +434,9 @@ Every matched file is listed below with function and type symbol parity.
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
+- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `unicode_tables/grapheme_cluster_break.rs` vs expected `unicode_tables/grapheme_cluster_break.rs`
+- **Proposed provenance header:** `// port-lint: source unicode_tables/grapheme_cluster_break.rs` (current: `// port-lint: source unicode_tables/grapheme_cluster_break.rs`)
+- **Lint issues:** 1
 
 ## Success Criteria
 
@@ -443,7 +452,7 @@ For each file to be considered "complete":
 ```bash
 # Initialize task queue for systematic porting
 cd tools/ast_distance
-./ast_distance --init-tasks ../../tmp/regex-syntax/src rust ../../src/commonMain kotlin tasks.json ../../AGENTS.md
+./ast_distance --init-tasks ../../tmp/regex-syntax rust ../../src/commonMain/kotlin/io/github/kotlinmania/regexsyntax kotlin tasks.json ../../AGENTS.md
 
 # Get next high-priority task
 ./ast_distance --assign tasks.json <agent-id>
@@ -459,5 +468,5 @@ do not treat them as the next implementation target by default.
 
 | Source | Expected target | Deps | Source path | Expected path |
 |--------|-----------------|------|-------------|---------------|
-| `unicode_tables.mod` | `unicodetables.Mod` | 0 | `unicode_tables/mod.rs` | `unicodetables/Mod.kt` |
+| `unicode_tables.mod` | `unicodetables.Mod` | 0 | `src/unicode_tables/mod.rs` | `unicodetables/Mod.kt` |
 

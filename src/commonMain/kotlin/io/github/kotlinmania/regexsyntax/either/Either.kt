@@ -1,11 +1,6 @@
 // port-lint: source src/either.rs
 package io.github.kotlinmania.regexsyntax.either
 
-/*
- * Copyright (c) The rust-lang regex contributors.
- * Licensed under either of Apache-2.0 OR MIT.
- */
-
 /**
  * A simple binary sum type.
  *

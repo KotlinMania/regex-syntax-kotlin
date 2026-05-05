@@ -1,272 +1,261 @@
-// port-lint: source src/rank.rs
+// port-lint: source rank.rs
 package io.github.kotlinmania.regexsyntax.rank
 
-/*
- * Copyright (c) The rust-lang regex contributors.
- * Licensed under either of Apache-2.0 OR MIT.
- */
-
-/**
- * Byte frequency table — index `b` holds the rank for byte value `b`. Used by the regex
- * literal-extraction layer to score how "common" a byte is.
- *
- * Mirrors upstream `BYTE_FREQUENCIES`.
- */
 internal val BYTE_FREQUENCIES: ByteArray = byteArrayOf(
-    55.toByte(), // '\x00'
-    52.toByte(), // '\x01'
-    51.toByte(), // '\x02'
-    50.toByte(), // '\x03'
-    49.toByte(), // '\x04'
-    48.toByte(), // '\x05'
-    47.toByte(), // '\x06'
-    46.toByte(), // '\x07'
-    45.toByte(), // '\x08'
-    103.toByte(), // '\t'
-    242.toByte(), // '\n'
-    66.toByte(), // '\x0b'
-    67.toByte(), // '\x0c'
-    229.toByte(), // '\r'
-    44.toByte(), // '\x0e'
-    43.toByte(), // '\x0f'
-    42.toByte(), // '\x10'
-    41.toByte(), // '\x11'
-    40.toByte(), // '\x12'
-    39.toByte(), // '\x13'
-    38.toByte(), // '\x14'
-    37.toByte(), // '\x15'
-    36.toByte(), // '\x16'
-    35.toByte(), // '\x17'
-    34.toByte(), // '\x18'
-    33.toByte(), // '\x19'
-    56.toByte(), // '\x1a'
-    32.toByte(), // '\x1b'
-    31.toByte(), // '\x1c'
-    30.toByte(), // '\x1d'
-    29.toByte(), // '\x1e'
-    28.toByte(), // '\x1f'
-    255.toByte(), // ' '
-    148.toByte(), // '!'
-    164.toByte(), // '"'
-    149.toByte(), // '#'
-    136.toByte(), // '$'
-    160.toByte(), // '%'
-    155.toByte(), // '&'
-    173.toByte(), // "'"
-    221.toByte(), // '('
-    222.toByte(), // ')'
-    134.toByte(), // '*'
-    122.toByte(), // '+'
-    232.toByte(), // ','
-    202.toByte(), // '-'
-    215.toByte(), // '.'
-    224.toByte(), // '/'
-    208.toByte(), // '0'
-    220.toByte(), // '1'
-    204.toByte(), // '2'
-    187.toByte(), // '3'
-    183.toByte(), // '4'
-    179.toByte(), // '5'
-    177.toByte(), // '6'
-    168.toByte(), // '7'
-    178.toByte(), // '8'
-    200.toByte(), // '9'
-    226.toByte(), // ':'
-    195.toByte(), // ';'
-    154.toByte(), // '<'
-    184.toByte(), // '='
-    174.toByte(), // '>'
-    126.toByte(), // '?'
-    120.toByte(), // '@'
-    191.toByte(), // 'A'
-    157.toByte(), // 'B'
-    194.toByte(), // 'C'
-    170.toByte(), // 'D'
-    189.toByte(), // 'E'
-    162.toByte(), // 'F'
-    161.toByte(), // 'G'
-    150.toByte(), // 'H'
-    193.toByte(), // 'I'
-    142.toByte(), // 'J'
-    137.toByte(), // 'K'
-    171.toByte(), // 'L'
-    176.toByte(), // 'M'
-    185.toByte(), // 'N'
-    167.toByte(), // 'O'
-    186.toByte(), // 'P'
-    112.toByte(), // 'Q'
-    175.toByte(), // 'R'
-    192.toByte(), // 'S'
-    188.toByte(), // 'T'
-    156.toByte(), // 'U'
-    140.toByte(), // 'V'
-    143.toByte(), // 'W'
-    123.toByte(), // 'X'
-    133.toByte(), // 'Y'
-    128.toByte(), // 'Z'
-    147.toByte(), // '['
-    138.toByte(), // '\\'
-    146.toByte(), // ']'
-    114.toByte(), // '^'
-    223.toByte(), // '_'
-    151.toByte(), // '`'
-    249.toByte(), // 'a'
-    216.toByte(), // 'b'
-    238.toByte(), // 'c'
-    236.toByte(), // 'd'
-    253.toByte(), // 'e'
-    227.toByte(), // 'f'
-    218.toByte(), // 'g'
-    230.toByte(), // 'h'
-    247.toByte(), // 'i'
-    135.toByte(), // 'j'
-    180.toByte(), // 'k'
-    241.toByte(), // 'l'
-    233.toByte(), // 'm'
-    246.toByte(), // 'n'
-    244.toByte(), // 'o'
-    231.toByte(), // 'p'
-    139.toByte(), // 'q'
-    245.toByte(), // 'r'
-    243.toByte(), // 's'
-    251.toByte(), // 't'
-    235.toByte(), // 'u'
-    201.toByte(), // 'v'
-    196.toByte(), // 'w'
-    240.toByte(), // 'x'
-    214.toByte(), // 'y'
-    152.toByte(), // 'z'
-    182.toByte(), // '{'
-    205.toByte(), // '|'
-    181.toByte(), // '}'
-    127.toByte(), // '~'
-    27.toByte(), // '\x7f'
-    212.toByte(), // '\x80'
-    211.toByte(), // '\x81'
-    210.toByte(), // '\x82'
-    213.toByte(), // '\x83'
-    228.toByte(), // '\x84'
-    197.toByte(), // '\x85'
-    169.toByte(), // '\x86'
-    159.toByte(), // '\x87'
-    131.toByte(), // '\x88'
-    172.toByte(), // '\x89'
-    105.toByte(), // '\x8a'
-    80.toByte(), // '\x8b'
-    98.toByte(), // '\x8c'
-    96.toByte(), // '\x8d'
-    97.toByte(), // '\x8e'
-    81.toByte(), // '\x8f'
-    207.toByte(), // '\x90'
-    145.toByte(), // '\x91'
-    116.toByte(), // '\x92'
-    115.toByte(), // '\x93'
-    144.toByte(), // '\x94'
-    130.toByte(), // '\x95'
-    153.toByte(), // '\x96'
-    121.toByte(), // '\x97'
-    107.toByte(), // '\x98'
-    132.toByte(), // '\x99'
-    109.toByte(), // '\x9a'
-    110.toByte(), // '\x9b'
-    124.toByte(), // '\x9c'
-    111.toByte(), // '\x9d'
-    82.toByte(), // '\x9e'
-    108.toByte(), // '\x9f'
-    118.toByte(), // '\xa0'
-    141.toByte(), // '¡'
-    113.toByte(), // '¢'
-    129.toByte(), // '£'
-    119.toByte(), // '¤'
-    125.toByte(), // '¥'
-    165.toByte(), // '¦'
-    117.toByte(), // '§'
-    92.toByte(), // '¨'
-    106.toByte(), // '©'
-    83.toByte(), // 'ª'
-    72.toByte(), // '«'
-    99.toByte(), // '¬'
-    93.toByte(), // '\xad'
-    65.toByte(), // '®'
-    79.toByte(), // '¯'
-    166.toByte(), // '°'
-    237.toByte(), // '±'
-    163.toByte(), // '²'
-    199.toByte(), // '³'
-    190.toByte(), // '´'
-    225.toByte(), // 'µ'
-    209.toByte(), // '¶'
-    203.toByte(), // '·'
-    198.toByte(), // '¸'
-    217.toByte(), // '¹'
-    219.toByte(), // 'º'
-    206.toByte(), // '»'
-    234.toByte(), // '¼'
-    248.toByte(), // '½'
-    158.toByte(), // '¾'
-    239.toByte(), // '¿'
-    255.toByte(), // 'À'
-    255.toByte(), // 'Á'
-    255.toByte(), // 'Â'
-    255.toByte(), // 'Ã'
-    255.toByte(), // 'Ä'
-    255.toByte(), // 'Å'
-    255.toByte(), // 'Æ'
-    255.toByte(), // 'Ç'
-    255.toByte(), // 'È'
-    255.toByte(), // 'É'
-    255.toByte(), // 'Ê'
-    255.toByte(), // 'Ë'
-    255.toByte(), // 'Ì'
-    255.toByte(), // 'Í'
-    255.toByte(), // 'Î'
-    255.toByte(), // 'Ï'
-    255.toByte(), // 'Ð'
-    255.toByte(), // 'Ñ'
-    255.toByte(), // 'Ò'
-    255.toByte(), // 'Ó'
-    255.toByte(), // 'Ô'
-    255.toByte(), // 'Õ'
-    255.toByte(), // 'Ö'
-    255.toByte(), // '×'
-    255.toByte(), // 'Ø'
-    255.toByte(), // 'Ù'
-    255.toByte(), // 'Ú'
-    255.toByte(), // 'Û'
-    255.toByte(), // 'Ü'
-    255.toByte(), // 'Ý'
-    255.toByte(), // 'Þ'
-    255.toByte(), // 'ß'
-    255.toByte(), // 'à'
-    255.toByte(), // 'á'
-    255.toByte(), // 'â'
-    255.toByte(), // 'ã'
-    255.toByte(), // 'ä'
-    255.toByte(), // 'å'
-    255.toByte(), // 'æ'
-    255.toByte(), // 'ç'
-    255.toByte(), // 'è'
-    255.toByte(), // 'é'
-    255.toByte(), // 'ê'
-    255.toByte(), // 'ë'
-    255.toByte(), // 'ì'
-    255.toByte(), // 'í'
-    255.toByte(), // 'î'
-    255.toByte(), // 'ï'
-    255.toByte(), // 'ð'
-    255.toByte(), // 'ñ'
-    255.toByte(), // 'ò'
-    255.toByte(), // 'ó'
-    255.toByte(), // 'ô'
-    255.toByte(), // 'õ'
-    255.toByte(), // 'ö'
-    255.toByte(), // '÷'
-    255.toByte(), // 'ø'
-    255.toByte(), // 'ù'
-    255.toByte(), // 'ú'
-    255.toByte(), // 'û'
-    255.toByte(), // 'ü'
-    255.toByte(), // 'ý'
-    255.toByte(), // 'þ'
-    255.toByte(), // 'ÿ'
+    55.toByte(), // char \x00
+    52.toByte(), // char \x01
+    51.toByte(), // char \x02
+    50.toByte(), // char \x03
+    49.toByte(), // char \x04
+    48.toByte(), // char \x05
+    47.toByte(), // char \x06
+    46.toByte(), // char \x07
+    45.toByte(), // char \x08
+    103.toByte(), // char \t
+    242.toByte(), // char \n
+    66.toByte(), // char \x0b
+    67.toByte(), // char \x0c
+    229.toByte(), // char \r
+    44.toByte(), // char \x0e
+    43.toByte(), // char \x0f
+    42.toByte(), // char \x10
+    41.toByte(), // char \x11
+    40.toByte(), // char \x12
+    39.toByte(), // char \x13
+    38.toByte(), // char \x14
+    37.toByte(), // char \x15
+    36.toByte(), // char \x16
+    35.toByte(), // char \x17
+    34.toByte(), // char \x18
+    33.toByte(), // char \x19
+    56.toByte(), // char \x1a
+    32.toByte(), // char \x1b
+    31.toByte(), // char \x1c
+    30.toByte(), // char \x1d
+    29.toByte(), // char \x1e
+    28.toByte(), // char \x1f
+    255.toByte(), // char  
+    148.toByte(), // char !
+    164.toByte(), // char "
+    149.toByte(), // char #
+    136.toByte(), // char $
+    160.toByte(), // char %
+    155.toByte(), // char &
+    173.toByte(), // char apostrophe
+    221.toByte(), // char (
+    222.toByte(), // char )
+    134.toByte(), // char *
+    122.toByte(), // char +
+    232.toByte(), // char ,
+    202.toByte(), // char -
+    215.toByte(), // char .
+    224.toByte(), // char /
+    208.toByte(), // char 0
+    220.toByte(), // char 1
+    204.toByte(), // char 2
+    187.toByte(), // char 3
+    183.toByte(), // char 4
+    179.toByte(), // char 5
+    177.toByte(), // char 6
+    168.toByte(), // char 7
+    178.toByte(), // char 8
+    200.toByte(), // char 9
+    226.toByte(), // char :
+    195.toByte(), // char ;
+    154.toByte(), // char <
+    184.toByte(), // char =
+    174.toByte(), // char >
+    126.toByte(), // char ?
+    120.toByte(), // char @
+    191.toByte(), // char A
+    157.toByte(), // char B
+    194.toByte(), // char C
+    170.toByte(), // char D
+    189.toByte(), // char E
+    162.toByte(), // char F
+    161.toByte(), // char G
+    150.toByte(), // char H
+    193.toByte(), // char I
+    142.toByte(), // char J
+    137.toByte(), // char K
+    171.toByte(), // char L
+    176.toByte(), // char M
+    185.toByte(), // char N
+    167.toByte(), // char O
+    186.toByte(), // char P
+    112.toByte(), // char Q
+    175.toByte(), // char R
+    192.toByte(), // char S
+    188.toByte(), // char T
+    156.toByte(), // char U
+    140.toByte(), // char V
+    143.toByte(), // char W
+    123.toByte(), // char X
+    133.toByte(), // char Y
+    128.toByte(), // char Z
+    147.toByte(), // char [
+    138.toByte(), // char \\
+    146.toByte(), // char ]
+    114.toByte(), // char ^
+    223.toByte(), // char _
+    151.toByte(), // char `
+    249.toByte(), // char a
+    216.toByte(), // char b
+    238.toByte(), // char c
+    236.toByte(), // char d
+    253.toByte(), // char e
+    227.toByte(), // char f
+    218.toByte(), // char g
+    230.toByte(), // char h
+    247.toByte(), // char i
+    135.toByte(), // char j
+    180.toByte(), // char k
+    241.toByte(), // char l
+    233.toByte(), // char m
+    246.toByte(), // char n
+    244.toByte(), // char o
+    231.toByte(), // char p
+    139.toByte(), // char q
+    245.toByte(), // char r
+    243.toByte(), // char s
+    251.toByte(), // char t
+    235.toByte(), // char u
+    201.toByte(), // char v
+    196.toByte(), // char w
+    240.toByte(), // char x
+    214.toByte(), // char y
+    152.toByte(), // char z
+    182.toByte(), // char {
+    205.toByte(), // char |
+    181.toByte(), // char }
+    127.toByte(), // char ~
+    27.toByte(), // char \x7f
+    212.toByte(), // char \x80
+    211.toByte(), // char \x81
+    210.toByte(), // char \x82
+    213.toByte(), // char \x83
+    228.toByte(), // char \x84
+    197.toByte(), // char \x85
+    169.toByte(), // char \x86
+    159.toByte(), // char \x87
+    131.toByte(), // char \x88
+    172.toByte(), // char \x89
+    105.toByte(), // char \x8a
+    80.toByte(), // char \x8b
+    98.toByte(), // char \x8c
+    96.toByte(), // char \x8d
+    97.toByte(), // char \x8e
+    81.toByte(), // char \x8f
+    207.toByte(), // char \x90
+    145.toByte(), // char \x91
+    116.toByte(), // char \x92
+    115.toByte(), // char \x93
+    144.toByte(), // char \x94
+    130.toByte(), // char \x95
+    153.toByte(), // char \x96
+    121.toByte(), // char \x97
+    107.toByte(), // char \x98
+    132.toByte(), // char \x99
+    109.toByte(), // char \x9a
+    110.toByte(), // char \x9b
+    124.toByte(), // char \x9c
+    111.toByte(), // char \x9d
+    82.toByte(), // char \x9e
+    108.toByte(), // char \x9f
+    118.toByte(), // char \xa0
+    141.toByte(), // char ¡
+    113.toByte(), // char ¢
+    129.toByte(), // char £
+    119.toByte(), // char ¤
+    125.toByte(), // char ¥
+    165.toByte(), // char ¦
+    117.toByte(), // char §
+    92.toByte(), // char ¨
+    106.toByte(), // char ©
+    83.toByte(), // char ª
+    72.toByte(), // char «
+    99.toByte(), // char ¬
+    93.toByte(), // char \xad
+    65.toByte(), // char ®
+    79.toByte(), // char ¯
+    166.toByte(), // char °
+    237.toByte(), // char ±
+    163.toByte(), // char ²
+    199.toByte(), // char ³
+    190.toByte(), // char ´
+    225.toByte(), // char µ
+    209.toByte(), // char ¶
+    203.toByte(), // char ·
+    198.toByte(), // char ¸
+    217.toByte(), // char ¹
+    219.toByte(), // char º
+    206.toByte(), // char »
+    234.toByte(), // char ¼
+    248.toByte(), // char ½
+    158.toByte(), // char ¾
+    239.toByte(), // char ¿
+    255.toByte(), // char À
+    255.toByte(), // char Á
+    255.toByte(), // char Â
+    255.toByte(), // char Ã
+    255.toByte(), // char Ä
+    255.toByte(), // char Å
+    255.toByte(), // char Æ
+    255.toByte(), // char Ç
+    255.toByte(), // char È
+    255.toByte(), // char É
+    255.toByte(), // char Ê
+    255.toByte(), // char Ë
+    255.toByte(), // char Ì
+    255.toByte(), // char Í
+    255.toByte(), // char Î
+    255.toByte(), // char Ï
+    255.toByte(), // char Ð
+    255.toByte(), // char Ñ
+    255.toByte(), // char Ò
+    255.toByte(), // char Ó
+    255.toByte(), // char Ô
+    255.toByte(), // char Õ
+    255.toByte(), // char Ö
+    255.toByte(), // char ×
+    255.toByte(), // char Ø
+    255.toByte(), // char Ù
+    255.toByte(), // char Ú
+    255.toByte(), // char Û
+    255.toByte(), // char Ü
+    255.toByte(), // char Ý
+    255.toByte(), // char Þ
+    255.toByte(), // char ß
+    255.toByte(), // char à
+    255.toByte(), // char á
+    255.toByte(), // char â
+    255.toByte(), // char ã
+    255.toByte(), // char ä
+    255.toByte(), // char å
+    255.toByte(), // char æ
+    255.toByte(), // char ç
+    255.toByte(), // char è
+    255.toByte(), // char é
+    255.toByte(), // char ê
+    255.toByte(), // char ë
+    255.toByte(), // char ì
+    255.toByte(), // char í
+    255.toByte(), // char î
+    255.toByte(), // char ï
+    255.toByte(), // char ð
+    255.toByte(), // char ñ
+    255.toByte(), // char ò
+    255.toByte(), // char ó
+    255.toByte(), // char ô
+    255.toByte(), // char õ
+    255.toByte(), // char ö
+    255.toByte(), // char ÷
+    255.toByte(), // char ø
+    255.toByte(), // char ù
+    255.toByte(), // char ú
+    255.toByte(), // char û
+    255.toByte(), // char ü
+    255.toByte(), // char ý
+    255.toByte(), // char þ
+    255.toByte(), // char ÿ
 )
