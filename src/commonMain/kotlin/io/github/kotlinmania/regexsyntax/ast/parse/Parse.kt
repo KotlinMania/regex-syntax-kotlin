@@ -20,6 +20,9 @@ class ParserBuilder {
     companion object {
         /** Create a new parser builder with a default configuration. */
         fun new(): ParserBuilder = ParserBuilder()
+
+        /** Create a new parser builder with a default configuration. */
+        fun default(): ParserBuilder = new()
     }
 
     private var nestLimit: UInt = 250u
@@ -134,6 +137,10 @@ class Parser internal constructor(
     /** The initial ignore whitespace setting. */
     internal val initialIgnoreWhitespace: Boolean,
 ) {
+    companion object {
+        /** Create a new parser with a default configuration. */
+        fun new(): Parser = ParserBuilder.new().build()
+    }
     /** The current position of the parser. */
     internal var pos: Position = Position(0, 1, 1)
     /** The current capture index. */
@@ -190,6 +197,13 @@ class Parser internal constructor(
         captureNames.clear()
         scratch.setLength(0)
     }
+}
+
+/** Returns true if the given codepoint is a hexadecimal digit. */
+private fun isHex(c: Int): Boolean {
+    if (c > 0xFFFF) return false
+    val ch = c.toChar()
+    return (ch in '0'..'9') || (ch in 'a'..'f') || (ch in 'A'..'F')
 }
 
 /**

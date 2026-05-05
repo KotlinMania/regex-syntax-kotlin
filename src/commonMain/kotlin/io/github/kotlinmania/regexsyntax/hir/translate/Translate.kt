@@ -1,7 +1,7 @@
 // port-lint: source src/hir/translate.rs
-/*!
-Defines a translator that converts an `Ast` to an `Hir`.
-*/
+/**
+ * Defines a translator that converts an [Ast] to an [Hir].
+ */
 package io.github.kotlinmania.regexsyntax.hir.translate
 
 import io.github.kotlinmania.regexsyntax.ast.Ast
@@ -44,7 +44,6 @@ import io.github.kotlinmania.regexsyntax.hir.Look
 import io.github.kotlinmania.regexsyntax.hir.Repetition
 import io.github.kotlinmania.regexsyntax.unicode.ClassQuery
 import io.github.kotlinmania.regexsyntax.unicode.SimpleCaseFolder
-import io.github.kotlinmania.regexsyntax.unicode.UnicodeError
 import io.github.kotlinmania.regexsyntax.unicode.UnicodeErrorException
 import io.github.kotlinmania.regexsyntax.unicode.perlDigit
 import io.github.kotlinmania.regexsyntax.unicode.perlSpace
@@ -53,6 +52,14 @@ import io.github.kotlinmania.regexsyntax.unicode.unicodeClass
 
 /** A builder for constructing an AST->HIR translator. */
 class TranslatorBuilder {
+    companion object {
+        /** Create a new translator builder with a default configuration. */
+        fun new(): TranslatorBuilder = TranslatorBuilder()
+
+        /** Create a new translator builder with a default configuration. */
+        fun default(): TranslatorBuilder = new()
+    }
+
     private var utf8: Boolean = true
     private var lineTerminator: Byte = '\n'.code.toByte()
     private var flags: Flags = Flags()
@@ -1088,9 +1095,9 @@ internal class TranslatorI(
         val sp = span
         val kind = if (err is UnicodeErrorException) {
             when (err.error) {
-                UnicodeError.PROPERTY_NOT_FOUND -> ErrorKind.UnicodePropertyNotFound
-                UnicodeError.PROPERTY_VALUE_NOT_FOUND -> ErrorKind.UnicodePropertyValueNotFound
-                UnicodeError.PERL_CLASS_NOT_FOUND -> ErrorKind.UnicodePerlClassNotFound
+                io.github.kotlinmania.regexsyntax.unicode.Error.PropertyNotFound -> ErrorKind.UnicodePropertyNotFound
+                io.github.kotlinmania.regexsyntax.unicode.Error.PropertyValueNotFound -> ErrorKind.UnicodePropertyValueNotFound
+                io.github.kotlinmania.regexsyntax.unicode.Error.PerlClassNotFound -> ErrorKind.UnicodePerlClassNotFound
             }
         } else {
             ErrorKind.UnicodePerlClassNotFound

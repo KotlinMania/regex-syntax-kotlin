@@ -158,6 +158,13 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     }
 
     /**
+     * Kotlin equivalent of Rust's `IntoIterator for &Utf8Sequence`.
+     *
+     * This returns an iterator over the underlying byte ranges.
+     */
+    fun intoIter(): Iterator<Utf8Range> = iterator()
+
+    /**
      * Returns the number of byte ranges in this sequence.
      *
      * The length is guaranteed to be in the closed interval `[1, 4]`.
@@ -203,6 +210,13 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     }
 
     override fun iterator(): Iterator<Utf8Range> = asSlice().iterator()
+
+    /**
+     * Kotlin equivalent of Rust's `fmt::Debug` implementation.
+     *
+     * This matches [toString].
+     */
+    fun fmt(): String = toString()
 
     override fun toString(): String = when (this) {
         is One -> r.toString()

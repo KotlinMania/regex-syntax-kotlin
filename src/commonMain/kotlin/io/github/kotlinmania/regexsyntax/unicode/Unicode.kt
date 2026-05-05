@@ -45,21 +45,15 @@ import io.github.kotlinmania.regexsyntax.unicodetables.sentencebreak.BY_NAME as 
 import io.github.kotlinmania.regexsyntax.unicodetables.wordbreak.BY_NAME as WB_BY_NAME
 
 /**
- * An inclusive range of codepoints from a generated file.
- *
- * In the Kotlin port a range is encoded as an `IntArray` of size 2: `[start, end]`.
- */
-
-/**
  * An error that occurs when dealing with Unicode.
  *
  * We don't impl the Error trait here because these always get converted
  * into other public errors. (This error type isn't exported.)
  */
-internal enum class UnicodeError {
-    PROPERTY_NOT_FOUND,
-    PROPERTY_VALUE_NOT_FOUND,
-    PERL_CLASS_NOT_FOUND,
+internal enum class Error {
+    PropertyNotFound,
+    PropertyValueNotFound,
+    PerlClassNotFound,
 }
 
 /**
@@ -70,9 +64,14 @@ internal enum class UnicodeError {
  * `unicode-case` feature is disabled. (The feature is enabled by default.)
  */
 class CaseFoldError internal constructor() : Throwable() {
-    override val message: String
-        get() = "Unicode-aware case folding is not available " +
+    fun fmt(): String =
+        "Unicode-aware case folding is not available " +
             "(probably because the unicode-case feature is not enabled)"
+
+    override val message: String
+        get() = fmt()
+
+    override fun toString(): String = fmt()
 }
 
 /**
@@ -83,9 +82,14 @@ class CaseFoldError internal constructor() : Throwable() {
  * `unicode-perl` feature is disabled. (The feature is enabled by default.)
  */
 class UnicodeWordError internal constructor() : Throwable() {
-    override val message: String
-        get() = "Unicode-aware \\w class is not available " +
+    fun fmt(): String =
+        "Unicode-aware \\w class is not available " +
             "(probably because the unicode-perl feature is not enabled)"
+
+    override val message: String
+        get() = fmt()
+
+    override fun toString(): String = fmt()
 }
 
 /**
@@ -233,8 +237,10 @@ class SimpleCaseFolder private constructor(
  * possible values were a binary property.
  *
  * In all circumstances, property names and values are normalized and
- * canonicalized: short, long, abbreviated, and underscored forms all
- * collapse to the same canonical entry per UTS#44 alias rules.
+ * canonicalized. That is, `GC == gc == GeneralCategory == generalCategory`.
+ *
+ * The lifetime refers to the shorter of the lifetimes of property name and
+ * property value.
  */
 sealed class ClassQuery {
     /**
@@ -278,29 +284,29 @@ sealed class ClassQuery {
                 val canonNameRes = canonicalProp(propertyName)
                 if (canonNameRes.isFailure) return Result.failure(canonNameRes.exceptionOrNull()!!)
                 val canonName = canonNameRes.getOrNull()
-                    ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_NOT_FOUND))
+                    ?: return Result.failure(UnicodeErrorException(Error.PropertyNotFound))
                 Result.success(when (canonName) {
                     "General_Category" -> {
                         val canonRes = canonicalGencat(propertyValue)
                         if (canonRes.isFailure) return Result.failure(canonRes.exceptionOrNull()!!)
                         val canon = canonRes.getOrNull()
-                            ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+                            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
                         CanonicalClassQuery.GeneralCategory(canon)
                     }
                     "Script" -> {
                         val canonRes = canonicalScript(propertyValue)
                         if (canonRes.isFailure) return Result.failure(canonRes.exceptionOrNull()!!)
                         val canon = canonRes.getOrNull()
-                            ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+                            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
                         CanonicalClassQuery.Script(canon)
                     }
                     else -> {
                         val valsRes = propertyValues(canonName)
                         if (valsRes.isFailure) return Result.failure(valsRes.exceptionOrNull()!!)
                         val vals = valsRes.getOrNull()
-                            ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+                            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
                         val canonVal = canonicalValue(vals, propertyValue)
-                            ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+                            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
                         CanonicalClassQuery.ByValue(
                             propertyName = canonName,
                             propertyValue = canonVal,
@@ -352,7 +358,7 @@ sealed class ClassQuery {
                 return Result.success(CanonicalClassQuery.Script(canon))
             }
         }
-        return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_NOT_FOUND))
+        return Result.failure(UnicodeErrorException(Error.PropertyNotFound))
     }
 }
 
@@ -387,12 +393,19 @@ internal sealed class CanonicalClassQuery {
     ) : CanonicalClassQuery()
 }
 
-/** Wraps [UnicodeError] for `Result` propagation. */
-internal class UnicodeErrorException(val error: UnicodeError) : Throwable(error.name)
+/** Wraps [Error] for `Result` propagation. */
+internal class UnicodeErrorException(val error: Error) : Throwable(error.name)
+
+/**
+ * A table of property values for a particular property.
+ *
+ * This is used as an internal representation to reflect the upstream type.
+ */
+internal class PropertyValues(val entries: Array<Pair<String, String>>)
 
 /**
  * Looks up a Unicode class given a query. If one doesn't exist, then
- * the result carries [UnicodeError.PROPERTY_NOT_FOUND].
+ * the result carries [Error.PropertyNotFound].
  */
 fun unicodeClass(query: ClassQuery): Result<ClassUnicode> {
     val canonRes = query.canonicalize()
@@ -417,11 +430,14 @@ fun unicodeClass(query: ClassQuery): Result<ClassUnicode> {
             "Word_Break" -> wb(canon.propertyValue)
             else -> {
                 // What else should we support?
-                Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_NOT_FOUND))
+                Result.failure(UnicodeErrorException(Error.PropertyNotFound))
             }
         }
     }
 }
+
+/** Equivalent to [unicodeClass], but preserves the upstream name. */
+fun `class`(query: ClassQuery): Result<ClassUnicode> = unicodeClass(query)
 
 /**
  * Returns a Unicode aware class for `\w`.
@@ -444,7 +460,7 @@ fun perlSpace(): Result<ClassUnicode> = Result.success(hirClass(PROPBOOL_WHITE_S
  */
 fun perlDigit(): Result<ClassUnicode> {
     val decimal = propertySet(GENCAT_BY_NAME, "Decimal_Number")
-        ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(decimal))
 }
 
@@ -537,12 +553,13 @@ private fun canonicalProp(normalizedName: String): Result<String?> {
  * UAX44 LM3, which can be done using [symbolicNameNormalize].
  */
 private fun canonicalValue(
-    vals: Array<Pair<String, String>>,
+    vals: PropertyValues,
     normalizedValue: String,
 ): String? {
-    val r = binarySearchBy(vals.size) { i -> vals[i].first.compareTo(normalizedValue) }
+    val entries = vals.entries
+    val r = binarySearchBy(entries.size) { i -> entries[i].first.compareTo(normalizedValue) }
     return when (r) {
-        is BinarySearchResult.Ok -> vals[r.index].second
+        is BinarySearchResult.Ok -> entries[r.index].second
         is BinarySearchResult.Err -> null
     }
 }
@@ -552,12 +569,12 @@ private fun canonicalValue(
  *
  * If the property values data is not available, then a failure is returned.
  */
-private fun propertyValues(canonicalPropertyName: String): Result<Array<Pair<String, String>>?> {
+private fun propertyValues(canonicalPropertyName: String): Result<PropertyValues?> {
     val r = binarySearchBy(PROPERTY_VALUES.size) { i ->
         PROPERTY_VALUES[i].first.compareTo(canonicalPropertyName)
     }
     return Result.success(when (r) {
-        is BinarySearchResult.Ok -> PROPERTY_VALUES[r.index].second
+        is BinarySearchResult.Ok -> PropertyValues(PROPERTY_VALUES[r.index].second)
         is BinarySearchResult.Err -> null
     })
 }
@@ -616,7 +633,7 @@ private fun ages(canonicalAge: String): Result<List<Array<IntArray>>> {
 
     val pos = ages.indexOfFirst { it.first == canonicalAge }
     return if (pos < 0) {
-        Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+        Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     } else {
         Result.success(ages.subList(0, pos + 1).map { it.second })
     }
@@ -645,7 +662,7 @@ private fun gencat(canonicalName: String): Result<ClassUnicode> {
             }
             else -> {
                 val set = propertySet(GENCAT_BY_NAME, canonicalName)
-                    ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+                    ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
                 Result.success(hirClass(set))
             }
         }
@@ -662,7 +679,7 @@ private fun gencat(canonicalName: String): Result<ClassUnicode> {
  */
 private fun script(canonicalName: String): Result<ClassUnicode> {
     val set = propertySet(SCRIPT_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
@@ -676,7 +693,7 @@ private fun script(canonicalName: String): Result<ClassUnicode> {
  */
 private fun scriptExtension(canonicalName: String): Result<ClassUnicode> {
     val set = propertySet(SCRIPTEXT_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
@@ -695,7 +712,7 @@ private fun boolProperty(canonicalName: String): Result<ClassUnicode> {
         "White_Space" -> perlSpace()
         else -> {
             val set = propertySet(PROPBOOL_BY_NAME, canonicalName)
-                ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_NOT_FOUND))
+                ?: return Result.failure(UnicodeErrorException(Error.PropertyNotFound))
             Result.success(hirClass(set))
         }
     }
@@ -707,7 +724,7 @@ private fun boolProperty(canonicalName: String): Result<ClassUnicode> {
  */
 private fun gcb(canonicalName: String): Result<ClassUnicode> {
     val set = propertySet(GCB_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
@@ -717,7 +734,7 @@ private fun gcb(canonicalName: String): Result<ClassUnicode> {
  */
 private fun wb(canonicalName: String): Result<ClassUnicode> {
     val set = propertySet(WB_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
@@ -727,7 +744,7 @@ private fun wb(canonicalName: String): Result<ClassUnicode> {
  */
 private fun sb(canonicalName: String): Result<ClassUnicode> {
     val set = propertySet(SB_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(UnicodeError.PROPERTY_VALUE_NOT_FOUND))
+        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
