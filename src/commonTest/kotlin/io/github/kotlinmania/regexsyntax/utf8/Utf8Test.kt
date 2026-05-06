@@ -14,9 +14,9 @@ class Utf8Test {
 
     private fun rutf8(s: Int, e: Int): Utf8Range = Utf8Range.new(s.toByte(), e.toByte())
 
-    private fun neverAcceptsSurrogateCodepoints(start: Int, end: Int) {
+    private fun never_accepts_surrogate_codepoints(start: Int, end: Int) {
         for (cp in 0xD800 until 0xE000) {
-            val buf = encodeSurrogate(cp)
+            val buf = encode_surrogate(cp)
             for (r in collect(start, end)) {
                 if (r.matches(buf)) {
                     error(
@@ -29,16 +29,16 @@ class Utf8Test {
     }
 
     @Test
-    fun codepointsNoSurrogates() {
-        neverAcceptsSurrogateCodepoints(0x0, 0xFFFF)
-        neverAcceptsSurrogateCodepoints(0x0, 0x10FFFF)
-        neverAcceptsSurrogateCodepoints(0x0, 0x10FFFE)
-        neverAcceptsSurrogateCodepoints(0x80, 0x10FFFF)
-        neverAcceptsSurrogateCodepoints(0xD7FF, 0xE000)
+    fun codepoints_no_surrogates() {
+        never_accepts_surrogate_codepoints(0x0, 0xFFFF)
+        never_accepts_surrogate_codepoints(0x0, 0x10FFFF)
+        never_accepts_surrogate_codepoints(0x0, 0x10FFFE)
+        never_accepts_surrogate_codepoints(0x80, 0x10FFFF)
+        never_accepts_surrogate_codepoints(0xD7FF, 0xE000)
     }
 
     @Test
-    fun singleCodepointOneSequence() {
+    fun single_codepoint_one_sequence() {
         for (cp in 0x0..0x10FFFF) {
             if (!isUnicodeScalarValue(cp)) continue
             val seqs = collect(cp, cp)
@@ -86,7 +86,7 @@ class Utf8Test {
         return cp !in 0xD800..0xDFFF
     }
 
-    private fun encodeSurrogate(cp: Int): ByteArray {
+    private fun encode_surrogate(cp: Int): ByteArray {
         val tagCont = 0b1000_0000
         val tagThreeB = 0b1110_0000
 
