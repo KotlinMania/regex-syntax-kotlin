@@ -6,41 +6,49 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+private fun simpleFoldOk(c: Int): IntArray {
+    return SimpleCaseFolder.new().getOrThrow().mapping(c)
+}
+
+private fun containsCaseMap(start: Int, end: Int): Boolean {
+    return SimpleCaseFolder.new().getOrThrow().overlaps(start, end)
+}
+
 class UnicodeTest {
-    private fun `simple_fold_ok`(c: Int): IntArray {
-        return SimpleCaseFolder.new().getOrThrow().mapping(c)
-    }
-
-    private fun `contains_case_map`(start: Int, end: Int): Boolean {
-        return SimpleCaseFolder.new().getOrThrow().overlaps(start, end)
-    }
-
     @Test
     fun `simple_fold_k`() {
-        assertEquals(intArrayOf('K'.code, 'K'.code).toList(), `simple_fold_ok`('k'.code).toList())
-        assertEquals(intArrayOf('k'.code, 'K'.code).toList(), `simple_fold_ok`('K'.code).toList())
-        assertEquals(intArrayOf('K'.code, 'k'.code).toList(), `simple_fold_ok`('K'.code).toList())
+        assertEquals(intArrayOf('K'.code, 'K'.code).toList(), simpleFoldOk('k'.code).toList())
+        assertEquals(intArrayOf('k'.code, 'K'.code).toList(), simpleFoldOk('K'.code).toList())
+        assertEquals(intArrayOf('K'.code, 'k'.code).toList(), simpleFoldOk('K'.code).toList())
     }
 
     @Test
     fun `simple_fold_a`() {
-        assertEquals(intArrayOf('A'.code).toList(), `simple_fold_ok`('a'.code).toList())
-        assertEquals(intArrayOf('a'.code).toList(), `simple_fold_ok`('A'.code).toList())
+        assertEquals(intArrayOf('A'.code).toList(), simpleFoldOk('a'.code).toList())
+        assertEquals(intArrayOf('a'.code).toList(), simpleFoldOk('A'.code).toList())
+    }
+
+    @Test
+    fun `simple_fold_disabled`() {
+        // In upstream Rust this is only compiled when the `unicode-case`
+        // feature is disabled. This Kotlin port always ships with the Unicode
+        // case folding tables, so construction should always succeed.
+        assertTrue(SimpleCaseFolder.new().isSuccess)
     }
 
     @Test
     fun `range_contains`() {
-        assertTrue(`contains_case_map`('A'.code, 'A'.code))
-        assertTrue(`contains_case_map`('Z'.code, 'Z'.code))
-        assertTrue(`contains_case_map`('A'.code, 'Z'.code))
-        assertTrue(`contains_case_map`('@'.code, 'A'.code))
-        assertTrue(`contains_case_map`('Z'.code, '['.code))
-        assertTrue(`contains_case_map`('☃'.code, 'Ⰰ'.code))
+        assertTrue(containsCaseMap('A'.code, 'A'.code))
+        assertTrue(containsCaseMap('Z'.code, 'Z'.code))
+        assertTrue(containsCaseMap('A'.code, 'Z'.code))
+        assertTrue(containsCaseMap('@'.code, 'A'.code))
+        assertTrue(containsCaseMap('Z'.code, '['.code))
+        assertTrue(containsCaseMap('☃'.code, 'Ⰰ'.code))
 
-        assertFalse(`contains_case_map`('['.code, '['.code))
-        assertFalse(`contains_case_map`('['.code, '`'.code))
+        assertFalse(containsCaseMap('['.code, '['.code))
+        assertFalse(containsCaseMap('['.code, '`'.code))
 
-        assertFalse(`contains_case_map`('☃'.code, '☃'.code))
+        assertFalse(containsCaseMap('☃'.code, '☃'.code))
     }
 
     @Test
