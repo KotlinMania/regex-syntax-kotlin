@@ -16,20 +16,20 @@ private fun containsCaseMap(start: Int, end: Int): Boolean {
 
 class UnicodeTest {
     @Test
-    fun `simple_fold_k`() {
+    fun simpleFoldK() {
         assertEquals(intArrayOf('K'.code, 'K'.code).toList(), simpleFoldOk('k'.code).toList())
         assertEquals(intArrayOf('k'.code, 'K'.code).toList(), simpleFoldOk('K'.code).toList())
         assertEquals(intArrayOf('K'.code, 'k'.code).toList(), simpleFoldOk('K'.code).toList())
     }
 
     @Test
-    fun `simple_fold_a`() {
+    fun simpleFoldA() {
         assertEquals(intArrayOf('A'.code).toList(), simpleFoldOk('a'.code).toList())
         assertEquals(intArrayOf('a'.code).toList(), simpleFoldOk('A'.code).toList())
     }
 
     @Test
-    fun `simple_fold_disabled`() {
+    fun simpleFoldDisabled() {
         // In upstream Rust this is only compiled when the `unicode-case`
         // feature is disabled. This Kotlin port always ships with the Unicode
         // case folding tables, so construction should always succeed.
@@ -37,7 +37,7 @@ class UnicodeTest {
     }
 
     @Test
-    fun `range_contains`() {
+    fun rangeContains() {
         assertTrue(containsCaseMap('A'.code, 'A'.code))
         assertTrue(containsCaseMap('Z'.code, 'Z'.code))
         assertTrue(containsCaseMap('A'.code, 'Z'.code))
@@ -52,13 +52,13 @@ class UnicodeTest {
     }
 
     @Test
-    fun `regression_466`() {
+    fun regression466() {
         val q = ClassQuery.OneLetter('C'.code)
         assertEquals(CanonicalClassQuery.GeneralCategory("Other"), q.canonicalize().getOrThrow())
     }
 
     @Test
-    fun `sym_normalize`() {
+    fun symNormalize() {
         val symNorm = ::symbolicNameNormalize
 
         assertEquals("linebreak", symNorm("Line_Break"))
@@ -75,7 +75,7 @@ class UnicodeTest {
     }
 
     @Test
-    fun `valid_utf8_symbolic`() {
+    fun validUtf8Symbolic() {
         val x = byteArrayOf(
             'a'.code.toByte(),
             'b'.code.toByte(),
