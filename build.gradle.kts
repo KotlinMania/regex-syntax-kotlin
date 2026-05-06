@@ -167,16 +167,11 @@ mavenPublishing {
 
     pom {
         name.set("regex-syntax")
-        description.set("Kotlin Multiplatform port of maciejhirsz/regex-syntax - fast lexer generator")
+        description.set("Kotlin Multiplatform port of rust-lang/regex - Regular expression parser library")
         inceptionYear.set("2026")
         url.set("https://github.com/KotlinMania/regex-syntax-kotlin")
 
         licenses {
-            license {
-                name.set("Apache-2.0")
-                url.set("https://opensource.org/licenses/Apache-2.0")
-                distribution.set("repo")
-            }
             license {
                 name.set("MIT")
                 url.set("https://opensource.org/licenses/MIT")
@@ -202,16 +197,15 @@ mavenPublishing {
 }
 
 tasks.register("test") {
-    val hasAndroidSdk = androidSdkDir != null && file(androidSdkDir).exists()
-    if (hasAndroidSdk) {
-        dependsOn("allTests")
-    } else {
-        listOf(
-            "jsNodeTest",
-            "wasmJsNodeTest",
-            "macosArm64Test",
-        ).forEach { taskName ->
-            tasks.findByName(taskName)?.let { dependsOn(it) }
-        }
-    }
+    group = "verification"
+    description =
+        "Runs a portable test suite (macOS + JS + WasmJS). Android and non-host native targets are intentionally excluded."
+
+    val defaultTestTasks = listOf(
+        "macosArm64Test",
+        "jsNodeTest",
+        "wasmJsNodeTest",
+    )
+
+    dependsOn(defaultTestTasks.mapNotNull { taskName -> tasks.findByName(taskName) })
 }
