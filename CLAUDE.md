@@ -168,3 +168,68 @@ gh pr checks <pr-number>
 - Clear, descriptive, focused on what changed and why.
 - No "Co-Authored-By" lines.
 - No emoji or robot references.
+
+## Re-exports from upstream `mod.rs` files
+
+When an upstream Rust `mod.rs` is **only re-exporting** something that actually lives elsewhere
+(`pub use <crate-path>::<Name>;`, often under a different name), do **not** preserve that
+re-export shape in Kotlin as a "central alias" API. Do not write a `typealias` for the
+re-exported name. The existing `Forbidden` rule against "Re-export typealias files at root
+packages" is enforced through this procedure.
+
+Workflow:
+
+1. **Identify what the `mod.rs` is re-exporting and the name it's exported as.** Record both
+   the original symbol's fully-qualified upstream path and the (possibly different) re-export
+   name.
+
+2. **Find callers — Rust-side first, then Kotlin-side.** Many `*-kotlin` repos are
+   bootstrap-only (`tmp/` cloned, little or no Kotlin ported yet), so the deterministic source
+   of truth is the Rust import graph, not the Kotlin source. Grepping the Kotlin tree first
+   will silently miss every caller whose port hasn't started.
+
+   a. **Rust-side (deterministic, primary).** Build or query a graph (graphml or an equivalent
+      JSON index) of every `use` statement and every `pub use` re-export across all
+      `tmp/<crate>/**/*.rs` files in the workspace, keyed by symbol path. Every Rust crate that
+      does `use <reexport-crate>::<reexport-path>::<Name>` — directly, or via a transitive
+      `pub use` chain — is a future Kotlin caller. For each importer, drill into the Rust
+      source to find the specific call sites: `<Name>(…)`, `: <Name>`, `<Name>::method`,
+      `impl <Name> for …`, pattern matches, trait bounds, generics. Record the Rust path of
+      each call site so that when that crate is later ported to Kotlin, the translation lands
+      on the upstream symbol from day one and never on the re-export.
+
+   b. **Kotlin-side (live ports, secondary).** Repos that have already produced Kotlin source
+      need migration *now*. Search `*-kotlin/src/**/*.kt` for:
+      - direct imports: `import <reexport-package>.<Name>`
+      - wildcard imports of the re-export package, when `<Name>` is used in the file body
+      - fully-qualified inline references
+
+   The Rust pass catches callers whose Kotlin doesn't exist yet; the Kotlin pass catches
+   callers already ported. Both must run.
+
+3. **Rewrite each live Kotlin caller to reference the upstream/original symbol directly.** If
+   the caller still needs to write `<Name>` unchanged, use Kotlin aliasing:
+   `import <upstream-fully-qualified-name> as <Name>`. Never bridge with a Kotlin `typealias`.
+   For Rust-side findings whose Kotlin counterpart hasn't been written yet, no edit is made
+   now — instead, the call sites are recorded as a porting hint for whoever lands the Kotlin
+   translation later.
+
+4. **Keep `Mod.kt` (or the equivalent file for that package) as a tracking file.** It carries
+   the translated upstream module-level comments and a literal-quoted reference to each
+   upstream `pub use` line (e.g. `// pub use crate::lib::result::Result;`). Each time a caller
+   is migrated off the re-export, append the caller's absolute path under a
+   `// Callers migrated:` ledger in `Mod.kt`. Append, never delete. Once all callers are
+   migrated, the `typealias` (if any) is removed; the tracking file remains as the ledger of
+   the migration.
+
+   Also record the **Rust-side projected callers** (crates with `tmp/` that import the
+   re-export but haven't been ported yet) under a `// Projected callers (Rust):` block in the
+   same file, so future porters see the migration target before they ever introduce a new
+   caller pointing at the re-export.
+
+Reference example: `/Volumes/stuff/Projects/kotlinmania/serde-kotlin/tmp/serde/serde_core/src/private/mod.rs`
+re-exports `Result` from `crate::lib::result`. The Kotlin tracking file lives at
+`/Volumes/stuff/Projects/kotlinmania/serde-kotlin/src/commonMain/kotlin/io/github/kotlinmania/serde/core/private/Mod.kt`.
+A caller that previously did `import io.github.kotlinmania.serde.core.private.Result` is
+rewritten to `import kotlin.Result as Result` (or just removes the import and relies on the
+auto-imported `kotlin.Result`).
