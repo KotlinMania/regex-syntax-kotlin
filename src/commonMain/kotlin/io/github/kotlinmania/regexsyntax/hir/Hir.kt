@@ -264,6 +264,15 @@ class Hir internal constructor(
             return Hir(HirKind.Class(cls), props)
         }
 
+        /**
+         * Creates a class HIR expression. The class may either be defined over
+         * ranges of Unicode codepoints or ranges of raw byte values.
+         *
+         * Note that an empty class is permitted. An empty class is equivalent to
+         * [fail].
+         */
+        fun `class`(cls: Class): Hir = classOfHir(cls)
+
         /** Creates a look-around assertion HIR expression. */
         fun look(look: Look): Hir {
             val props = Properties.look(look)
@@ -1685,7 +1694,7 @@ data class LookSet(
      * of a bitset, where each assertion occupies bit `i` where
      * `i = Look.asRepr()`.
      */
-    val bits: Int,
+    var bits: Int,
 ) : Iterable<Look> {
     companion object {
         /** Create an empty set of look-around assertions. */
@@ -1758,17 +1767,42 @@ data class LookSet(
     /** Return a new set with the given assertion added. */
     fun insert(look: Look): LookSet = LookSet(bits or look.asRepr())
 
+    /** Updates this set in place with the result of inserting the given assertion into this set. */
+    fun setInsert(look: Look) {
+        bits = bits or look.asRepr()
+    }
+
     /** Return a new set with the given assertion removed. */
     fun remove(look: Look): LookSet = LookSet(bits and look.asRepr().inv())
+
+    /** Updates this set in place with the result of removing the given assertion from this set. */
+    fun setRemove(look: Look) {
+        bits = bits and look.asRepr().inv()
+    }
 
     /** Returns a new set that is the result of subtracting the given set from this set. */
     fun subtract(other: LookSet): LookSet = LookSet(bits and other.bits.inv())
 
+    /** Updates this set in place with the result of subtracting the given set from this set. */
+    fun setSubtract(other: LookSet) {
+        bits = bits and other.bits.inv()
+    }
+
     /** Returns a new set that is the union of this and the one given. */
     fun union(other: LookSet): LookSet = LookSet(bits or other.bits)
 
+    /** Updates this set in place with the result of unioning it with the one given. */
+    fun setUnion(other: LookSet) {
+        bits = bits or other.bits
+    }
+
     /** Returns a new set that is the intersection of this and the one given. */
     fun intersect(other: LookSet): LookSet = LookSet(bits and other.bits)
+
+    /** Updates this set in place with the result of intersecting it with the one given. */
+    fun setIntersect(other: LookSet) {
+        bits = bits and other.bits
+    }
 
     /** Write a [LookSet] as a native endian 32-bit integer to the beginning of the slice given. */
     fun writeRepr(slice: ByteArray) {
