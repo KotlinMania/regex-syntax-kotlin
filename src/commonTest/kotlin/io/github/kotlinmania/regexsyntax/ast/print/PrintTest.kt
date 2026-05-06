@@ -1,4 +1,4 @@
-// port-lint: source src/ast/print.rs
+// port-lint: source ast/print.rs
 package io.github.kotlinmania.regexsyntax.ast.print
 
 import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder
