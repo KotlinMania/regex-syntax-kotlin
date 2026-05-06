@@ -1,4 +1,4 @@
-// port-lint: source src/error.rs
+// port-lint: source error.rs
 package io.github.kotlinmania.regexsyntax
 
 import io.github.kotlinmania.regexsyntax.ast.parse.AstException
@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class ErrorTest {
-    private fun assertPanicMessage(pattern: String, expectedMsg: String) {
+    private fun assert_panic_message(pattern: String, expectedMsg: String) {
         val result = Parser().parse(pattern)
         val err = result.exceptionOrNull()
         if (err == null) {
@@ -21,7 +21,7 @@ class ErrorTest {
 
     // See: https://github.com/rust-lang/regex/issues/464
     @Test
-    fun regression464() {
+    fun regression_464() {
         val result = Parser().parse("a{\n")
         val err = result.exceptionOrNull() as AstException
         // This test checks that the error formatter doesn't panic.
@@ -30,8 +30,8 @@ class ErrorTest {
 
     // See: https://github.com/rust-lang/regex/issues/545
     @Test
-    fun repetitionQuantifierExpectsAValidDecimal() {
-        assertPanicMessage(
+    fun repetition_quantifier_expects_a_valid_decimal() {
+        assert_panic_message(
             "\\\\u{[^}]*}",
             """
             regex parse error:
