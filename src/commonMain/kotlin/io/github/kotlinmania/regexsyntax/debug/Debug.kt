@@ -115,7 +115,12 @@ internal fun utf8Decode(bytes: ByteArray): Utf8Decoded? {
         n > bytes.size -> Utf8Decoded.Failed(first)
         n == 1 -> Utf8Decoded.Ok((first.toInt() and 0xFF))
         else -> {
-            val s = bytes.copyOfRange(0, n).decodeToString(throwOnInvalidSequence = true)
+            val s =
+                try {
+                    bytes.copyOfRange(0, n).decodeToString(throwOnInvalidSequence = true)
+                } catch (_: Throwable) {
+                    return Utf8Decoded.Failed(first)
+                }
             try {
                 Utf8Decoded.Ok(s.codePointAtCompat(0))
             } catch (_: Throwable) {

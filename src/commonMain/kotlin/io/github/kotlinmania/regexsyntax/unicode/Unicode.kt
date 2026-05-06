@@ -45,6 +45,15 @@ import io.github.kotlinmania.regexsyntax.unicodetables.sentencebreak.BY_NAME as 
 import io.github.kotlinmania.regexsyntax.unicodetables.wordbreak.BY_NAME as WB_BY_NAME
 
 /**
+ * An inclusive range of codepoints from a generated file.
+ *
+ * In the upstream Rust implementation this is represented as a shared static
+ * slice; in Kotlin it is an immutable table of inclusive `[start, end]`
+ * codepoint pairs.
+ */
+internal typealias Range = Array<IntArray>
+
+/**
  * An error that occurs when dealing with Unicode.
  *
  * We don't impl the Error trait here because these always get converted
@@ -238,9 +247,6 @@ class SimpleCaseFolder private constructor(
  *
  * In all circumstances, property names and values are normalized and
  * canonicalized. That is, `GC == gc == GeneralCategory == generalCategory`.
- *
- * The lifetime refers to the shorter of the lifetimes of property name and
- * property value.
  */
 sealed class ClassQuery {
     /**
@@ -444,14 +450,20 @@ fun `class`(query: ClassQuery): Result<ClassUnicode> = unicodeClass(query)
  *
  * This returns an error if the data is not available for `\w`.
  */
-fun perlWord(): Result<ClassUnicode> = Result.success(hirClass(PERL_WORD))
+fun perlWord(): Result<ClassUnicode> {
+    fun imp(): Result<ClassUnicode> = Result.success(hirClass(PERL_WORD))
+    return imp()
+}
 
 /**
  * Returns a Unicode aware class for `\s`.
  *
  * This returns an error if the data is not available for `\s`.
  */
-fun perlSpace(): Result<ClassUnicode> = Result.success(hirClass(PROPBOOL_WHITE_SPACE))
+fun perlSpace(): Result<ClassUnicode> {
+    fun imp(): Result<ClassUnicode> = Result.success(hirClass(PROPBOOL_WHITE_SPACE))
+    return imp()
+}
 
 /**
  * Returns a Unicode aware class for `\d`.
@@ -459,13 +471,16 @@ fun perlSpace(): Result<ClassUnicode> = Result.success(hirClass(PROPBOOL_WHITE_S
  * This returns an error if the data is not available for `\d`.
  */
 fun perlDigit(): Result<ClassUnicode> {
-    val decimal = propertySet(GENCAT_BY_NAME, "Decimal_Number")
-        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
-    return Result.success(hirClass(decimal))
+    fun imp(): Result<ClassUnicode> {
+        val decimal = propertySet(GENCAT_BY_NAME, "Decimal_Number")
+            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+        return Result.success(hirClass(decimal))
+    }
+    return imp()
 }
 
 /** Build a Unicode HIR class from a sequence of Unicode scalar value ranges. */
-fun hirClass(ranges: Array<IntArray>): ClassUnicode {
+fun hirClass(ranges: Range): ClassUnicode {
     val hirRanges = ranges.map { ClassUnicodeRange.new(it[0], it[1]) }
     return ClassUnicode.new(hirRanges)
 }
@@ -476,19 +491,22 @@ fun hirClass(ranges: Array<IntArray>): ClassUnicode {
  * If the `unicode-perl` feature is not enabled, then this returns an error.
  */
 fun isWordCharacter(c: Int): Result<Boolean> {
-    if (c in 0..127 && isWordByte(c.toByte())) {
-        return Result.success(true)
-    }
-    val r = binarySearchBy(PERL_WORD.size) { i ->
-        val start = PERL_WORD[i][0]
-        val end = PERL_WORD[i][1]
-        when {
-            start <= c && c <= end -> 0
-            start > c -> 1
-            else -> -1
+    fun imp(c: Int): Result<Boolean> {
+        if (c in 0..127 && isWordByte(c.toByte())) {
+            return Result.success(true)
         }
+        val r = binarySearchBy(PERL_WORD.size) { i ->
+            val start = PERL_WORD[i][0]
+            val end = PERL_WORD[i][1]
+            when {
+                start <= c && c <= end -> 0
+                start > c -> 1
+                else -> -1
+            }
+        }
+        return Result.success(r is BinarySearchResult.Ok)
     }
-    return Result.success(r is BinarySearchResult.Ok)
+    return imp(c)
 }
 
 private fun isWordByte(b: Byte): Boolean {
@@ -581,9 +599,9 @@ private fun propertyValues(canonicalPropertyName: String): Result<PropertyValues
 
 /** Look up a property by canonical name in a `BY_NAME` table. */
 private fun propertySet(
-    nameMap: Array<Pair<String, Array<IntArray>>>,
+    nameMap: Array<Pair<String, Range>>,
     canonical: String,
-): Array<IntArray>? {
+): Range? {
     val r = binarySearchBy(nameMap.size) { i -> nameMap[i].first.compareTo(canonical) }
     return when (r) {
         is BinarySearchResult.Ok -> nameMap[r.index].second
@@ -599,8 +617,8 @@ private fun propertySet(
  * If the given age value isn't valid or if the data isn't available, then a
  * failure is returned instead.
  */
-private fun ages(canonicalAge: String): Result<List<Array<IntArray>>> {
-    val ages: List<Pair<String, Array<IntArray>>> = listOf(
+private fun ages(canonicalAge: String): Result<List<Range>> {
+    val ages: List<Pair<String, Range>> = listOf(
         "V1_1" to AGE_V1_1,
         "V2_0" to AGE_V2_0,
         "V2_1" to AGE_V2_1,
