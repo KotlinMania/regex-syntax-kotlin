@@ -1,4 +1,4 @@
-// port-lint: source src/hir/print.rs
+// port-lint: source hir/print.rs
 package io.github.kotlinmania.regexsyntax.hir.print
 
 import io.github.kotlinmania.regexsyntax.hir.Hir
@@ -10,14 +10,14 @@ import kotlin.test.assertEquals
 
 class PrintTest {
     private fun roundtrip(given: String, expected: String) {
-        roundtripWith({ it }, given, expected)
+        roundtrip_with({ it }, given, expected)
     }
 
-    private fun roundtripBytes(given: String, expected: String) {
-        roundtripWith({ it.utf8(false) }, given, expected)
+    private fun roundtrip_bytes(given: String, expected: String) {
+        roundtrip_with({ it.utf8(false) }, given, expected)
     }
 
-    private fun roundtripWith(f: (ParserBuilder) -> ParserBuilder, given: String, expected: String) {
+    private fun roundtrip_with(f: (ParserBuilder) -> ParserBuilder, given: String, expected: String) {
         val builder = ParserBuilder.new()
         val hir = f(builder).build().parse(given).getOrThrow()
 
@@ -31,16 +31,16 @@ class PrintTest {
     }
 
     @Test
-    fun printLiteral() {
+    fun print_literal() {
         roundtrip("a", "a")
         roundtrip("\\xff", "\u00FF")
-        roundtripBytes("\\xff", "\u00FF")
-        roundtripBytes("(?-u)\\xff", "(?-u:\\xFF)")
+        roundtrip_bytes("\\xff", "\u00FF")
+        roundtrip_bytes("(?-u)\\xff", "(?-u:\\xFF)")
         roundtrip("☃", "☃")
     }
 
     @Test
-    fun printClass() {
+    fun print_class() {
         roundtrip("[a]", "a")
         roundtrip("[ab]", "[ab]")
         roundtrip("[a-z]", "[a-z]")
@@ -52,7 +52,7 @@ class PrintTest {
         roundtrip("(?-u)[a]", "a")
         roundtrip("(?-u)[ab]", "(?-u:[ab])")
         roundtrip("(?-u)[a-z]", "(?-u:[a-z])")
-        roundtripBytes("(?-u)[a-\\xFF]", "(?-u:[a-\\xFF])")
+        roundtrip_bytes("(?-u)[a-\\xFF]", "(?-u:[a-\\xFF])")
 
         // The following test that the printer escapes meta characters
         // in character classes.
@@ -62,17 +62,17 @@ class PrintTest {
 
         // The following test that the printer escapes meta characters
         // in byte oriented character classes.
-        roundtripBytes("(?-u)[\\[]", "\\[")
-        roundtripBytes("(?-u)[Z-_]", "(?-u:[Z-_])")
-        roundtripBytes("(?-u)[Z-_--Z]", "(?-u:[\\[-_])")
+        roundtrip_bytes("(?-u)[\\[]", "\\[")
+        roundtrip_bytes("(?-u)[Z-_]", "(?-u:[Z-_])")
+        roundtrip_bytes("(?-u)[Z-_--Z]", "(?-u:[\\[-_])")
 
         // This tests that an empty character class is correctly roundtripped.
         roundtrip("\\P{any}", "[a&&b]")
-        roundtripBytes("(?-u)[^\\x00-\\xFF]", "[a&&b]")
+        roundtrip_bytes("(?-u)[^\\x00-\\xFF]", "[a&&b]")
     }
 
     @Test
-    fun printAnchor() {
+    fun print_anchor() {
         roundtrip("^", "\\A")
         roundtrip("$", "\\z")
         roundtrip("(?m)^", "(?m:^)")
@@ -80,15 +80,15 @@ class PrintTest {
     }
 
     @Test
-    fun printWordBoundary() {
+    fun print_word_boundary() {
         roundtrip("\\b", "\\b")
         roundtrip("\\B", "\\B")
         roundtrip("(?-u)\\b", "(?-u:\\b)")
-        roundtripBytes("(?-u)\\B", "(?-u:\\B)")
+        roundtrip_bytes("(?-u)\\B", "(?-u:\\B)")
     }
 
     @Test
-    fun printRepetition() {
+    fun print_repetition() {
         roundtrip("a?", "a?")
         roundtrip("a??", "a??")
         roundtrip("(?U)a?", "a??")
@@ -124,7 +124,7 @@ class PrintTest {
     }
 
     @Test
-    fun printGroup() {
+    fun print_group() {
         roundtrip("()", "((?:))")
         roundtrip("(?P<foo>)", "(?P<foo>(?:))")
         roundtrip("(?:)", "(?:)")
@@ -137,7 +137,7 @@ class PrintTest {
     }
 
     @Test
-    fun printAlternation() {
+    fun print_alternation() {
         roundtrip("|", "(?:(?:)|(?:))")
         roundtrip("||", "(?:(?:)|(?:)|(?:))")
 
@@ -148,9 +148,26 @@ class PrintTest {
         roundtrip("foo|bar|quux", "(?:(?:foo)|(?:bar)|(?:quux))")
     }
 
+    // This is a regression test that stresses a peculiarity of how the HIR
+    // is both constructed and printed. Namely, it is legal for a repetition
+    // to directly contain a concatenation. This particular construct isn't
+    // really possible to build from the concrete syntax directly, since you'd
+    // be forced to put the concatenation into (at least) a non-capturing
+    // group. Concurrently, the printer doesn't consider this case and just
+    // kind of naively prints the child expression and tacks on the repetition
+    // operator.
+    //
+    // As a result, if you attached '+' to a 'concat(a, b)', the printer gives
+    // you 'ab+', but clearly it really should be '(?:ab)+'.
+    //
+    // This bug isn't easy to surface because most ways of building an HIR
+    // come directly from the concrete syntax, and as mentioned above, it just
+    // isn't possible to build this kind of HIR from the concrete syntax.
+    // Nevertheless, this is definitely a bug.
+    //
     // See: https://github.com/rust-lang/regex/issues/731
     @Test
-    fun regressionRepetitionConcat() {
+    fun regression_repetition_concat() {
         var expr = Hir.concat(listOf(
             Hir.literal("x".encodeToByteArray()),
             Hir.repetition(Repetition(
@@ -179,9 +196,12 @@ class PrintTest {
         assertEquals("(?:\\A\\A\\z\\z)", expr.toString())
     }
 
+    // Just like regression_repetition_concat, but with the repetition using
+    // an alternation as a child expression instead.
+    //
     // See: https://github.com/rust-lang/regex/issues/731
     @Test
-    fun regressionRepetitionAlternation() {
+    fun regression_repetition_alternation() {
         var expr = Hir.concat(listOf(
             Hir.literal("ab".encodeToByteArray()),
             Hir.repetition(Repetition(
@@ -213,9 +233,19 @@ class PrintTest {
         assertEquals("(?:\\A(?:\\A|\\z)\\z)", expr.toString())
     }
 
+    // This regression test is very similar in flavor to
+    // regression_repetition_concat in that the root of the issue lies in a
+    // peculiarity of how the HIR is represented and how the printer writes it
+    // out. Like the other regression, this one is also rooted in the fact that
+    // you can't produce the peculiar HIR from the concrete syntax. Namely, you
+    // just can't have a 'concat(a, alt(b, c))' because the 'alt' will normally
+    // be in (at least) a non-capturing group. Why? Because the '|' has very
+    // low precedence (lower that concatenation), and so something like 'ab|c'
+    // is actually 'alt(ab, c)'.
+    //
     // See: https://github.com/rust-lang/regex/issues/516
     @Test
-    fun regressionAlternationConcat() {
+    fun regression_alternation_concat() {
         var expr = Hir.concat(listOf(
             Hir.literal("ab".encodeToByteArray()),
             Hir.alternation(listOf(
