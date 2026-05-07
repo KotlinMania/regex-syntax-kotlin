@@ -1424,8 +1424,7 @@ internal class ParserI(
     private fun parseHex(): Result<io.github.kotlinmania.regexsyntax.ast.Literal> {
         val start = pos()
         val c = char().toChar()
-        bump()
-        if (isEof()) {
+        if (!bumpAndBumpSpace()) {
             return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeUnexpectedEof)))
         }
         return when (c) {
@@ -1441,15 +1440,15 @@ internal class ParserI(
         var i = 0
         var hex = 0
         while (i < n) {
-            if (isEof()) {
+            if (i > 0 && !bumpAndBumpSpace()) {
                 return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeUnexpectedEof)))
             }
             val d = char().toChar().digitToIntOrNull(16)
                 ?: return Result.failure(AstException(error(spanChar(), ErrorKind.EscapeHexInvalidDigit)))
             hex = (hex shl 4) or d
-            bump()
             i++
         }
+        bumpAndBumpSpace()
         if (kind != HexLiteralKind.X) {
             if (hex > 0x10FFFF || (hex in 0xD800..0xDFFF)) {
                 return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeHexInvalid)))
@@ -1464,10 +1463,10 @@ internal class ParserI(
 
     private fun parseHexBrace(start: Position, kind: HexLiteralKind): Result<io.github.kotlinmania.regexsyntax.ast.Literal> {
         if (char() != '{'.code) throw IllegalStateException("expected {")
-        bump()
-        val startDigits = pos()
+        val startDigits = spanChar().end
         var hex = 0
         var digits = 0
+        bumpAndBumpSpace()
         while (!isEof() && char() != '}'.code) {
             val d = char().toChar().digitToIntOrNull(16)
                 ?: return Result.failure(AstException(error(spanChar(), ErrorKind.EscapeHexInvalidDigit)))
@@ -1476,8 +1475,8 @@ internal class ParserI(
                 while (!isEof() && char() != '}'.code) bump()
                 return Result.failure(AstException(error(Span(startDigits, pos()), ErrorKind.EscapeHexInvalid)))
             }
-            bump()
             digits++
+            bumpAndBumpSpace()
         }
         if (isEof()) {
             return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeUnexpectedEof)))
@@ -1488,7 +1487,7 @@ internal class ParserI(
         if (hex in 0xD800..0xDFFF) {
             return Result.failure(AstException(error(Span(startDigits, pos()), ErrorKind.EscapeHexInvalid)))
         }
-        bump() // '}'
+        bumpAndBumpSpace() // '}'
         return Result.success(io.github.kotlinmania.regexsyntax.ast.Literal(
             span = Span(start, pos()),
             kind = LiteralKind.HexBrace(kind),
@@ -1565,7 +1564,23 @@ internal class ParserI(
                 return Result.failure(AstException(unclosedClassError()))
             }
             val charResult: Result<ClassSetUnion> = when (char().toChar()) {
-                '[' -> pushClassOpen(currentUnion)
+                '[' -> {
+                    // If we've already parsed the opening bracket, then
+                    // attempt to treat this as the beginning of an ASCII
+                    // class. If ASCII class parsing fails, then the parser
+                    // backs up to `[`.
+                    if (parser().stackClass.isNotEmpty()) {
+                        val cls = maybeParseAsciiClass()
+                        if (cls != null) {
+                            currentUnion.push(ClassSetItem.Ascii(cls))
+                            Result.success(currentUnion)
+                        } else {
+                            pushClassOpen(currentUnion)
+                        }
+                    } else {
+                        pushClassOpen(currentUnion)
+                    }
+                }
                 ']' -> {
                     val popRes = popClass(currentUnion)
                     if (popRes.isFailure) return Result.failure(popRes.exceptionOrNull()!!)
@@ -1745,32 +1760,30 @@ internal class ParserI(
         val start = pos()
         val c = char().toChar()
         val negated = c == 'P'
-        bump()
-        if (isEof()) {
+        if (!bumpAndBumpSpace()) {
             return Result.failure(AstException(error(Span.splat(pos()), ErrorKind.EscapeUnexpectedEof)))
         }
 
-        return if (bumpIf("{")) {
+        return if (char() == '{'.code) {
             parser().scratch.setLength(0)
-            while (!isEof() && char().toChar() != '}') {
+            while (bumpAndBumpSpace() && char().toChar() != '}') {
                 parser().scratch.append(char().toChar())
-                bump()
             }
             if (isEof()) {
                 Result.failure(AstException(error(Span.splat(pos()), ErrorKind.EscapeUnexpectedEof)))
             } else {
                 val content = parser().scratch.toString()
-                bump() // '}'
+                bumpAndBumpSpace() // '}'
 
-                val kind = if (content.contains(":")) {
+                val kind = if (content.contains("!=")) {
+                    val parts = content.split("!=", limit = 2)
+                    ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.NotEqual, parts[0], parts[1])
+                } else if (content.contains(":")) {
                     val parts = content.split(":", limit = 2)
                     ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Colon, parts[0], parts[1])
                 } else if (content.contains("=")) {
                     val parts = content.split("=", limit = 2)
                     ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Equal, parts[0], parts[1])
-                } else if (content.contains("!=")) {
-                    val parts = content.split("!=", limit = 2)
-                    ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.NotEqual, parts[0], parts[1])
                 } else {
                     ClassUnicodeKind.Named(content)
                 }
@@ -1779,7 +1792,7 @@ internal class ParserI(
         } else {
             val cp = char()
             val span = Span(start, spanChar().end)
-            bump()
+            bumpAndBumpSpace()
             Result.success(ClassUnicode(span, negated, ClassUnicodeKind.OneLetter(cp)))
         }
     }
