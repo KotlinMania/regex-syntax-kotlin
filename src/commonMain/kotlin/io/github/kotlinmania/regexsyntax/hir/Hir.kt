@@ -1830,20 +1830,25 @@ data class LookSet(
 class LookSetIter internal constructor(initial: LookSet) : Iterator<Look> {
     private var set: LookSet = initial
 
-    override fun hasNext(): Boolean = !set.isEmpty()
+    override fun hasNext(): Boolean = nextLook() != null
 
     override fun next(): Look {
-        if (set.isEmpty()) throw NoSuchElementException()
-        // Trailing zeros count
-        var bit = 0
-        var b = set.bits
-        while (b and 1 == 0) {
-            bit++
-            b = b ushr 1
-        }
-        val look = Look.fromRepr(1 shl bit) ?: throw NoSuchElementException()
+        val look = nextLook() ?: throw NoSuchElementException()
         set = set.remove(look)
         return look
+    }
+
+    private fun nextLook(): Look? {
+        if (set.isEmpty()) return null
+        // We'll never have more than UByte.MAX_VALUE distinct look-around
+        // assertions, so `bit` will always fit into a UShort.
+        var bit = 0
+        var candidateBits = set.bits
+        while (candidateBits and 1 == 0) {
+            bit++
+            candidateBits = candidateBits ushr 1
+        }
+        return Look.fromRepr(1 shl bit)
     }
 }
 
