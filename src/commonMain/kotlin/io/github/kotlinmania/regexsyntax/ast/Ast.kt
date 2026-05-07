@@ -12,6 +12,21 @@ package io.github.kotlinmania.regexsyntax.ast
 
 import io.github.kotlinmania.regexsyntax.Formatter as ErrorFormatter
 
+/*
+ * Upstream re-exports (tracking):
+ *
+ * - `pub use crate::ast::visitor::{visit, Visitor};`
+ *
+ * Kotlin note:
+ * - This port does not create a central re-export surface in `io.github.kotlinmania.regexsyntax.ast`.
+ * - Callers should import `io.github.kotlinmania.regexsyntax.ast.visitor.visit` and/or
+ *   `io.github.kotlinmania.regexsyntax.ast.visitor.Visitor` directly (and use Kotlin `as` imports
+ *   if a local name must be preserved).
+ *
+ * Callers migrated:
+ * - (none yet)
+ */
+
 /**
  * An error that occurred while parsing a regular expression into an abstract
  * syntax tree.

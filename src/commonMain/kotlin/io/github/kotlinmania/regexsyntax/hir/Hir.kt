@@ -36,6 +36,25 @@ import io.github.kotlinmania.regexsyntax.debug.utf8Decode
 import io.github.kotlinmania.regexsyntax.debug.Utf8Decoded
 import io.github.kotlinmania.regexsyntax.debug.len
 
+/*
+ * Upstream re-exports (tracking):
+ *
+ * - `pub use crate::{`
+ * - `    hir::visitor::{visit, Visitor},`
+ * - `    unicode::CaseFoldError,`
+ * - `};`
+ *
+ * Kotlin note:
+ * - This port does not create a central re-export surface in `io.github.kotlinmania.regexsyntax.hir`.
+ * - Callers should import `io.github.kotlinmania.regexsyntax.hir.visitor.visit` and/or
+ *   `io.github.kotlinmania.regexsyntax.hir.visitor.Visitor` directly. For `CaseFoldError`, import
+ *   `io.github.kotlinmania.regexsyntax.unicode.CaseFoldError` directly (and use Kotlin `as` imports
+ *   if a local name must be preserved).
+ *
+ * Callers migrated:
+ * - (none yet)
+ */
+
 /** An error that can occur while translating an `Ast` to a [Hir]. */
 data class Error(
     /** The kind of error. */

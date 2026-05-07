@@ -330,7 +330,7 @@ internal class ParserI(
      * The offset starts at `0` from the beginning of the regular expression
      * pattern string.
      */
-    private fun offset(): Int = parser().pos.offset
+    internal fun offset(): Int = parser().pos.offset
 
     /**
      * Return the current line number of the parser.
@@ -1651,7 +1651,7 @@ internal class ParserI(
         throw IllegalStateException("unreachable")
     }
 
-    private fun parseSetClassOpen(): Result<Pair<ClassBracketed, ClassSetUnion>> {
+    internal fun parseSetClassOpen(): Result<Pair<ClassBracketed, ClassSetUnion>> {
         if (char() != '['.code) throw IllegalStateException("expected [")
         val start = pos()
         if (!bumpAndBumpSpace()) {
@@ -1816,6 +1816,9 @@ internal class ParserI(
             }
         } else {
             val cp = char()
+            if (cp == '\\'.code) {
+                return Result.failure(AstException(error(spanChar(), ErrorKind.UnicodeClassInvalid)))
+            }
             val span = Span(start, spanChar().end)
             bumpAndBumpSpace()
             Result.success(ClassUnicode(span, negated, ClassUnicodeKind.OneLetter(cp)))

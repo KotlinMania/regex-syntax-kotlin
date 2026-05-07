@@ -2580,74 +2580,1047 @@ class ParseTest {
     }
 
     @Test
-    fun parsePerlClass() {
+    fun parseSetClass() {
+        fun union(span: Span, items: List<ClassSetItem>): ClassSet =
+            ClassSet.union(ClassSetUnion(span, items.toMutableList()))
+
+        fun intersection(span: Span, lhs: ClassSet, rhs: ClassSet): ClassSet =
+            ClassSet.BinaryOp(
+                ClassSetBinaryOp(
+                    span = span,
+                    kind = ClassSetBinaryOpKind.Intersection,
+                    lhs = lhs,
+                    rhs = rhs,
+                ),
+            )
+
+        fun difference(span: Span, lhs: ClassSet, rhs: ClassSet): ClassSet =
+            ClassSet.BinaryOp(
+                ClassSetBinaryOp(
+                    span = span,
+                    kind = ClassSetBinaryOpKind.Difference,
+                    lhs = lhs,
+                    rhs = rhs,
+                ),
+            )
+
+        fun symdifference(span: Span, lhs: ClassSet, rhs: ClassSet): ClassSet =
+            ClassSet.BinaryOp(
+                ClassSetBinaryOp(
+                    span = span,
+                    kind = ClassSetBinaryOpKind.SymmetricDifference,
+                    lhs = lhs,
+                    rhs = rhs,
+                ),
+            )
+
+        fun itemset(item: ClassSetItem): ClassSet = ClassSet.Item(item)
+        fun itemAscii(cls: ClassAscii): ClassSetItem = ClassSetItem.Ascii(cls)
+        fun itemUnicode(cls: ClassUnicode): ClassSetItem = ClassSetItem.Unicode(cls)
+        fun itemPerl(cls: ClassPerl): ClassSetItem = ClassSetItem.Perl(cls)
+        fun itemBracket(cls: ClassBracketed): ClassSetItem = ClassSetItem.Bracketed(cls)
+
+        fun lit(span: Span, c: Char): ClassSetItem = ClassSetItem.Literal(
+            io.github.kotlinmania.regexsyntax.ast.Literal(
+                span = span,
+                kind = LiteralKind.Verbatim,
+                c = c.code,
+            ),
+        )
+
+        fun empty(span: Span): ClassSetItem = ClassSetItem.Empty(span)
+
+        fun range(span: Span, start: Char, end: Char): ClassSetItem {
+            val pos1 = span.start.copy(
+                offset = span.start.offset + utf8Len(start.code),
+                column = span.start.column + 1,
+            )
+            val pos2 = span.end.copy(
+                offset = span.end.offset - utf8Len(end.code),
+                column = span.end.column - 1,
+            )
+            return ClassSetItem.Range(
+                ClassSetRange(
+                    span = span,
+                    start = io.github.kotlinmania.regexsyntax.ast.Literal(
+                        span = Span(span.start, pos1),
+                        kind = LiteralKind.Verbatim,
+                        c = start.code,
+                    ),
+                    end = io.github.kotlinmania.regexsyntax.ast.Literal(
+                        span = Span(pos2, span.end),
+                        kind = LiteralKind.Verbatim,
+                        c = end.code,
+                    ),
+                ),
+            )
+        }
+
+        fun alnum(span: Span, negated: Boolean): ClassAscii = ClassAscii(span, ClassAsciiKind.Alnum, negated)
+        fun lower(span: Span, negated: Boolean): ClassAscii = ClassAscii(span, ClassAsciiKind.Lower, negated)
+
         assertEquals(
-            Ast.ClassPerl(
-                ClassPerl(
-                    span = spanEx(0, 2),
-                    kind = ClassPerlKind.Digit,
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 11),
                     negated = false,
+                    kind = itemset(itemAscii(alnum(spanEx(1, 10), false))),
                 ),
             ),
-            Parser().parse("\\d").getOrThrow(),
+            parser("[[:alnum:]]").parse().getOrThrow(),
         )
-
         assertEquals(
-            Ast.ClassPerl(
-                ClassPerl(
-                    span = spanEx(0, 2),
-                    kind = ClassPerlKind.Digit,
-                    negated = true,
-                ),
-            ),
-            Parser().parse("\\D").getOrThrow(),
-        )
-
-        assertEquals(
-            Ast.ClassPerl(
-                ClassPerl(
-                    span = spanEx(0, 2),
-                    kind = ClassPerlKind.Space,
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 13),
                     negated = false,
-                ),
-            ),
-            Parser().parse("\\s").getOrThrow(),
-        )
-
-        assertEquals(
-            Ast.ClassPerl(
-                ClassPerl(
-                    span = spanEx(0, 2),
-                    kind = ClassPerlKind.Word,
-                    negated = true,
-                ),
-            ),
-            Parser().parse("\\W").getOrThrow(),
-        )
-
-        assertEquals(
-            Ast.Concat(
-                Concat(
-                    span = spanEx(0, 3),
-                    asts = mutableListOf(
-                        Ast.ClassPerl(
-                            ClassPerl(
-                                span = spanEx(0, 2),
-                                kind = ClassPerlKind.Digit,
+                    kind = itemset(
+                        itemBracket(
+                            ClassBracketed(
+                                span = spanEx(1, 12),
                                 negated = false,
-                            ),
-                        ),
-                        Ast.Literal(
-                            Literal(
-                                span = spanEx(2, 3),
-                                kind = LiteralKind.Verbatim,
-                                c = 'z'.code,
+                                kind = itemset(itemAscii(alnum(spanEx(2, 11), false))),
                             ),
                         ),
                     ),
                 ),
             ),
-            Parser().parse("\\dz").getOrThrow(),
+            parser("[[[:alnum:]]]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 22),
+                    negated = false,
+                    kind = intersection(
+                        spanEx(1, 21),
+                        itemset(itemAscii(alnum(spanEx(1, 10), false))),
+                        itemset(itemAscii(lower(spanEx(12, 21), false))),
+                    ),
+                ),
+            ),
+            parser("[[:alnum:]&&[:lower:]]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 22),
+                    negated = false,
+                    kind = difference(
+                        spanEx(1, 21),
+                        itemset(itemAscii(alnum(spanEx(1, 10), false))),
+                        itemset(itemAscii(lower(spanEx(12, 21), false))),
+                    ),
+                ),
+            ),
+            parser("[[:alnum:]--[:lower:]]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 22),
+                    negated = false,
+                    kind = symdifference(
+                        spanEx(1, 21),
+                        itemset(itemAscii(alnum(spanEx(1, 10), false))),
+                        itemset(itemAscii(lower(spanEx(12, 21), false))),
+                    ),
+                ),
+            ),
+            parser("[[:alnum:]~~[:lower:]]").parse().getOrThrow(),
+        )
+
+        assertEquals(
+            Ast.ClassBracketed(ClassBracketed(spanEx(0, 3), false, itemset(lit(spanEx(1, 2), 'a')))),
+            parser("[a]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 5),
+                    negated = false,
+                    kind = union(
+                        spanEx(1, 4),
+                        listOf(
+                            lit(spanEx(1, 2), 'a'),
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(2, 4),
+                                    kind = LiteralKind.Meta,
+                                    c = ']'.code,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parser("[a\\]]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 6),
+                    negated = false,
+                    kind = union(
+                        spanEx(1, 5),
+                        listOf(
+                            lit(spanEx(1, 2), 'a'),
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(2, 4),
+                                    kind = LiteralKind.Meta,
+                                    c = '-'.code,
+                                ),
+                            ),
+                            lit(spanEx(4, 5), 'z'),
+                        ),
+                    ),
+                ),
+            ),
+            parser("[a\\-z]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 4),
+                    negated = false,
+                    kind = union(spanEx(1, 3), listOf(lit(spanEx(1, 2), 'a'), lit(spanEx(2, 3), 'b'))),
+                ),
+            ),
+            parser("[ab]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 4),
+                    negated = false,
+                    kind = union(spanEx(1, 3), listOf(lit(spanEx(1, 2), 'a'), lit(spanEx(2, 3), '-'))),
+                ),
+            ),
+            parser("[a-]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 4),
+                    negated = false,
+                    kind = union(spanEx(1, 3), listOf(lit(spanEx(1, 2), '-'), lit(spanEx(2, 3), 'a'))),
+                ),
+            ),
+            parser("[-a]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 5),
+                    negated = false,
+                    kind = itemset(
+                        itemUnicode(
+                            ClassUnicode(
+                                span = spanEx(1, 4),
+                                negated = false,
+                                kind = ClassUnicodeKind.OneLetter('L'.code),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parser("[\\pL]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 4),
+                    negated = false,
+                    kind = itemset(
+                        itemPerl(
+                            ClassPerl(
+                                span = spanEx(1, 3),
+                                kind = ClassPerlKind.Word,
+                                negated = false,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parser("[\\w]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 6),
+                    negated = false,
+                    kind = union(
+                        spanEx(1, 5),
+                        listOf(
+                            lit(spanEx(1, 2), 'a'),
+                            itemPerl(ClassPerl(spanEx(2, 4), ClassPerlKind.Word, false)),
+                            lit(spanEx(4, 5), 'z'),
+                        ),
+                    ),
+                ),
+            ),
+            parser("[a\\wz]").parse().getOrThrow(),
+        )
+
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 5),
+                    negated = false,
+                    kind = itemset(range(spanEx(1, 4), 'a', 'z')),
+                ),
+            ),
+            parser("[a-z]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 8),
+                    negated = false,
+                    kind = union(
+                        spanEx(1, 7),
+                        listOf(
+                            range(spanEx(1, 4), 'a', 'c'),
+                            range(spanEx(4, 7), 'x', 'z'),
+                        ),
+                    ),
+                ),
+            ),
+            parser("[a-cx-z]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 12),
+                    negated = false,
+                    kind = intersection(
+                        spanEx(1, 11),
+                        itemset(itemPerl(ClassPerl(spanEx(1, 3), ClassPerlKind.Word, false))),
+                        union(
+                            spanEx(5, 11),
+                            listOf(
+                                range(spanEx(5, 8), 'a', 'c'),
+                                range(spanEx(8, 11), 'x', 'z'),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parser("[\\w&&a-cx-z]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 12),
+                    negated = false,
+                    kind = intersection(
+                        spanEx(1, 11),
+                        union(
+                            spanEx(1, 7),
+                            listOf(
+                                range(spanEx(1, 4), 'a', 'c'),
+                                range(spanEx(4, 7), 'x', 'z'),
+                            ),
+                        ),
+                        itemset(itemPerl(ClassPerl(spanEx(9, 11), ClassPerlKind.Word, false))),
+                    ),
+                ),
+            ),
+            parser("[a-cx-z&&\\w]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 9),
+                    negated = false,
+                    kind = difference(
+                        spanEx(1, 8),
+                        difference(
+                            spanEx(1, 5),
+                            itemset(lit(spanEx(1, 2), 'a')),
+                            itemset(lit(spanEx(4, 5), 'b')),
+                        ),
+                        itemset(lit(spanEx(7, 8), 'c')),
+                    ),
+                ),
+            ),
+            parser("[a--b--c]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 9),
+                    negated = false,
+                    kind = symdifference(
+                        spanEx(1, 8),
+                        symdifference(
+                            spanEx(1, 5),
+                            itemset(lit(spanEx(1, 2), 'a')),
+                            itemset(lit(spanEx(4, 5), 'b')),
+                        ),
+                        itemset(lit(spanEx(7, 8), 'c')),
+                    ),
+                ),
+            ),
+            parser("[a~~b~~c]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 7),
+                    negated = false,
+                    kind = intersection(
+                        spanEx(1, 6),
+                        itemset(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(1, 3),
+                                    kind = LiteralKind.Meta,
+                                    c = '^'.code,
+                                ),
+                            ),
+                        ),
+                        itemset(lit(spanEx(5, 6), '^')),
+                    ),
+                ),
+            ),
+            parser("[\\^&&^]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 7),
+                    negated = false,
+                    kind = intersection(
+                        spanEx(1, 6),
+                        itemset(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(1, 3),
+                                    kind = LiteralKind.Meta,
+                                    c = '&'.code,
+                                ),
+                            ),
+                        ),
+                        itemset(lit(spanEx(5, 6), '&')),
+                    ),
+                ),
+            ),
+            parser("[\\&&&&]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 6),
+                    negated = false,
+                    kind = intersection(
+                        spanEx(1, 5),
+                        intersection(
+                            spanEx(1, 3),
+                            itemset(empty(spanEx(1, 1))),
+                            itemset(empty(spanEx(3, 3))),
+                        ),
+                        itemset(empty(spanEx(5, 5))),
+                    ),
+                ),
+            ),
+            parser("[&&&&]").parse().getOrThrow(),
+        )
+
+        val pat = "[☃-⛄]"
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 5),
+                    negated = false,
+                    kind = itemset(
+                        ClassSetItem.Range(
+                            ClassSetRange(
+                                span = spanEx(1, 4),
+                                start = io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(1, 2),
+                                    kind = LiteralKind.Verbatim,
+                                    c = '☃'.code,
+                                ),
+                                end = io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(3, 4),
+                                    kind = LiteralKind.Verbatim,
+                                    c = '⛄'.code,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parser(pat).parse().getOrThrow(),
+        )
+
+        assertEquals(
+            Ast.ClassBracketed(ClassBracketed(spanEx(0, 3), false, itemset(lit(spanEx(1, 2), ']')))),
+            parser("[]]").parse().getOrThrow(),
+        )
+        assertEquals(
+            Ast.ClassBracketed(
+                ClassBracketed(
+                    span = spanEx(0, 5),
+                    negated = false,
+                    kind = union(
+                        spanEx(1, 4),
+                        listOf(
+                            lit(spanEx(1, 2), ']'),
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(2, 4),
+                                    kind = LiteralKind.Meta,
+                                    c = '['.code,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parser("[]\\[]").parse().getOrThrow(),
+        )
+        assertEquals(
+            concat(
+                0,
+                5,
+                listOf(
+                    Ast.ClassBracketed(
+                        ClassBracketed(
+                            span = spanEx(0, 4),
+                            negated = false,
+                            kind = itemset(
+                                ClassSetItem.Literal(
+                                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                                        span = spanEx(1, 3),
+                                        kind = LiteralKind.Meta,
+                                        c = '['.code,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                    Ast.Literal(
+                        Literal(
+                            span = spanEx(4, 5),
+                            kind = LiteralKind.Verbatim,
+                            c = ']'.code,
+                        ),
+                    ),
+                ),
+            ),
+            parser("[\\[]]").parse().getOrThrow(),
+        )
+
+        assertEquals(TestError(spanEx(0, 1), ErrorKind.ClassUnclosed), parseErr("["))
+        assertEquals(TestError(spanEx(1, 2), ErrorKind.ClassUnclosed), parseErr("[["))
+        assertEquals(TestError(spanEx(0, 1), ErrorKind.ClassUnclosed), parseErr("[[-"))
+        assertEquals(TestError(spanEx(1, 2), ErrorKind.ClassUnclosed), parseErr("[[[:alnum:]"))
+        assertEquals(TestError(spanEx(1, 3), ErrorKind.ClassEscapeInvalid), parseErr("[\\b]"))
+        assertEquals(TestError(spanEx(1, 3), ErrorKind.ClassRangeLiteral), parseErr("[\\w-a]"))
+        assertEquals(TestError(spanEx(3, 5), ErrorKind.ClassRangeLiteral), parseErr("[a-\\w]"))
+        assertEquals(TestError(spanEx(1, 4), ErrorKind.ClassRangeInvalid), parseErr("[z-a]"))
+
+        fun parseErrIgnoreWhitespace(pat: String): TestError {
+            val res = parserIgnoreWhitespace(pat).parse()
+            val ex = res.fold(
+                onSuccess = { ast -> fail("expected parse failure for ignoreWhitespace pattern=$pat, got ast=$ast") },
+                onFailure = { t -> expectAstException(t) },
+            )
+            return TestError(ex.err.span(), ex.err.kind())
+        }
+        assertEquals(TestError(spanEx(0, 1), ErrorKind.ClassUnclosed), parseErrIgnoreWhitespace("[a "))
+        assertEquals(TestError(spanEx(0, 1), ErrorKind.ClassUnclosed), parseErrIgnoreWhitespace("[a- "))
+    }
+
+    @Test
+    fun parseSetClassOpen() {
+        fun parseSetClassOpenOk(pat: String): Pair<ClassBracketed, ClassSetUnion> =
+            parser(pat).parseSetClassOpen().getOrThrow()
+
+        fun parseSetClassOpenOkIgnoreWhitespace(pat: String): Pair<ClassBracketed, ClassSetUnion> =
+            parserIgnoreWhitespace(pat).parseSetClassOpen().getOrThrow()
+
+        fun parseSetClassOpenErr(pat: String): TestError {
+            val ex = parser(pat).parseSetClassOpen().fold(
+                onSuccess = { pair -> fail("expected parseSetClassOpen failure for pattern=$pat, got pair=$pair") },
+                onFailure = { t -> expectAstException(t) },
+            )
+            return TestError(ex.err.span(), ex.err.kind())
+        }
+
+        fun parseSetClassOpenErrIgnoreWhitespace(pat: String): TestError {
+            val ex = parserIgnoreWhitespace(pat).parseSetClassOpen().fold(
+                onSuccess = { pair -> fail("expected parseSetClassOpen failure for ignoreWhitespace pattern=$pat, got pair=$pair") },
+                onFailure = { t -> expectAstException(t) },
+            )
+            return TestError(ex.err.span(), ex.err.kind())
+        }
+
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 1),
+                    negated = false,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(1, 1), mutableListOf())),
+                ),
+                ClassSetUnion(spanEx(1, 1), mutableListOf()),
+            ),
+            parseSetClassOpenOk("[a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 4),
+                    negated = false,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(4, 4), mutableListOf())),
+                ),
+                ClassSetUnion(spanEx(4, 4), mutableListOf()),
+            ),
+            parseSetClassOpenOkIgnoreWhitespace("[   a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 2),
+                    negated = true,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(2, 2), mutableListOf())),
+                ),
+                ClassSetUnion(spanEx(2, 2), mutableListOf()),
+            ),
+            parseSetClassOpenOk("[^a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 4),
+                    negated = true,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(4, 4), mutableListOf())),
+                ),
+                ClassSetUnion(spanEx(4, 4), mutableListOf()),
+            ),
+            parseSetClassOpenOkIgnoreWhitespace("[ ^ a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 2),
+                    negated = false,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(1, 1), mutableListOf())),
+                ),
+                ClassSetUnion(
+                    span = spanEx(1, 2),
+                    items = mutableListOf(
+                        ClassSetItem.Literal(
+                            io.github.kotlinmania.regexsyntax.ast.Literal(
+                                span = spanEx(1, 2),
+                                kind = LiteralKind.Verbatim,
+                                c = '-'.code,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parseSetClassOpenOk("[-a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 4),
+                    negated = false,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(2, 2), mutableListOf())),
+                ),
+                ClassSetUnion(
+                    span = spanEx(2, 3),
+                    items = mutableListOf(
+                        ClassSetItem.Literal(
+                            io.github.kotlinmania.regexsyntax.ast.Literal(
+                                span = spanEx(2, 3),
+                                kind = LiteralKind.Verbatim,
+                                c = '-'.code,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parseSetClassOpenOkIgnoreWhitespace("[ - a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 3),
+                    negated = true,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(2, 2), mutableListOf())),
+                ),
+                ClassSetUnion(
+                    span = spanEx(2, 3),
+                    items = mutableListOf(
+                        ClassSetItem.Literal(
+                            io.github.kotlinmania.regexsyntax.ast.Literal(
+                                span = spanEx(2, 3),
+                                kind = LiteralKind.Verbatim,
+                                c = '-'.code,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parseSetClassOpenOk("[^-a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 3),
+                    negated = false,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(1, 1), mutableListOf())),
+                ),
+                ClassSetUnion(
+                    span = spanEx(1, 3),
+                    items = mutableListOf(
+                        ClassSetItem.Literal(
+                            io.github.kotlinmania.regexsyntax.ast.Literal(
+                                span = spanEx(1, 2),
+                                kind = LiteralKind.Verbatim,
+                                c = '-'.code,
+                            ),
+                        ),
+                        ClassSetItem.Literal(
+                            io.github.kotlinmania.regexsyntax.ast.Literal(
+                                span = spanEx(2, 3),
+                                kind = LiteralKind.Verbatim,
+                                c = '-'.code,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parseSetClassOpenOk("[--a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 2),
+                    negated = false,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(1, 1), mutableListOf())),
+                ),
+                ClassSetUnion(
+                    span = spanEx(1, 2),
+                    items = mutableListOf(
+                        ClassSetItem.Literal(
+                            io.github.kotlinmania.regexsyntax.ast.Literal(
+                                span = spanEx(1, 2),
+                                kind = LiteralKind.Verbatim,
+                                c = ']'.code,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parseSetClassOpenOk("[]a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 4),
+                    negated = false,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(2, 2), mutableListOf())),
+                ),
+                ClassSetUnion(
+                    span = spanEx(2, 3),
+                    items = mutableListOf(
+                        ClassSetItem.Literal(
+                            io.github.kotlinmania.regexsyntax.ast.Literal(
+                                span = spanEx(2, 3),
+                                kind = LiteralKind.Verbatim,
+                                c = ']'.code,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parseSetClassOpenOkIgnoreWhitespace("[ ] a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 3),
+                    negated = true,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(2, 2), mutableListOf())),
+                ),
+                ClassSetUnion(
+                    span = spanEx(2, 3),
+                    items = mutableListOf(
+                        ClassSetItem.Literal(
+                            io.github.kotlinmania.regexsyntax.ast.Literal(
+                                span = spanEx(2, 3),
+                                kind = LiteralKind.Verbatim,
+                                c = ']'.code,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parseSetClassOpenOk("[^]a]"),
+        )
+        assertEquals(
+            Pair(
+                ClassBracketed(
+                    span = spanEx(0, 2),
+                    negated = false,
+                    kind = ClassSet.union(ClassSetUnion(spanEx(1, 1), mutableListOf())),
+                ),
+                ClassSetUnion(
+                    span = spanEx(1, 2),
+                    items = mutableListOf(
+                        ClassSetItem.Literal(
+                            io.github.kotlinmania.regexsyntax.ast.Literal(
+                                span = spanEx(1, 2),
+                                kind = LiteralKind.Verbatim,
+                                c = '-'.code,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            parseSetClassOpenOk("[-]a]"),
+        )
+
+        assertEquals(TestError(spanEx(0, 1), ErrorKind.ClassUnclosed), parseSetClassOpenErr("["))
+        assertEquals(TestError(spanEx(0, 5), ErrorKind.ClassUnclosed), parseSetClassOpenErrIgnoreWhitespace("[    "))
+        assertEquals(TestError(spanEx(0, 2), ErrorKind.ClassUnclosed), parseSetClassOpenErr("[^"))
+        assertEquals(TestError(spanEx(0, 2), ErrorKind.ClassUnclosed), parseSetClassOpenErr("[]"))
+        assertEquals(TestError(spanEx(0, 0), ErrorKind.ClassUnclosed), parseSetClassOpenErr("[-"))
+        assertEquals(TestError(spanEx(0, 0), ErrorKind.ClassUnclosed), parseSetClassOpenErr("[--"))
+
+        assertEquals(
+            TestError(spanEx(4, 4), ErrorKind.ClassUnclosed),
+            run {
+                val ex = parser("(?x)[-#]").parseWithComments().fold(
+                    onSuccess = { wc -> fail("expected parseWithComments failure, got $wc") },
+                    onFailure = { t -> expectAstException(t) },
+                )
+                TestError(ex.err.span(), ex.err.kind())
+            },
+        )
+    }
+
+    @Test
+    fun maybeParseAsciiClass() {
+        assertEquals(
+            ClassAscii(span = spanEx(0, 9), kind = ClassAsciiKind.Alnum, negated = false),
+            parser("[:alnum:]").maybeParseAsciiClass(),
+        )
+        assertEquals(
+            ClassAscii(span = spanEx(0, 9), kind = ClassAsciiKind.Alnum, negated = false),
+            parser("[:alnum:]A").maybeParseAsciiClass(),
+        )
+        assertEquals(
+            ClassAscii(span = spanEx(0, 10), kind = ClassAsciiKind.Alnum, negated = true),
+            parser("[:^alnum:]").maybeParseAsciiClass(),
+        )
+
+        run {
+            val p = parser("[:")
+            assertEquals(null, p.maybeParseAsciiClass())
+            assertEquals(0, p.offset())
+        }
+        run {
+            val p = parser("[:^")
+            assertEquals(null, p.maybeParseAsciiClass())
+            assertEquals(0, p.offset())
+        }
+        run {
+            val p = parser("[^:alnum:]")
+            assertEquals(null, p.maybeParseAsciiClass())
+            assertEquals(0, p.offset())
+        }
+        run {
+            val p = parser("[:alnnum:]")
+            assertEquals(null, p.maybeParseAsciiClass())
+            assertEquals(0, p.offset())
+        }
+        run {
+            val p = parser("[:alnum]")
+            assertEquals(null, p.maybeParseAsciiClass())
+            assertEquals(0, p.offset())
+        }
+        run {
+            val p = parser("[:alnum:")
+            assertEquals(null, p.maybeParseAsciiClass())
+            assertEquals(0, p.offset())
+        }
+    }
+
+    @Test
+    fun parseUnicodeClass() {
+        fun parseEscapeOk(pat: String): Primitive = parser(pat).parseEscape().getOrThrow()
+        fun parseEscapeErr(pat: String): TestError {
+            val ex = parser(pat).parseEscape().fold(
+                onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
+                onFailure = { t -> expectAstException(t) }
+            )
+            return TestError(ex.err.span(), ex.err.kind())
+        }
+
+        assertEquals(
+            Primitive.Unicode(ClassUnicode(spanEx(0, 3), false, ClassUnicodeKind.OneLetter('N'.code))),
+            parseEscapeOk("\\pN"),
+        )
+        assertEquals(
+            Primitive.Unicode(ClassUnicode(spanEx(0, 3), true, ClassUnicodeKind.OneLetter('N'.code))),
+            parseEscapeOk("\\PN"),
+        )
+        assertEquals(
+            Primitive.Unicode(ClassUnicode(spanEx(0, 5), false, ClassUnicodeKind.Named("N"))),
+            parseEscapeOk("\\p{N}"),
+        )
+        assertEquals(
+            Primitive.Unicode(ClassUnicode(spanEx(0, 5), true, ClassUnicodeKind.Named("N"))),
+            parseEscapeOk("\\P{N}"),
+        )
+        assertEquals(
+            Primitive.Unicode(ClassUnicode(spanEx(0, 9), false, ClassUnicodeKind.Named("Greek"))),
+            parseEscapeOk("\\p{Greek}"),
+        )
+
+        assertEquals(
+            Primitive.Unicode(
+                ClassUnicode(
+                    span = spanEx(0, 16),
+                    negated = false,
+                    kind = ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Colon, "scx", "Katakana"),
+                ),
+            ),
+            parseEscapeOk("\\p{scx:Katakana}"),
+        )
+        assertEquals(
+            Primitive.Unicode(
+                ClassUnicode(
+                    span = spanEx(0, 16),
+                    negated = false,
+                    kind = ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Equal, "scx", "Katakana"),
+                ),
+            ),
+            parseEscapeOk("\\p{scx=Katakana}"),
+        )
+        assertEquals(
+            Primitive.Unicode(
+                ClassUnicode(
+                    span = spanEx(0, 17),
+                    negated = false,
+                    kind = ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.NotEqual, "scx", "Katakana"),
+                ),
+            ),
+            parseEscapeOk("\\p{scx!=Katakana}"),
+        )
+
+        assertEquals(
+            Primitive.Unicode(
+                ClassUnicode(
+                    span = spanEx(0, 5),
+                    negated = false,
+                    kind = ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Colon, "", ""),
+                ),
+            ),
+            parseEscapeOk("\\p{:}"),
+        )
+        assertEquals(
+            Primitive.Unicode(
+                ClassUnicode(
+                    span = spanEx(0, 5),
+                    negated = false,
+                    kind = ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Equal, "", ""),
+                ),
+            ),
+            parseEscapeOk("\\p{=}"),
+        )
+        assertEquals(
+            Primitive.Unicode(
+                ClassUnicode(
+                    span = spanEx(0, 6),
+                    negated = false,
+                    kind = ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.NotEqual, "", ""),
+                ),
+            ),
+            parseEscapeOk("\\p{!=}"),
+        )
+
+        assertEquals(TestError(spanEx(2, 2), ErrorKind.EscapeUnexpectedEof), parseEscapeErr("\\p"))
+        assertEquals(TestError(spanEx(3, 3), ErrorKind.EscapeUnexpectedEof), parseEscapeErr("\\p{"))
+        assertEquals(TestError(spanEx(4, 4), ErrorKind.EscapeUnexpectedEof), parseEscapeErr("\\p{N"))
+        assertEquals(TestError(spanEx(8, 8), ErrorKind.EscapeUnexpectedEof), parseEscapeErr("\\p{Greek"))
+
+        assertEquals(
+            concat(
+                0,
+                4,
+                listOf(
+                    Ast.ClassUnicode(ClassUnicode(spanEx(0, 3), false, ClassUnicodeKind.OneLetter('N'.code))),
+                    Ast.Literal(Literal(spanEx(3, 4), LiteralKind.Verbatim, 'z'.code)),
+                ),
+            ),
+            parser("\\pNz").parse().getOrThrow(),
+        )
+        assertEquals(
+            concat(
+                0,
+                10,
+                listOf(
+                    Ast.ClassUnicode(ClassUnicode(spanEx(0, 9), false, ClassUnicodeKind.Named("Greek"))),
+                    Ast.Literal(Literal(spanEx(9, 10), LiteralKind.Verbatim, 'z'.code)),
+                ),
+            ),
+            parser("\\p{Greek}z").parse().getOrThrow(),
+        )
+        assertEquals(TestError(spanEx(2, 3), ErrorKind.UnicodeClassInvalid), parseErr("\\p\\{"))
+        assertEquals(TestError(spanEx(2, 3), ErrorKind.UnicodeClassInvalid), parseErr("\\P\\{"))
+    }
+
+    @Test
+    fun parsePerlClass() {
+        fun parseEscapeOk(pat: String): Primitive = parser(pat).parseEscape().getOrThrow()
+
+        assertEquals(
+            Primitive.Perl(ClassPerl(spanEx(0, 2), ClassPerlKind.Digit, false)),
+            parseEscapeOk("\\d"),
+        )
+        assertEquals(
+            Primitive.Perl(ClassPerl(spanEx(0, 2), ClassPerlKind.Digit, true)),
+            parseEscapeOk("\\D"),
+        )
+        assertEquals(
+            Primitive.Perl(ClassPerl(spanEx(0, 2), ClassPerlKind.Space, false)),
+            parseEscapeOk("\\s"),
+        )
+        assertEquals(
+            Primitive.Perl(ClassPerl(spanEx(0, 2), ClassPerlKind.Space, true)),
+            parseEscapeOk("\\S"),
+        )
+        assertEquals(
+            Primitive.Perl(ClassPerl(spanEx(0, 2), ClassPerlKind.Word, false)),
+            parseEscapeOk("\\w"),
+        )
+        assertEquals(
+            Primitive.Perl(ClassPerl(spanEx(0, 2), ClassPerlKind.Word, true)),
+            parseEscapeOk("\\W"),
+        )
+
+        assertEquals(
+            Ast.ClassPerl(ClassPerl(spanEx(0, 2), ClassPerlKind.Digit, false)),
+            parser("\\d").parse().getOrThrow(),
+        )
+        assertEquals(
+            concat(
+                0,
+                3,
+                listOf(
+                    Ast.ClassPerl(ClassPerl(spanEx(0, 2), ClassPerlKind.Digit, false)),
+                    Ast.Literal(Literal(spanEx(2, 3), LiteralKind.Verbatim, 'z'.code)),
+                ),
+            ),
+            parser("\\dz").parse().getOrThrow(),
         )
     }
 
