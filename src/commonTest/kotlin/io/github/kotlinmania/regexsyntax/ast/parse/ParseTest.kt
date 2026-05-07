@@ -3116,7 +3116,7 @@ class ParseTest {
 
         assertEquals(TestError(spanEx(0, 1), ErrorKind.ClassUnclosed), parseErr("["))
         assertEquals(TestError(spanEx(1, 2), ErrorKind.ClassUnclosed), parseErr("[["))
-        assertEquals(TestError(spanEx(0, 1), ErrorKind.ClassUnclosed), parseErr("[[-"))
+        assertEquals(TestError(spanEx(0, 1), ErrorKind.ClassUnclosed), parseErr("[[-]"))
         assertEquals(TestError(spanEx(1, 2), ErrorKind.ClassUnclosed), parseErr("[[[:alnum:]"))
         assertEquals(TestError(spanEx(1, 3), ErrorKind.ClassEscapeInvalid), parseErr("[\\b]"))
         assertEquals(TestError(spanEx(1, 3), ErrorKind.ClassRangeLiteral), parseErr("[\\w-a]"))
