@@ -287,6 +287,44 @@ data class Utf8Range(
  *
  * Each sequence of byte ranges matches a unique set of bytes. That is, no two
  * sequences will match the same bytes.
+ *
+ * # Example
+ *
+ * This shows how to match an arbitrary byte sequence against a range of
+ * scalar values.
+ *
+ * ```kotlin
+ * import io.github.kotlinmania.regexsyntax.utf8.Utf8Sequence
+ * import io.github.kotlinmania.regexsyntax.utf8.Utf8Sequences
+ *
+ * fun matches(seqs: List<Utf8Sequence>, bytes: ByteArray): Boolean {
+ *     for (range in seqs) {
+ *         if (range.matches(bytes)) return true
+ *     }
+ *     return false
+ * }
+ *
+ * // Test the basic multilingual plane.
+ * val seqs: List<Utf8Sequence> = Utf8Sequences(0x0, 0xFFFF).asSequence().toList()
+ *
+ * // UTF-8 encoding of 'a'.
+ * check(matches(seqs, byteArrayOf(0x61)))
+ * // UTF-8 encoding of '☃' (`\u2603`).
+ * check(matches(seqs, byteArrayOf(0xE2.toByte(), 0x98.toByte(), 0x83.toByte())))
+ * // UTF-8 encoding of `\u10348` (outside the BMP).
+ * check(!matches(seqs, byteArrayOf(0xF0.toByte(), 0x90.toByte(), 0x8D.toByte(), 0x88.toByte())))
+ * // Tries to match against a UTF-8 encoding of a surrogate codepoint,
+ * // which is invalid UTF-8, and therefore fails, despite the fact that
+ * // the corresponding codepoint (0xD800) falls in the range given.
+ * check(!matches(seqs, byteArrayOf(0xED.toByte(), 0xA0.toByte(), 0x80.toByte())))
+ * // And fails against plain old invalid UTF-8.
+ * check(!matches(seqs, byteArrayOf(0xFF.toByte(), 0xFF.toByte())))
+ * ```
+ *
+ * If this example seems circuitous, that's because it is. It's meant to be
+ * illustrative. In practice, you could just try to decode your byte sequence
+ * and compare it with the scalar value range directly. However, this is not
+ * always possible (for example, in a byte based automaton).
  */
 class Utf8Sequences(start: Int, end: Int) : Iterator<Utf8Sequence> {
     private val rangeStack: MutableList<ScalarRange> = mutableListOf(ScalarRange(start, end))
@@ -300,6 +338,8 @@ class Utf8Sequences(start: Int, end: Int) : Iterator<Utf8Sequence> {
         ready = false
         nextItem = null
     }
+
+    override fun toString(): String = "Utf8Sequences(rangeStack=$rangeStack)"
 
     private fun push(start: Int, end: Int) {
         rangeStack.add(ScalarRange(start, end))
@@ -374,6 +414,9 @@ class Utf8Sequences(start: Int, end: Int) : Iterator<Utf8Sequence> {
 
 /** A range over scalar (Unicode codepoint) values. */
 internal data class ScalarRange(var start: Int, var end: Int) {
+    override fun toString(): String =
+        "ScalarRange(${start.toString(16).uppercase()}, ${end.toString(16).uppercase()})"
+
     /**
      * `split` splits this range if it overlaps with a surrogate codepoint.
      *
