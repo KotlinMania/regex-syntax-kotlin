@@ -39,7 +39,6 @@ Line-by-line transliteration. Read the Rust file end to end, then port. Don't re
 ## Blast radius
 
 - No repo-wide scripting.
-- More than ~5 files in a single change? Stop and ask.
 
 ## Verification
 

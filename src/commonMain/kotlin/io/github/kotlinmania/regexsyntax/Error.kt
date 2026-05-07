@@ -274,7 +274,7 @@ private class Spans(
  * and a trailing `\n` does not produce an extra empty line.
  */
 private fun patternLines(pattern: String): List<String> {
-    if (pattern.isEmpty()) return emptyList()
+    if (pattern.isEmpty()) return listOf("")
     val lines = mutableListOf<String>()
     var start = 0
     var i = 0

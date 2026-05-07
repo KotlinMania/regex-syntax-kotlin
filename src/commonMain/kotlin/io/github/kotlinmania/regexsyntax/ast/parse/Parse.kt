@@ -967,6 +967,12 @@ internal class ParserI(
         } else {
             return Result.failure(AstException(error(Span.splat(start), ErrorKind.RepetitionMissing)))
         }
+        when (ast) {
+            is Ast.Empty, is Ast.Flags -> {
+                return Result.failure(AstException(error(span(), ErrorKind.RepetitionMissing)))
+            }
+            else -> {}
+        }
 
         val opStart = pos()
         bump()
@@ -993,65 +999,67 @@ internal class ParserI(
             return Result.failure(AstException(error(Span.splat(start), ErrorKind.RepetitionMissing)))
         }
 
-        bump()
-        bumpSpace()
+        when (ast) {
+            is Ast.Empty, is Ast.Flags -> {
+                return Result.failure(AstException(error(span(), ErrorKind.RepetitionMissing)))
+            }
+            else -> {}
+        }
+
+        if (!bumpAndBumpSpace()) {
+            return Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
+        }
+        val countStartResult = specializeErr(parseDecimal(), ErrorKind.DecimalEmpty, ErrorKind.RepetitionCountDecimalEmpty)
         if (isEof()) {
             return Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
         }
 
-        val startRangeResult = if (char().toChar().isDigit()) {
-            parseDecimal()
-        } else if (parser().emptyMinRange && char() == ','.code) {
-            Result.success(0u)
-        } else {
-            Result.failure(AstException(error(Span.splat(pos()), ErrorKind.RepetitionCountDecimalEmpty)))
-        }
-        val startRange = startRangeResult.fold(
-            onSuccess = { it },
-            onFailure = { return Result.failure(it) }
-        )
-
-        bumpSpace()
-        if (isEof()) {
-            return Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
-        }
-
-        val rangeResult: Result<RepetitionRange> = if (bumpIf(",")) {
-            bumpSpace()
-            if (isEof()) {
-                Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
-            } else if (char().toChar().isDigit()) {
-                parseDecimal().fold(
-                    onSuccess = { end ->
-                        if (startRange > end) {
-                            Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountInvalid)))
+        val range: RepetitionRange = if (char() == ','.code) {
+            if (!bumpAndBumpSpace()) {
+                return Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
+            }
+            if (char() != '}'.code) {
+                val countStart = countStartResult.fold(
+                    onSuccess = { it },
+                    onFailure = { e ->
+                        if (e is AstException && e.err.kind() == ErrorKind.RepetitionCountDecimalEmpty) {
+                            if (parser().emptyMinRange) {
+                                0u
+                            } else {
+                                return Result.failure(e)
+                            }
                         } else {
-                            Result.success(RepetitionRange.Bounded(startRange, end))
+                            return Result.failure(e)
                         }
-                    },
-                    onFailure = { Result.failure(it) }
+                    }
                 )
+                val countEnd = specializeErr(parseDecimal(), ErrorKind.DecimalEmpty, ErrorKind.RepetitionCountDecimalEmpty)
+                    .getOrElse { return Result.failure(it) }
+                RepetitionRange.Bounded(countStart, countEnd)
             } else {
-                Result.success(RepetitionRange.AtLeast(startRange))
+                RepetitionRange.AtLeast(countStartResult.getOrElse { return Result.failure(it) })
             }
         } else {
-            Result.success(RepetitionRange.Exactly(startRange))
+            RepetitionRange.Exactly(countStartResult.getOrElse { return Result.failure(it) })
         }
-        val range = rangeResult.fold(
-            onSuccess = { it },
-            onFailure = { return Result.failure(it) }
-        )
 
-        bumpSpace()
         if (isEof() || char() != '}'.code) {
             return Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
         }
-        bump()
-        val greedy = !bumpIf("?")
+
+        var greedy = true
+        if (bumpAndBumpSpace() && char() == '?'.code) {
+            greedy = false
+            bump()
+        }
+
         val opSpan = Span(start, pos())
-        val span = Span(ast.span().start, pos())
+        if (!range.isValid()) {
+            return Result.failure(AstException(error(opSpan, ErrorKind.RepetitionCountInvalid)))
+        }
+
         concat.asts.add(Ast.Repetition(Repetition(
-            span = span,
+            span = ast.span().withEnd(pos()),
             op = RepetitionOp(opSpan, RepetitionKind.Range(range)),
             greedy = greedy,
             ast = ast
@@ -1167,7 +1175,7 @@ internal class ParserI(
     /**
      * Parses a sequence of flags.
      */
-    private fun parseFlags(): Result<Flags> {
+    internal fun parseFlags(): Result<Flags> {
         val start = pos()
         val items = mutableListOf<FlagsItem>()
         var negated = false
@@ -1194,6 +1202,9 @@ internal class ParserI(
                 bump()
             }
         }
+        if (isEof()) {
+            return Result.failure(AstException(error(span(), ErrorKind.FlagUnexpectedEof)))
+        }
         if (items.isEmpty()) {
             return Result.success(Flags(Span(pos(), pos()), items))
         }
@@ -1206,7 +1217,7 @@ internal class ParserI(
     /**
      * Parses a single flag.
      */
-    private fun parseFlag(): Result<Flag> {
+    internal fun parseFlag(): Result<Flag> {
         return when (char().toChar()) {
             'i' -> Result.success(Flag.CaseInsensitive)
             'm' -> Result.success(Flag.MultiLine)
@@ -1222,7 +1233,7 @@ internal class ParserI(
     /**
      * Parses a single primitive expression.
      */
-    private fun parsePrimitive(): Result<Primitive> {
+    internal fun parsePrimitive(): Result<Primitive> {
         val c = char()
         return when (c.toChar()) {
             '\\' -> parseEscape()
@@ -1256,7 +1267,7 @@ internal class ParserI(
     /**
      * Parses an escape sequence.
      */
-    private fun parseEscape(): Result<Primitive> {
+    internal fun parseEscape(): Result<Primitive> {
         val start = pos()
         if (!bump()) {
             return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeUnexpectedEof)))
@@ -1400,7 +1411,7 @@ internal class ParserI(
         return Result.success(kind)
     }
 
-    private fun parseOctal(): io.github.kotlinmania.regexsyntax.ast.Literal {
+    internal fun parseOctal(): io.github.kotlinmania.regexsyntax.ast.Literal {
         val start = pos()
         var n = 0
         var i = 0
@@ -1421,11 +1432,11 @@ internal class ParserI(
         )
     }
 
-    private fun parseHex(): Result<io.github.kotlinmania.regexsyntax.ast.Literal> {
+    internal fun parseHex(): Result<io.github.kotlinmania.regexsyntax.ast.Literal> {
         val start = pos()
         val c = char().toChar()
         if (!bumpAndBumpSpace()) {
-            return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeUnexpectedEof)))
+            return Result.failure(AstException(error(Span.splat(pos()), ErrorKind.EscapeUnexpectedEof)))
         }
         return when (c) {
             'x' -> if (char() == '{'.code) parseHexBrace(start, HexLiteralKind.X) else parseHexDigits(2, HexLiteralKind.X)
@@ -1435,13 +1446,13 @@ internal class ParserI(
         }
     }
 
-    private fun parseHexDigits(n: Int, kind: HexLiteralKind): Result<io.github.kotlinmania.regexsyntax.ast.Literal> {
+    internal fun parseHexDigits(n: Int, kind: HexLiteralKind): Result<io.github.kotlinmania.regexsyntax.ast.Literal> {
         val start = pos()
         var i = 0
         var hex = 0
         while (i < n) {
             if (i > 0 && !bumpAndBumpSpace()) {
-                return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeUnexpectedEof)))
+                return Result.failure(AstException(error(Span.splat(pos()), ErrorKind.EscapeUnexpectedEof)))
             }
             val d = char().toChar().digitToIntOrNull(16)
                 ?: return Result.failure(AstException(error(spanChar(), ErrorKind.EscapeHexInvalidDigit)))
@@ -1461,8 +1472,9 @@ internal class ParserI(
         ))
     }
 
-    private fun parseHexBrace(start: Position, kind: HexLiteralKind): Result<io.github.kotlinmania.regexsyntax.ast.Literal> {
+    internal fun parseHexBrace(start: Position, kind: HexLiteralKind): Result<io.github.kotlinmania.regexsyntax.ast.Literal> {
         if (char() != '{'.code) throw IllegalStateException("expected {")
+        val braceStart = pos()
         val startDigits = spanChar().end
         var hex = 0
         var digits = 0
@@ -1479,10 +1491,11 @@ internal class ParserI(
             bumpAndBumpSpace()
         }
         if (isEof()) {
-            return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeUnexpectedEof)))
+            return Result.failure(AstException(error(Span(braceStart, pos()), ErrorKind.EscapeUnexpectedEof)))
         }
         if (digits == 0) {
-            return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeHexEmpty)))
+            bumpAndBumpSpace() // '}'
+            return Result.failure(AstException(error(Span(braceStart, pos()), ErrorKind.EscapeHexEmpty)))
         }
         if (hex in 0xD800..0xDFFF) {
             return Result.failure(AstException(error(Span(startDigits, pos()), ErrorKind.EscapeHexInvalid)))
@@ -1495,23 +1508,35 @@ internal class ParserI(
         ))
     }
 
-    private fun parseDecimal(): Result<UInt> {
+    internal fun parseDecimal(): Result<UInt> {
+        while (!isEof() && char().toChar().isWhitespace()) {
+            bump()
+        }
         val start = pos()
+
         var n = 0u
         var digits = 0
         while (!isEof()) {
             val d = char().toChar().digitToIntOrNull(10) ?: break
             val next = n.toLong() * 10 + d
             if (next > UInt.MAX_VALUE.toLong()) {
-                while (!isEof() && char().toChar().isDigit()) bump()
+                while (!isEof() && char().toChar().isDigit()) {
+                    bump()
+                }
                 return Result.failure(AstException(error(Span(start, pos()), ErrorKind.DecimalInvalid)))
             }
             n = next.toUInt()
-            bump()
+            bumpAndBumpSpace()
             digits++
         }
+        val span = Span(start, pos())
+
+        while (!isEof() && char().toChar().isWhitespace()) {
+            bumpAndBumpSpace()
+        }
+
         if (digits == 0) {
-            return Result.failure(AstException(error(Span(start, pos()), ErrorKind.DecimalEmpty)))
+            return Result.failure(AstException(error(span, ErrorKind.DecimalEmpty)))
         }
         return Result.success(n)
     }
@@ -1673,7 +1698,7 @@ internal class ParserI(
         return Result.success(set to union)
     }
 
-    private fun maybeParseAsciiClass(): ClassAscii? {
+    internal fun maybeParseAsciiClass(): ClassAscii? {
         if (char() != '['.code) throw IllegalStateException("expected [")
         val start = pos()
         var negated = false
@@ -1756,7 +1781,7 @@ internal class ParserI(
         }
     }
 
-    private fun parseUnicodeClass(): Result<ClassUnicode> {
+    internal fun parseUnicodeClass(): Result<ClassUnicode> {
         val start = pos()
         val c = char().toChar()
         val negated = c == 'P'
@@ -1797,7 +1822,7 @@ internal class ParserI(
         }
     }
 
-    private fun parsePerlClass(): ClassPerl {
+    internal fun parsePerlClass(): ClassPerl {
         val start = pos()
         val c = char().toChar()
         val negated = c.isUpperCase()
@@ -1819,7 +1844,12 @@ internal class ParserI(
         return if (first) {
             ch == '_' || ch.isLetter()
         } else {
-            ch == '_' || ch == '.' || ch == '[' || ch == ']' || ch.isLetterOrDigit()
+            ch == '_' ||
+                ch == '.' ||
+                ch == '[' ||
+                ch == ']' ||
+                ch.isLetterOrDigit() ||
+                ch.category == CharCategory.OTHER_NUMBER
         }
     }
 }
