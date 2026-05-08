@@ -8,10 +8,10 @@ Based on AST analysis, here are the concrete next steps.
 - **Function parity:** 619/739 matched (target 1168) — 83.8%
 - **Class/type parity:** 119/134 matched (target 279) — 88.8%
 - **Combined symbol parity:** 738/873 matched (target 1447) — 84.5%
-- **Average inline-code cosine:** 0.43 (function body across 28 matched files)
+- **Average inline-code cosine:** 0.46 (function body across 28 matched files)
 - **Average documentation cosine:** 0.33 (doc text across 28 matched files)
-- **Cheat-zeroed Files:** 19
-- **Critical Issues:** 21 files with <0.60 function similarity
+- **Cheat-zeroed Files:** 17
+- **Critical Issues:** 20 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -29,10 +29,10 @@ Every matched file is listed below with function and type symbol parity.
 
 ### 1. unicode
 
-- **Target:** `unicode.Unicode [ZERO]`
-- **Similarity:** 0.00
+- **Target:** `unicode.Unicode`
+- **Similarity:** 0.34
 - **Dependents:** 1
-- **Priority Score:** 1034710.0
+- **Priority Score:** 1034706.6
 - **Functions:** 36/39 matched (target 50)
 - **Missing functions:** `class`, `simple_fold_ok`, `contains_case_map`
 - **Types:** 8/8 matched (target 18)
@@ -182,10 +182,10 @@ Every matched file is listed below with function and type symbol parity.
 
 ### 13. utf8
 
-- **Target:** `utf8.Utf8 [ZERO]`
-- **Similarity:** 0.00
+- **Target:** `utf8.Utf8`
+- **Similarity:** 0.63
 - **Dependents:** 0
-- **Priority Score:** 52910.0
+- **Priority Score:** 52903.7
 - **Functions:** 20/23 matched (target 43)
 - **Missing functions:** `rutf8`, `never_accepts_surrogate_codepoints`, `encode_surrogate`
 - **Types:** 4/6 matched (target 9)

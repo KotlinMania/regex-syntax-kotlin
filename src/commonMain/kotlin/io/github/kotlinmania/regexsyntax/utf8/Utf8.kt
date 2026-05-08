@@ -42,8 +42,8 @@ package io.github.kotlinmania.regexsyntax.utf8
  * Instead, you need multiple sequences of byte ranges:
  *
  * ```text
- * [D0-D3][80-BF]  # matches codepoints 0400-04FF
- * [D4][80-AF]     # matches codepoints 0500-052F
+ * [D0-D3][80-BF]  # accepts codepoints 0400-04FF
+ * [D4][80-AF]     # accepts codepoints 0500-052F
  * ```
  *
  * This gets even more complicated if you want bigger ranges, particularly if
@@ -59,7 +59,7 @@ package io.github.kotlinmania.regexsyntax.utf8
  * [EE-EF][80-BF][80-BF]
  * ```
  *
- * Note that the byte ranges above will *not* match any erroneous encoding of
+ * Note that the byte ranges above will *not* accept any erroneous encoding of
  * UTF-8, including encodings of surrogate codepoints.
  *
  * And, of course, for all of Unicode (`[000000-10FFFF]`):
@@ -91,11 +91,11 @@ private const val MAX_UTF8_BYTES: Int = 4
 /**
  * [Utf8Sequence] represents a sequence of byte ranges.
  *
- * To match a [Utf8Sequence], a candidate byte sequence must match each
+ * To satisfy a [Utf8Sequence], a candidate byte sequence must satisfy each
  * successive range.
  *
  * For example, if there are two ranges, `[C2-DF][80-BF]`, then the byte
- * sequence `\xDD\x61` would not match because `0x61 < 0x80`.
+ * sequence `\xDD\x61` would not satisfy it because `0x61 < 0x80`.
  */
 sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     /** One byte range. */
@@ -158,9 +158,7 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     }
 
     /**
-     * Kotlin equivalent of Rust's `IntoIterator for &Utf8Sequence`.
-     *
-     * This returns an iterator over the underlying byte ranges.
+     * Returns an iterator over the underlying byte ranges.
      */
     fun intoIter(): Iterator<Utf8Range> = iterator()
 
@@ -186,7 +184,7 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
      * [80-BF][D0-D3]
      * ```
      *
-     * This is useful when one is constructing a UTF-8 automaton to match
+     * This is useful when one is constructing a UTF-8 automaton to accept
      * character classes in reverse.
      */
     fun reverse(): Utf8Sequence = when (this) {
@@ -197,7 +195,7 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     }
 
     /**
-     * Returns true if and only if a prefix of [bytes] matches this sequence
+     * Returns true if and only if a prefix of [bytes] satisfies this sequence
      * of byte ranges.
      */
     fun matches(bytes: ByteArray): Boolean {
@@ -212,9 +210,7 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     override fun iterator(): Iterator<Utf8Range> = asSlice().iterator()
 
     /**
-     * Kotlin equivalent of Rust's `fmt::Debug` implementation.
-     *
-     * This matches [toString].
+     * Returns the same debug representation as [toString].
      */
     fun fmt(): String = toString()
 
@@ -276,28 +272,28 @@ data class Utf8Range(
 }
 
 /**
- * An iterator over ranges of matching UTF-8 byte sequences.
+ * An iterator over ranges of accepted UTF-8 byte sequences.
  *
  * The iteration represents an alternation of comprehensive byte sequences
- * that match precisely the set of UTF-8 encoded scalar values.
+ * that accept precisely the set of UTF-8 encoded scalar values.
  *
  * A byte sequence corresponds to one of the scalar values in the range given
- * if and only if it completely matches exactly one of the sequences of byte
+ * if and only if it completely satisfies exactly one of the sequences of byte
  * ranges produced by this iterator.
  *
- * Each sequence of byte ranges matches a unique set of bytes. That is, no two
- * sequences will match the same bytes.
+ * Each sequence of byte ranges accepts a unique set of bytes. That is, no two
+ * sequences accept the same bytes.
  *
  * # Example
  *
- * This shows how to match an arbitrary byte sequence against a range of
+ * This shows how to test an arbitrary byte sequence against a range of
  * scalar values.
  *
  * ```kotlin
  * import io.github.kotlinmania.regexsyntax.utf8.Utf8Sequence
  * import io.github.kotlinmania.regexsyntax.utf8.Utf8Sequences
  *
- * fun matches(seqs: List<Utf8Sequence>, bytes: ByteArray): Boolean {
+ * fun accepts(seqs: List<Utf8Sequence>, bytes: ByteArray): Boolean {
  *     for (range in seqs) {
  *         if (range.matches(bytes)) return true
  *     }
@@ -307,18 +303,18 @@ data class Utf8Range(
  * // Test the basic multilingual plane.
  * val seqs: List<Utf8Sequence> = Utf8Sequences(0x0, 0xFFFF).asSequence().toList()
  *
- * // UTF-8 encoding of 'a'.
- * check(matches(seqs, byteArrayOf(0x61)))
- * // UTF-8 encoding of '☃' (`\u2603`).
- * check(matches(seqs, byteArrayOf(0xE2.toByte(), 0x98.toByte(), 0x83.toByte())))
+ * // UTF-8 encoding of the letter a.
+ * check(accepts(seqs, byteArrayOf(0x61)))
+ * // UTF-8 encoding of the snowman character (`\u2603`).
+ * check(accepts(seqs, byteArrayOf(0xE2.toByte(), 0x98.toByte(), 0x83.toByte())))
  * // UTF-8 encoding of `\u10348` (outside the BMP).
- * check(!matches(seqs, byteArrayOf(0xF0.toByte(), 0x90.toByte(), 0x8D.toByte(), 0x88.toByte())))
- * // Tries to match against a UTF-8 encoding of a surrogate codepoint,
+ * check(!accepts(seqs, byteArrayOf(0xF0.toByte(), 0x90.toByte(), 0x8D.toByte(), 0x88.toByte())))
+ * // Tries a UTF-8 encoding of a surrogate codepoint,
  * // which is invalid UTF-8, and therefore fails, despite the fact that
  * // the corresponding codepoint (0xD800) falls in the range given.
- * check(!matches(seqs, byteArrayOf(0xED.toByte(), 0xA0.toByte(), 0x80.toByte())))
+ * check(!accepts(seqs, byteArrayOf(0xED.toByte(), 0xA0.toByte(), 0x80.toByte())))
  * // And fails against plain old invalid UTF-8.
- * check(!matches(seqs, byteArrayOf(0xFF.toByte(), 0xFF.toByte())))
+ * check(!accepts(seqs, byteArrayOf(0xFF.toByte(), 0xFF.toByte())))
  * ```
  *
  * If this example seems circuitous, that's because it is. It's meant to be
