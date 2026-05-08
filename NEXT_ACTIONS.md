@@ -5,13 +5,13 @@ Based on AST analysis, here are the concrete next steps.
 ## Summary
 
 - **Files Present:** 33/33 (100.0%)
-- **Function parity:** 619/739 matched (target 1168) — 83.8%
+- **Function parity:** 620/739 matched (target 1170) — 83.9%
 - **Class/type parity:** 119/134 matched (target 279) — 88.8%
-- **Combined symbol parity:** 738/873 matched (target 1447) — 84.5%
-- **Average inline-code cosine:** 0.46 (function body across 28 matched files)
-- **Average documentation cosine:** 0.33 (doc text across 28 matched files)
-- **Cheat-zeroed Files:** 17
-- **Critical Issues:** 20 files with <0.60 function similarity
+- **Combined symbol parity:** 739/873 matched (target 1449) — 84.7%
+- **Average inline-code cosine:** 0.49 (function body across 28 matched files)
+- **Average documentation cosine:** 0.37 (doc text across 28 matched files)
+- **Cheat-zeroed Files:** 16
+- **Critical Issues:** 19 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -221,22 +221,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Proposed provenance header:** `// port-lint: source ast/mod.rs` (current: `// port-lint: source src/ast/mod.rs`)
 - **Lint issues:** 1
 
-### 16. error
-
-- **Target:** `regexsyntax.ErrorTest [ZERO] [PROVENANCE-FALLBACK]`
-- **Similarity:** 0.00
-- **Dependents:** 0
-- **Priority Score:** 21510.0
-- **Functions:** 10/12 matched (target 19)
-- **Missing functions:** `fmt`, `assert_panic_message`
-- **Types:** 3/3 matched (target 6)
-- **Missing types:** _none_
-- **Tests:** 2/3 matched
-- **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/error.rs` vs expected `error.rs`
-- **Proposed provenance header:** `// port-lint: source error.rs` (current: `// port-lint: source src/error.rs`)
-- **Lint issues:** 1
-
-### 17. ast.visitor
+### 16. ast.visitor
 
 - **Target:** `commonMain.kotlin.io.github.kotlinmania.regexsyntax.ast.visitor.Visitor [PROVENANCE-FALLBACK]`
 - **Similarity:** 0.74
@@ -249,6 +234,18 @@ Every matched file is listed below with function and type symbol parity.
 - **Provenance warning:** port-lint provenance header matched only after fallback normalization: `src/ast/visitor.rs` vs expected `ast/visitor.rs`
 - **Proposed provenance header:** `// port-lint: source ast/visitor.rs` (current: `// port-lint: source src/ast/visitor.rs`)
 - **Lint issues:** 1
+
+### 17. error
+
+- **Target:** `regexsyntax.Error`
+- **Similarity:** 0.65
+- **Dependents:** 0
+- **Priority Score:** 11503.5
+- **Functions:** 11/12 matched (target 21)
+- **Missing functions:** `assert_panic_message`
+- **Types:** 3/3 matched (target 6)
+- **Missing types:** _none_
+- **Tests:** 2/3 matched
 
 ### 18. hir.visitor
 
@@ -311,62 +308,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Proposed provenance header:** `// port-lint: source either.rs` (current: `// port-lint: source src/either.rs`)
 - **Lint issues:** 1
 
-### 22. unicode_tables.word_break
-
-- **Target:** `wordbreak.WordBreak [ZERO]`
-- **Similarity:** 0.00
-- **Dependents:** 0
-- **Priority Score:** 10.0
-- **Functions:** 0/0 matched (target 5)
-- **Missing functions:** _none_
-- **Types:** 0/0 matched
-- **Missing types:** _none_
-
-### 23. unicode_tables.general_category
-
-- **Target:** `generalcategory.GeneralCategory [ZERO]`
-- **Similarity:** 0.00
-- **Dependents:** 0
-- **Priority Score:** 10.0
-- **Functions:** 0/0 matched (target 29)
-- **Missing functions:** _none_
-- **Types:** 0/0 matched
-- **Missing types:** _none_
-
-### 24. unicode_tables.case_folding_simple
-
-- **Target:** `casefoldingsimple.CaseFoldingSimple [ZERO]`
-- **Similarity:** 0.00
-- **Dependents:** 0
-- **Priority Score:** 10.0
-- **Functions:** 0/0 matched (target 6)
-- **Missing functions:** _none_
-- **Types:** 0/0 matched
-- **Missing types:** _none_
-
-### 25. unicode_tables.grapheme_cluster_break
-
-- **Target:** `graphemeclusterbreak.GraphemeClusterBreak [ZERO]`
-- **Similarity:** 0.00
-- **Dependents:** 0
-- **Priority Score:** 10.0
-- **Functions:** 0/0 matched (target 6)
-- **Missing functions:** _none_
-- **Types:** 0/0 matched
-- **Missing types:** _none_
-
-### 26. unicode_tables.sentence_break
-
-- **Target:** `sentencebreak.SentenceBreak [ZERO]`
-- **Similarity:** 0.00
-- **Dependents:** 0
-- **Priority Score:** 10.0
-- **Functions:** 0/0 matched (target 13)
-- **Missing functions:** _none_
-- **Types:** 0/0 matched
-- **Missing types:** _none_
-
-### 27. unicode_tables.property_bool
+### 22. unicode_tables.property_bool
 
 - **Target:** `propertybool.PropertyBool [ZERO]`
 - **Similarity:** 0.00
@@ -377,7 +319,51 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 0/0 matched
 - **Missing types:** _none_
 
-### 28. unicode_tables.mod
+### 23. unicode_tables.sentence_break
+
+- **Target:** `sentencebreak.SentenceBreak [ZERO]`
+- **Similarity:** 0.00
+- **Dependents:** 0
+- **Priority Score:** 10.0
+- **Functions:** 0/0 matched (target 13)
+- **Missing functions:** _none_
+- **Types:** 0/0 matched
+- **Missing types:** _none_
+
+### 24. unicode_tables.general_category
+
+- **Target:** `generalcategory.GeneralCategory [ZERO]`
+- **Similarity:** 0.00
+- **Dependents:** 0
+- **Priority Score:** 10.0
+- **Functions:** 0/0 matched (target 29)
+- **Missing functions:** _none_
+- **Types:** 0/0 matched
+- **Missing types:** _none_
+
+### 25. unicode_tables.case_folding_simple
+
+- **Target:** `casefoldingsimple.CaseFoldingSimple [ZERO]`
+- **Similarity:** 0.00
+- **Dependents:** 0
+- **Priority Score:** 10.0
+- **Functions:** 0/0 matched (target 6)
+- **Missing functions:** _none_
+- **Types:** 0/0 matched
+- **Missing types:** _none_
+
+### 26. unicode_tables.grapheme_cluster_break
+
+- **Target:** `graphemeclusterbreak.GraphemeClusterBreak [ZERO]`
+- **Similarity:** 0.00
+- **Dependents:** 0
+- **Priority Score:** 10.0
+- **Functions:** 0/0 matched (target 6)
+- **Missing functions:** _none_
+- **Types:** 0/0 matched
+- **Missing types:** _none_
+
+### 27. unicode_tables.mod
 
 - **Target:** `unicodetables.Mod [STUB] [PROVENANCE-FALLBACK]`
 - **Similarity:** 0.00
@@ -391,18 +377,18 @@ Every matched file is listed below with function and type symbol parity.
 - **Proposed provenance header:** `// port-lint: source unicode_tables/mod.rs` (current: `// port-lint: source src/unicode_tables/mod.rs`)
 - **Lint issues:** 1
 
-### 29. unicode_tables.script_extension
+### 28. unicode_tables.word_break
 
-- **Target:** `scriptextension.ScriptExtension`
-- **Similarity:** 1.00
+- **Target:** `wordbreak.WordBreak [ZERO]`
+- **Similarity:** 0.00
 - **Dependents:** 0
-- **Priority Score:** 0.0
-- **Functions:** 0/0 matched
+- **Priority Score:** 10.0
+- **Functions:** 0/0 matched (target 5)
 - **Missing functions:** _none_
 - **Types:** 0/0 matched
 - **Missing types:** _none_
 
-### 30. unicode_tables.perl_decimal
+### 29. unicode_tables.perl_decimal
 
 - **Target:** `perldecimal.PerlDecimal`
 - **Similarity:** 1.00
@@ -413,7 +399,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 0/0 matched
 - **Missing types:** _none_
 
-### 31. unicode_tables.perl_space
+### 30. unicode_tables.perl_space
 
 - **Target:** `perlspace.PerlSpace`
 - **Similarity:** 1.00
@@ -424,9 +410,20 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 0/0 matched
 - **Missing types:** _none_
 
-### 32. unicode_tables.script
+### 31. unicode_tables.script
 
 - **Target:** `script.Script`
+- **Similarity:** 1.00
+- **Dependents:** 0
+- **Priority Score:** 0.0
+- **Functions:** 0/0 matched
+- **Missing functions:** _none_
+- **Types:** 0/0 matched
+- **Missing types:** _none_
+
+### 32. unicode_tables.script_extension
+
+- **Target:** `scriptextension.ScriptExtension`
 - **Similarity:** 1.00
 - **Dependents:** 0
 - **Priority Score:** 0.0
