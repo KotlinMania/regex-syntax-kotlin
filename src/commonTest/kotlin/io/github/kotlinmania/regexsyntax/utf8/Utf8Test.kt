@@ -21,7 +21,7 @@ class Utf8Test {
                 if (r.matches(buf)) {
                     error(
                         "Sequence (${start.toString(16).uppercase()}, ${end.toString(16).uppercase()}) contains range $r, " +
-                            "which matches surrogate code point ${cp.toString(16).uppercase()} with encoded bytes ${buf.toList()}",
+                            "which accepts surrogate code point ${cp.toString(16).uppercase()} with encoded bytes ${buf.toList()}",
                     )
                 }
             }

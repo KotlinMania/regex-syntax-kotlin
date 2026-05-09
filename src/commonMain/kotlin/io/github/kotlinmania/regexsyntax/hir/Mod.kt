@@ -36,6 +36,25 @@ import io.github.kotlinmania.regexsyntax.debug.utf8Decode
 import io.github.kotlinmania.regexsyntax.debug.Utf8Decoded
 import io.github.kotlinmania.regexsyntax.debug.len
 
+/*
+ * Upstream re-exports (tracking):
+ *
+ * - `pub use crate::{`
+ * - `    hir::visitor::{visit, Visitor},`
+ * - `    unicode::CaseFoldError,`
+ * - `};`
+ *
+ * Kotlin note:
+ * - This port does not create a central re-export surface in `io.github.kotlinmania.regexsyntax.hir`.
+ * - Callers should import `io.github.kotlinmania.regexsyntax.hir.visitor.visit` and/or
+ *   `io.github.kotlinmania.regexsyntax.hir.visitor.Visitor` directly. For `CaseFoldError`, import
+ *   `io.github.kotlinmania.regexsyntax.unicode.CaseFoldError` directly (and use Kotlin `as` imports
+ *   if a local name must be preserved).
+ *
+ * Callers migrated:
+ * - (none yet)
+ */
+
 /** An error that can occur while translating an `Ast` to a [Hir]. */
 data class Error(
     /** The kind of error. */
@@ -1830,20 +1849,25 @@ data class LookSet(
 class LookSetIter internal constructor(initial: LookSet) : Iterator<Look> {
     private var set: LookSet = initial
 
-    override fun hasNext(): Boolean = !set.isEmpty()
+    override fun hasNext(): Boolean = nextLook() != null
 
     override fun next(): Look {
-        if (set.isEmpty()) throw NoSuchElementException()
-        // Trailing zeros count
-        var bit = 0
-        var b = set.bits
-        while (b and 1 == 0) {
-            bit++
-            b = b ushr 1
-        }
-        val look = Look.fromRepr(1 shl bit) ?: throw NoSuchElementException()
+        val look = nextLook() ?: throw NoSuchElementException()
         set = set.remove(look)
         return look
+    }
+
+    private fun nextLook(): Look? {
+        if (set.isEmpty()) return null
+        // We'll never have more than UByte.MAX_VALUE distinct look-around
+        // assertions, so `bit` will always fit into a UShort.
+        var bit = 0
+        var candidateBits = set.bits
+        while (candidateBits and 1 == 0) {
+            bit++
+            candidateBits = candidateBits ushr 1
+        }
+        return Look.fromRepr(1 shl bit)
     }
 }
 

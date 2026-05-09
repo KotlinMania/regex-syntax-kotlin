@@ -1,4 +1,4 @@
-// port-lint: source lib.rs
+// port-lint: source src/lib.rs
 package io.github.kotlinmania.regexsyntax
 
 import io.github.kotlinmania.regexsyntax.unicode.UnicodeWordError

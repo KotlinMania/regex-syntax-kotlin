@@ -444,13 +444,11 @@ internal class TranslatorI(
                 val scalarRes = astLiteralToScalar(ast.value)
                 if (scalarRes.isFailure) return Result.failure(scalarRes.exceptionOrNull()!!)
                 when (val scalar = scalarRes.getOrNull()!!) {
-                    is Either.Right<*, *> -> {
-                        @Suppress("UNCHECKED_CAST")
-                        pushByte((scalar as Either.Right<Int, Byte>).value)
+                    is Either.Right -> {
+                        pushByte(scalar.value)
                     }
-                    is Either.Left<*, *> -> {
-                        @Suppress("UNCHECKED_CAST")
-                        val ch = (scalar as Either.Left<Int, Byte>).value
+                    is Either.Left -> {
+                        val ch = scalar.value
                         val foldRes = caseFoldChar(ast.value.span, ch)
                         if (foldRes.isFailure) return Result.failure(foldRes.exceptionOrNull()!!)
                         when (val folded = foldRes.getOrNull()) {
@@ -1155,13 +1153,11 @@ internal class TranslatorI(
         val r = astLiteralToScalar(ast)
         if (r.isFailure) return Result.failure(r.exceptionOrNull()!!)
         return when (val v = r.getOrNull()!!) {
-            is Either.Right<*, *> -> {
-                @Suppress("UNCHECKED_CAST")
-                Result.success((v as Either.Right<Int, Byte>).value)
+            is Either.Right -> {
+                Result.success(v.value)
             }
-            is Either.Left<*, *> -> {
-                @Suppress("UNCHECKED_CAST")
-                val ch = (v as Either.Left<Int, Byte>).value
+            is Either.Left -> {
+                val ch = v.value
                 if (ch <= 0x7F) {
                     Result.success(ch.toByte())
                 } else {

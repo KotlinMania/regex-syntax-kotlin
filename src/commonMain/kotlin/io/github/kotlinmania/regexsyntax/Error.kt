@@ -1,4 +1,4 @@
-// port-lint: source src/error.rs
+// port-lint: source error.rs
 package io.github.kotlinmania.regexsyntax
 
 import io.github.kotlinmania.regexsyntax.ast.Span
@@ -32,6 +32,8 @@ sealed class Error {
         is Translate -> value.toString()
     }
 
+    fun fmt(): String = toString()
+
     companion object {
         fun from(err: AstError): Error = Parse(err)
 
@@ -63,6 +65,8 @@ class Formatter<E : Any>(
      */
     val auxSpan: Span?,
 ) {
+    fun fmt(): String = toString()
+
     override fun toString(): String {
         val out = StringBuilder()
         val spans = Spans.fromFormatter(this)
@@ -245,8 +249,8 @@ private class Spans(
         fun <E : Any> fromFormatter(fmter: Formatter<E>): Spans {
             var lineCount = patternLines(fmter.pattern).size
             // If the pattern ends with a `\n` literal, then our line count is
-            // off by one, since a span can occur immediately after the last `\n`,
-            // which is consider to be an additional line.
+            // off by one, since a span can occur immediately after the last
+            // `\n`, which is considered to be an additional line.
             if (fmter.pattern.endsWith('\n')) {
                 lineCount += 1
             }
@@ -269,12 +273,12 @@ private class Spans(
 }
 
 /**
- * Split the pattern into lines using `\n` as the terminator, mirroring Rust's
- * string line iteration. Each terminating `\n` (and a preceding `\r`) is stripped,
- * and a trailing `\n` does not produce an extra empty line.
+ * Split the pattern into lines using `\n` as the terminator. Each terminating
+ * `\n` (and a preceding `\r`) is stripped, and a trailing `\n` does not
+ * produce an extra empty line.
  */
 private fun patternLines(pattern: String): List<String> {
-    if (pattern.isEmpty()) return emptyList()
+    if (pattern.isEmpty()) return listOf("")
     val lines = mutableListOf<String>()
     var start = 0
     var i = 0

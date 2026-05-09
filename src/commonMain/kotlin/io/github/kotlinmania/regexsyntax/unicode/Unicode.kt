@@ -56,8 +56,8 @@ internal typealias Range = Array<IntArray>
 /**
  * An error that occurs when dealing with Unicode.
  *
- * We don't impl the Error trait here because these always get converted
- * into other public errors. (This error type isn't exported.)
+ * We don't implement [Throwable] here because these always get converted into
+ * other public errors. (This error type isn't exported.)
  */
 internal enum class Error {
     PropertyNotFound,
