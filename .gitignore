@@ -47,3 +47,6 @@ __pycache__/
 # Android SDK
 /.android-sdk/
 local.properties
+
+# Machine-specific Android SDK pointer — never tracked.
+local.properties
