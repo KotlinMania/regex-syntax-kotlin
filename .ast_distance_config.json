@@ -1,0 +1,22 @@
+{
+  "type": "port",
+  "name": "regex-syntax-kotlin",
+  "source": {
+    "path": "/Volumes/stuff/Projects/kotlinmania/regex-syntax-kotlin/tmp/regex-syntax/src/",
+    "lang": "rust"
+  },
+  "target": {
+    "path": "/Volumes/stuff/Projects/kotlinmania/regex-syntax-kotlin/src/",
+    "lang": "kotlin"
+  },
+  "checks": {
+    "deep": true,
+    "missing": true,
+    "todos": true,
+    "lint": true
+  },
+  "reexport_modules": [
+    "mod.rs",
+    "lib.rs"
+  ]
+}
