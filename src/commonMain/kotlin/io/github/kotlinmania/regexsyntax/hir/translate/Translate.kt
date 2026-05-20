@@ -1,4 +1,4 @@
-// port-lint: source src/hir/translate.rs
+// port-lint: source hir/translate.rs
 /**
  * Defines a translator that converts an [Ast] to an [Hir].
  */

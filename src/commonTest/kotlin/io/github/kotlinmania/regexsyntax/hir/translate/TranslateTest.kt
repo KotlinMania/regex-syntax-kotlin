@@ -320,7 +320,7 @@ class TranslateTest {
     }
 
     @Test
-    fun literal_case_insensitive() {
+    fun literalCaseInsensitive() {
         assertEquals(t("(?i)a"), hirUclass(c('A') to c('A'), c('a') to c('a')))
         assertEquals(t("(?i:a)"), hirUclass(c('A') to c('A'), c('a') to c('a')))
         assertEquals(
@@ -399,7 +399,7 @@ class TranslateTest {
     }
 
     @Test
-    fun line_anchors() {
+    fun lineAnchors() {
         assertEquals(t("^"), hirLook(Look.Start))
         assertEquals(t("$"), hirLook(Look.End))
         assertEquals(t("\\A"), hirLook(Look.Start))
@@ -611,7 +611,7 @@ class TranslateTest {
     }
 
     @Test
-    fun cat_alt() {
+    fun catAlt() {
         val a = { hirLook(Look.Start) }
         val b = { hirLook(Look.End) }
         val c = { hirLook(Look.WordUnicode) }
@@ -668,7 +668,7 @@ class TranslateTest {
     // in that class. (Unless some branches match invalid UTF-8 and others
     // match non-ASCII Unicode.)
     @Test
-    fun cat_class_flattened() {
+    fun catClassFlattened() {
         assertEquals(t("""[a-z]|[A-Z]"""), hirUclass(c('A') to c('Z'), c('a') to c('z')))
         // Combining all of the letter properties should give us the one giant
         // letter property.
@@ -701,7 +701,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_ascii() {
+    fun classAscii() {
         assertEquals(t("[[:alnum:]]"), hirAsciiUclass(ClassAsciiKind.Alnum))
         assertEquals(t("[[:alpha:]]"), hirAsciiUclass(ClassAsciiKind.Alpha))
         assertEquals(t("[[:ascii:]]"), hirAsciiUclass(ClassAsciiKind.Ascii))
@@ -741,7 +741,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_ascii_multiple() {
+    fun classAsciiMultiple() {
         // See: https://github.com/rust-lang/regex/issues/680
         assertEquals(
             t("[[:alnum:][:^ascii:]]"),
@@ -760,7 +760,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_perl_unicode() {
+    fun classPerlUnicode() {
         // Unicode
         assertEquals(t("""\d"""), hirUclassQuery(ClassQuery.Binary("digit")))
         assertEquals(t("""\s"""), hirUclassQuery(ClassQuery.Binary("space")))
@@ -779,7 +779,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_perl_ascii() {
+    fun classPerlAscii() {
         // ASCII only
         assertEquals(t("""(?-u)\d"""), hirAsciiBclass(ClassAsciiKind.Digit))
         assertEquals(t("""(?-u)\s"""), hirAsciiBclass(ClassAsciiKind.Space))
@@ -818,7 +818,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_unicode_gencat() {
+    fun classUnicodeGencat() {
         assertEquals(t("""\pZ"""), hirUclassQuery(ClassQuery.Binary("Z")))
         assertEquals(t("""\pz"""), hirUclassQuery(ClassQuery.Binary("Z")))
         assertEquals(t("""\p{Separator}"""), hirUclassQuery(ClassQuery.Binary("Z")))
@@ -873,7 +873,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_unicode_script() {
+    fun classUnicodeScript() {
         assertEquals(t("""\p{Greek}"""), hirUclassQuery(ClassQuery.Binary("Greek")))
         assertEquals(
             t("""(?i)\p{Greek}"""),
@@ -899,7 +899,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_unicode_age() {
+    fun classUnicodeAge() {
         assertTrue(
             TestError(
                 span = Span.new(Position.new(0, 1, 1), Position.new(11, 1, 12)),
@@ -909,12 +909,12 @@ class TranslateTest {
     }
 
     @Test
-    fun class_unicode_any_empty() {
+    fun classUnicodeAnyEmpty() {
         assertEquals(t("""\P{any}"""), hirUclass())
     }
 
     @Test
-    fun class_bracketed() {
+    fun classBracketed() {
         assertEquals(t("[a]"), hirLit("a"))
         assertEquals(t("[ab]"), hirUclass(c('a') to c('b')))
         assertEquals(t("[^[a]]"), classNegate(uclass(c('a') to c('a'))))
@@ -998,7 +998,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_bracketed_union() {
+    fun classBracketedUnion() {
         assertEquals(t("[a-zA-Z]"), hirUclass(c('A') to c('Z'), c('a') to c('z')))
         assertEquals(
             t("""[a\pZb]"""),
@@ -1071,7 +1071,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_bracketed_nested() {
+    fun classBracketedNested() {
         assertEquals(t("""[a[^c]]"""), classNegate(uclass(c('c') to c('c'))))
         assertEquals(t("""[a-b[^c]]"""), classNegate(uclass(c('c') to c('c'))))
         assertEquals(t("""[a-c[^c]]"""), classNegate(uclass()))
@@ -1096,7 +1096,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_bracketed_intersect() {
+    fun classBracketedIntersect() {
         assertEquals(t("[abc&&b-c]"), hirUclass(c('b') to c('c')))
         assertEquals(t("[abc&&[b-c]]"), hirUclass(c('b') to c('c')))
         assertEquals(t("[[abc]&&[b-c]]"), hirUclass(c('b') to c('c')))
@@ -1144,7 +1144,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_bracketed_intersect_negate() {
+    fun classBracketedIntersectNegate() {
         assertEquals(t("""[^\w&&\d]"""), hirNegate(hirUclassQuery(ClassQuery.Binary("digit"))))
         assertEquals(t("""[^[a-z&&a-c]]"""), hirNegate(hirUclass(c('a') to c('c'))))
         assertEquals(t("""[^[\w&&\d]]"""), hirNegate(hirUclassQuery(ClassQuery.Binary("digit"))))
@@ -1159,7 +1159,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_bracketed_difference() {
+    fun classBracketedDifference() {
         assertEquals(
             t("""[\pL--[:ascii:]]"""),
             hirDifference(
@@ -1175,7 +1175,7 @@ class TranslateTest {
     }
 
     @Test
-    fun class_bracketed_symmetric_difference() {
+    fun classBracketedSymmetricDifference() {
         assertEquals(
             t("""[\p{sc:Greek}~~\p{scx:Greek}]"""),
             // Class({
@@ -1214,7 +1214,7 @@ class TranslateTest {
     }
 
     @Test
-    fun ignore_whitespace() {
+    fun ignoreWhitespace() {
         assertEquals(t("""(?x)\12 3"""), hirLit("\n3"))
         assertEquals(t("""(?x)\x { 53 }"""), hirLit("S"))
         assertEquals(
@@ -1255,7 +1255,7 @@ class TranslateTest {
     }
 
     @Test
-    fun analysis_is_utf8() {
+    fun analysisIsUtf8() {
         // Positive examples.
         assertTrue(propsBytes("""a""").isUtf8())
         assertTrue(propsBytes("""ab""").isUtf8())
@@ -1278,7 +1278,7 @@ class TranslateTest {
     }
 
     @Test
-    fun analysis_captures_len() {
+    fun analysisCapturesLen() {
         assertEquals(0, props("""a""").explicitCapturesLen())
         assertEquals(0, props("""(?:a)""").explicitCapturesLen())
         assertEquals(0, props("""(?i-u:a)""").explicitCapturesLen())
@@ -1295,7 +1295,7 @@ class TranslateTest {
     }
 
     @Test
-    fun analysis_static_captures_len() {
+    fun analysisStaticCapturesLen() {
         val len = { pattern: String -> props(pattern).staticExplicitCapturesLen() }
         assertEquals(0, len(""""""))
         assertEquals(0, len("""foo|bar"""))
@@ -1327,7 +1327,7 @@ class TranslateTest {
     }
 
     @Test
-    fun analysis_is_all_assertions() {
+    fun analysisIsAllAssertions() {
         // Positive examples.
         for (pattern in listOf("""\b""", """\B""", """^""", """$""", """\A""", """\z""", """$^\z\A\b\B""", """$|^|\z|\A|\b|\B""", """^$|$^""", """((\b)+())*^""")) {
             val p = props(pattern)
@@ -1342,13 +1342,13 @@ class TranslateTest {
     }
 
     @Test
-    fun analysis_look_set_prefix_any() {
+    fun analysisLookSetPrefixAny() {
         val p = props("""(?-u)(?i:(?:\b|_)win(?:32|64|dows)?(?:\b|_))""")
         assertTrue(p.lookSetPrefixAny().contains(Look.WordAscii))
     }
 
     @Test
-    fun analysis_is_anchored() {
+    fun analysisIsAnchored() {
         val isStart = { pattern: String -> props(pattern).lookSetPrefix().contains(Look.Start) }
         val isEnd = { pattern: String -> props(pattern).lookSetSuffix().contains(Look.End) }
 
@@ -1418,7 +1418,7 @@ class TranslateTest {
     }
 
     @Test
-    fun analysis_is_any_anchored() {
+    fun analysisIsAnyAnchored() {
         val isStart = { pattern: String -> props(pattern).lookSet().contains(Look.Start) }
         val isEnd = { pattern: String -> props(pattern).lookSet().contains(Look.End) }
 
@@ -1436,7 +1436,7 @@ class TranslateTest {
     }
 
     @Test
-    fun analysis_can_empty() {
+    fun analysisCanEmpty() {
         // Positive examples.
         val assertEmpty = { pattern: String -> assertEquals(0, propsBytes(pattern).minimumLen()) }
         assertEmpty("""""")
@@ -1483,7 +1483,7 @@ class TranslateTest {
     }
 
     @Test
-    fun analysis_is_literal() {
+    fun analysisIsLiteral() {
         // Positive examples.
         assertTrue(props("""a""").isLiteral())
         assertTrue(props("""ab""").isLiteral())
@@ -1506,7 +1506,7 @@ class TranslateTest {
     }
 
     @Test
-    fun analysis_is_alternation_literal() {
+    fun analysisIsAlternationLiteral() {
         // Positive examples.
         assertTrue(props("""a""").isAlternationLiteral())
         assertTrue(props("""ab""").isAlternationLiteral())
@@ -1542,7 +1542,7 @@ class TranslateTest {
     // This tests that the smart Hir.repetition constructors does some basic
     // simplifications.
     @Test
-    fun smart_repetition() {
+    fun smartRepetition() {
         assertEquals(t("""a{0}"""), Hir.empty())
         assertEquals(t("""a{1}"""), hirLit("a"))
         assertEquals(t("""\B{32111}"""), hirLook(Look.WordUnicodeNegate))
@@ -1551,7 +1551,7 @@ class TranslateTest {
     // This tests that the smart Hir.concat constructor simplifies the given
     // exprs in a way we expect.
     @Test
-    fun smart_concat() {
+    fun smartConcat() {
         assertEquals(t(""), Hir.empty())
         assertEquals(t("(?:)"), Hir.empty())
         assertEquals(t("abc"), hirLit("abc"))
@@ -1578,7 +1578,7 @@ class TranslateTest {
     // This tests that the smart Hir.alternation constructor simplifies the
     // given exprs in a way we expect.
     @Test
-    fun smart_alternation() {
+    fun smartAlternation() {
         assertEquals(
             t("(?:foo)|(?:bar)"),
             hirAlt(listOf(hirLit("foo"), hirLit("bar"))),
@@ -1641,7 +1641,7 @@ class TranslateTest {
     }
 
     @Test
-    fun regression_alt_empty_concat() {
+    fun regressionAltEmptyConcat() {
         val span = spanSplat(Position.new(0, 0, 0))
         val ast = Ast.Alternation(
             AstAlternation(
@@ -1662,7 +1662,7 @@ class TranslateTest {
     }
 
     @Test
-    fun regression_empty_alt() {
+    fun regressionEmptyAlt() {
         val span = spanSplat(Position.new(0, 0, 0))
         val ast = Ast.Concat(
             AstConcat(
@@ -1683,7 +1683,7 @@ class TranslateTest {
     }
 
     @Test
-    fun regression_singleton_alt() {
+    fun regressionSingletonAlt() {
         val span = spanSplat(Position.new(0, 0, 0))
         val ast = Ast.Concat(
             AstConcat(
@@ -1705,7 +1705,7 @@ class TranslateTest {
 
     // See: https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=63168
     @Test
-    fun regression_fuzz_match() {
+    fun regressionFuzzMatch() {
         val pat = rustEscaped("""[(\u{6} \0-\u{afdf5}]  \0 """)
         val ast = ParserBuilder.new()
             .octal(false)
@@ -1734,14 +1734,14 @@ class TranslateTest {
 
     // See: https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=63155
     @Test
-    fun regression_fuzz_difference1() {
+    fun regressionFuzzDifference1() {
         val pat = """\W\W|\W[^\v--\W\W\P{Script_Extensions:Pau_Cin_Hau}\u10A1A1-\U{3E3E3}--~~~~--~~~~~~~~------~~~~~~--~~~~~~]*"""
         t(pat) // shouldn't panic
     }
 
     // See: https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=63153
     @Test
-    fun regression_fuzz_char_decrement1() {
+    fun regressionFuzzCharDecrement1() {
         val pat = rustEscaped("""w[w[^w?\rw\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\r\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0w?\rw[^w?\rw[^w?\rw[^w\0\0\u{1}\0]\0\0-*\0]\0\0\0\0\0\0\u{1}\0]\0\0-*\0]\0\0\0\0\0\u{1}\0]\0\0\0\0\0\0\0\0\0*\0\0\u{1}\0]\0\0-*\0][^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w\0\0\u{1}\0]\0\0-*\0]\0\0\0\0\0\0\u{1}\0]\0\0-*\0]\0\0\0\0\0\u{1}\0]\0\0\0\0\0\0\0\0\0x\0\0\u{1}\0]\0\0-*\0]\0\0\0\0\0\0\0\0\0*??\0\u{7f}{2}\u{10}??\0\0\0\0\0\0\0\0\0\u{3}\0\0\0}\0-*\0]\0\0\0\0\0\0\u{1}\0]\0\0-*\0]\0\0\0\0\0\0\u{1}\0]\0\0-*\0]\0\0\0\0\0\u{1}\0]\0\0-*\0]\0\0\0\0\0\0\0\u{1}\0]\0\u{1}\u{1}H-i]-]\0\0\0\0\u{1}\0]\0\0\0\u{1}\0]\0\0-*\0\0\0\0\u{1}9-\u{7f}]\0'|-\u{7f}]\0'|(?i-ux)[-\u{7f}]\0'\u{3}\0\0\0}\0-*\0]<D\0\0\0\0\0\0\u{1}]\0\0\0\0]\0\0-*\0]\0\0 """)
         t(pat) // shouldn't panic
     }

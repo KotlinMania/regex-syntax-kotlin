@@ -10,14 +10,14 @@ import kotlin.test.assertEquals
 
 class PrintTest {
     private fun roundtrip(given: String, expected: String) {
-        roundtrip_with({ it }, given, expected)
+        roundtripWith({ it }, given, expected)
     }
 
-    private fun roundtrip_bytes(given: String, expected: String) {
-        roundtrip_with({ it.utf8(false) }, given, expected)
+    private fun roundtripBytes(given: String, expected: String) {
+        roundtripWith({ it.utf8(false) }, given, expected)
     }
 
-    private fun roundtrip_with(f: (ParserBuilder) -> ParserBuilder, given: String, expected: String) {
+    private fun roundtripWith(f: (ParserBuilder) -> ParserBuilder, given: String, expected: String) {
         val builder = ParserBuilder.new()
         val hir = f(builder).build().parse(given).getOrThrow()
 
@@ -31,16 +31,16 @@ class PrintTest {
     }
 
     @Test
-    fun print_literal() {
+    fun printLiteral() {
         roundtrip("a", "a")
         roundtrip("\\xff", "\u00FF")
-        roundtrip_bytes("\\xff", "\u00FF")
-        roundtrip_bytes("(?-u)\\xff", "(?-u:\\xFF)")
+        roundtripBytes("\\xff", "\u00FF")
+        roundtripBytes("(?-u)\\xff", "(?-u:\\xFF)")
         roundtrip("☃", "☃")
     }
 
     @Test
-    fun print_class() {
+    fun printClass() {
         roundtrip("[a]", "a")
         roundtrip("[ab]", "[ab]")
         roundtrip("[a-z]", "[a-z]")
@@ -52,7 +52,7 @@ class PrintTest {
         roundtrip("(?-u)[a]", "a")
         roundtrip("(?-u)[ab]", "(?-u:[ab])")
         roundtrip("(?-u)[a-z]", "(?-u:[a-z])")
-        roundtrip_bytes("(?-u)[a-\\xFF]", "(?-u:[a-\\xFF])")
+        roundtripBytes("(?-u)[a-\\xFF]", "(?-u:[a-\\xFF])")
 
         // The following test that the printer escapes meta characters
         // in character classes.
@@ -62,17 +62,17 @@ class PrintTest {
 
         // The following test that the printer escapes meta characters
         // in byte oriented character classes.
-        roundtrip_bytes("(?-u)[\\[]", "\\[")
-        roundtrip_bytes("(?-u)[Z-_]", "(?-u:[Z-_])")
-        roundtrip_bytes("(?-u)[Z-_--Z]", "(?-u:[\\[-_])")
+        roundtripBytes("(?-u)[\\[]", "\\[")
+        roundtripBytes("(?-u)[Z-_]", "(?-u:[Z-_])")
+        roundtripBytes("(?-u)[Z-_--Z]", "(?-u:[\\[-_])")
 
         // This tests that an empty character class is correctly roundtripped.
         roundtrip("\\P{any}", "[a&&b]")
-        roundtrip_bytes("(?-u)[^\\x00-\\xFF]", "[a&&b]")
+        roundtripBytes("(?-u)[^\\x00-\\xFF]", "[a&&b]")
     }
 
     @Test
-    fun print_anchor() {
+    fun printAnchor() {
         roundtrip("^", "\\A")
         roundtrip("$", "\\z")
         roundtrip("(?m)^", "(?m:^)")
@@ -80,15 +80,15 @@ class PrintTest {
     }
 
     @Test
-    fun print_word_boundary() {
+    fun printWordBoundary() {
         roundtrip("\\b", "\\b")
         roundtrip("\\B", "\\B")
         roundtrip("(?-u)\\b", "(?-u:\\b)")
-        roundtrip_bytes("(?-u)\\B", "(?-u:\\B)")
+        roundtripBytes("(?-u)\\B", "(?-u:\\B)")
     }
 
     @Test
-    fun print_repetition() {
+    fun printRepetition() {
         roundtrip("a?", "a?")
         roundtrip("a??", "a??")
         roundtrip("(?U)a?", "a??")
@@ -124,7 +124,7 @@ class PrintTest {
     }
 
     @Test
-    fun print_group() {
+    fun printGroup() {
         roundtrip("()", "((?:))")
         roundtrip("(?P<foo>)", "(?P<foo>(?:))")
         roundtrip("(?:)", "(?:)")
@@ -137,7 +137,7 @@ class PrintTest {
     }
 
     @Test
-    fun print_alternation() {
+    fun printAlternation() {
         roundtrip("|", "(?:(?:)|(?:))")
         roundtrip("||", "(?:(?:)|(?:)|(?:))")
 
@@ -167,7 +167,7 @@ class PrintTest {
     //
     // See: https://github.com/rust-lang/regex/issues/731
     @Test
-    fun regression_repetition_concat() {
+    fun regressionRepetitionConcat() {
         var expr = Hir.concat(listOf(
             Hir.literal("x".encodeToByteArray()),
             Hir.repetition(Repetition(
@@ -196,12 +196,12 @@ class PrintTest {
         assertEquals("(?:\\A\\A\\z\\z)", expr.toString())
     }
 
-    // Just like regression_repetition_concat, but with the repetition using
+    // Just like regressionRepetitionConcat, but with the repetition using
     // an alternation as a child expression instead.
     //
     // See: https://github.com/rust-lang/regex/issues/731
     @Test
-    fun regression_repetition_alternation() {
+    fun regressionRepetitionAlternation() {
         var expr = Hir.concat(listOf(
             Hir.literal("ab".encodeToByteArray()),
             Hir.repetition(Repetition(
@@ -234,7 +234,7 @@ class PrintTest {
     }
 
     // This regression test is very similar in flavor to
-    // regression_repetition_concat in that the root of the issue lies in a
+    // regressionRepetitionConcat in that the root of the issue lies in a
     // peculiarity of how the HIR is represented and how the printer writes it
     // out. Like the other regression, this one is also rooted in the fact that
     // you can't produce the peculiar HIR from the concrete syntax. Namely, you
@@ -245,7 +245,7 @@ class PrintTest {
     //
     // See: https://github.com/rust-lang/regex/issues/516
     @Test
-    fun regression_alternation_concat() {
+    fun regressionAlternationConcat() {
         var expr = Hir.concat(listOf(
             Hir.literal("ab".encodeToByteArray()),
             Hir.alternation(listOf(

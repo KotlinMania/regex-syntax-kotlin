@@ -1,4 +1,4 @@
-// port-lint: source src/ast/mod.rs
+// port-lint: source ast/mod.rs
 package io.github.kotlinmania.regexsyntax.ast
 
 /*

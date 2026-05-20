@@ -450,10 +450,10 @@ internal val LINE_SEPARATOR: Array<IntArray> = arrayOf(
 )
 
 internal val LOWERCASE_LETTER: Array<IntArray> = buildList<IntArray> {
-    lowercase_letterChunk4()
-    lowercase_letterChunk5()
-    lowercase_letterChunk6()
-    lowercase_letterChunk7()
+    lowercaseLetterChunk4()
+    lowercaseLetterChunk5()
+    lowercaseLetterChunk6()
+    lowercaseLetterChunk7()
 }.toTypedArray()
 
 internal val MARK: Array<IntArray> = buildList<IntArray> {
@@ -642,8 +642,8 @@ internal val MODIFIER_SYMBOL: Array<IntArray> = arrayOf(
 )
 
 internal val NONSPACING_MARK: Array<IntArray> = buildList<IntArray> {
-    nonspacing_markChunk10()
-    nonspacing_markChunk11()
+    nonspacingMarkChunk10()
+    nonspacingMarkChunk11()
 }.toTypedArray()
 
 internal val NUMBER: Array<IntArray> = arrayOf(
@@ -883,9 +883,9 @@ internal val OTHER: Array<IntArray> = buildList<IntArray> {
 }.toTypedArray()
 
 internal val OTHER_LETTER: Array<IntArray> = buildList<IntArray> {
-    other_letterChunk16()
-    other_letterChunk17()
-    other_letterChunk18()
+    otherLetterChunk16()
+    otherLetterChunk17()
+    otherLetterChunk18()
 }.toTypedArray()
 
 internal val OTHER_NUMBER: Array<IntArray> = arrayOf(
@@ -1800,10 +1800,10 @@ internal val UNASSIGNED: Array<IntArray> = buildList<IntArray> {
 }.toTypedArray()
 
 internal val UPPERCASE_LETTER: Array<IntArray> = buildList<IntArray> {
-    uppercase_letterChunk25()
-    uppercase_letterChunk26()
-    uppercase_letterChunk27()
-    uppercase_letterChunk28()
+    uppercaseLetterChunk25()
+    uppercaseLetterChunk26()
+    uppercaseLetterChunk27()
+    uppercaseLetterChunk28()
 }.toTypedArray()
 
 internal val BY_NAME: Array<Pair<String, Array<IntArray>>> = arrayOf(
@@ -2535,7 +2535,7 @@ private fun MutableList<IntArray>.letterChunk3() {
     add(intArrayOf(201552, 205743))
 }
 
-private fun MutableList<IntArray>.lowercase_letterChunk4() {
+private fun MutableList<IntArray>.lowercaseLetterChunk4() {
     add(intArrayOf(97, 122))
     add(intArrayOf(181, 181))
     add(intArrayOf(223, 246))
@@ -2738,7 +2738,7 @@ private fun MutableList<IntArray>.lowercase_letterChunk4() {
     add(intArrayOf(1187, 1187))
 }
 
-private fun MutableList<IntArray>.lowercase_letterChunk5() {
+private fun MutableList<IntArray>.lowercaseLetterChunk5() {
     add(intArrayOf(1189, 1189))
     add(intArrayOf(1191, 1191))
     add(intArrayOf(1193, 1193))
@@ -2941,7 +2941,7 @@ private fun MutableList<IntArray>.lowercase_letterChunk5() {
     add(intArrayOf(7931, 7931))
 }
 
-private fun MutableList<IntArray>.lowercase_letterChunk6() {
+private fun MutableList<IntArray>.lowercaseLetterChunk6() {
     add(intArrayOf(7933, 7933))
     add(intArrayOf(7935, 7943))
     add(intArrayOf(7952, 7957))
@@ -3144,7 +3144,7 @@ private fun MutableList<IntArray>.lowercase_letterChunk6() {
     add(intArrayOf(42941, 42941))
 }
 
-private fun MutableList<IntArray>.lowercase_letterChunk7() {
+private fun MutableList<IntArray>.lowercaseLetterChunk7() {
     add(intArrayOf(42943, 42943))
     add(intArrayOf(42945, 42945))
     add(intArrayOf(42947, 42947))
@@ -3536,7 +3536,7 @@ private fun MutableList<IntArray>.markChunk9() {
     add(intArrayOf(917760, 917999))
 }
 
-private fun MutableList<IntArray>.nonspacing_markChunk10() {
+private fun MutableList<IntArray>.nonspacingMarkChunk10() {
     add(intArrayOf(768, 879))
     add(intArrayOf(1155, 1159))
     add(intArrayOf(1425, 1469))
@@ -3739,7 +3739,7 @@ private fun MutableList<IntArray>.nonspacing_markChunk10() {
     add(intArrayOf(43696, 43696))
 }
 
-private fun MutableList<IntArray>.nonspacing_markChunk11() {
+private fun MutableList<IntArray>.nonspacingMarkChunk11() {
     add(intArrayOf(43698, 43700))
     add(intArrayOf(43703, 43704))
     add(intArrayOf(43710, 43711))
@@ -4647,7 +4647,7 @@ private fun MutableList<IntArray>.otherChunk15() {
     add(intArrayOf(918000, 1114111))
 }
 
-private fun MutableList<IntArray>.other_letterChunk16() {
+private fun MutableList<IntArray>.otherLetterChunk16() {
     add(intArrayOf(170, 170))
     add(intArrayOf(186, 186))
     add(intArrayOf(443, 443))
@@ -4850,7 +4850,7 @@ private fun MutableList<IntArray>.other_letterChunk16() {
     add(intArrayOf(11688, 11694))
 }
 
-private fun MutableList<IntArray>.other_letterChunk17() {
+private fun MutableList<IntArray>.otherLetterChunk17() {
     add(intArrayOf(11696, 11702))
     add(intArrayOf(11704, 11710))
     add(intArrayOf(11712, 11718))
@@ -5053,7 +5053,7 @@ private fun MutableList<IntArray>.other_letterChunk17() {
     add(intArrayOf(71168, 71215))
 }
 
-private fun MutableList<IntArray>.other_letterChunk18() {
+private fun MutableList<IntArray>.otherLetterChunk18() {
     add(intArrayOf(71236, 71236))
     add(intArrayOf(71296, 71338))
     add(intArrayOf(71352, 71352))
@@ -6169,7 +6169,7 @@ private fun MutableList<IntArray>.unassignedChunk24() {
     add(intArrayOf(1114110, 1114111))
 }
 
-private fun MutableList<IntArray>.uppercase_letterChunk25() {
+private fun MutableList<IntArray>.uppercaseLetterChunk25() {
     add(intArrayOf(65, 90))
     add(intArrayOf(192, 214))
     add(intArrayOf(216, 222))
@@ -6372,7 +6372,7 @@ private fun MutableList<IntArray>.uppercase_letterChunk25() {
     add(intArrayOf(1182, 1182))
 }
 
-private fun MutableList<IntArray>.uppercase_letterChunk26() {
+private fun MutableList<IntArray>.uppercaseLetterChunk26() {
     add(intArrayOf(1184, 1184))
     add(intArrayOf(1186, 1186))
     add(intArrayOf(1188, 1188))
@@ -6575,7 +6575,7 @@ private fun MutableList<IntArray>.uppercase_letterChunk26() {
     add(intArrayOf(7928, 7928))
 }
 
-private fun MutableList<IntArray>.uppercase_letterChunk27() {
+private fun MutableList<IntArray>.uppercaseLetterChunk27() {
     add(intArrayOf(7930, 7930))
     add(intArrayOf(7932, 7932))
     add(intArrayOf(7934, 7934))
@@ -6778,7 +6778,7 @@ private fun MutableList<IntArray>.uppercase_letterChunk27() {
     add(intArrayOf(42948, 42951))
 }
 
-private fun MutableList<IntArray>.uppercase_letterChunk28() {
+private fun MutableList<IntArray>.uppercaseLetterChunk28() {
     add(intArrayOf(42953, 42953))
     add(intArrayOf(42955, 42956))
     add(intArrayOf(42960, 42960))

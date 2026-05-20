@@ -107,21 +107,21 @@ class HirTest {
     private fun c(ch: Char): Int = ch.code
 
     @Test
-    fun class_range_canonical_unicode() {
+    fun classRangeCanonicalUnicode() {
         val range = ClassUnicodeRange.new(0x00FF, 0)
         assertEquals(0, range.start())
         assertEquals(0x00FF, range.end())
     }
 
     @Test
-    fun class_range_canonical_bytes() {
+    fun classRangeCanonicalBytes() {
         val range = ClassBytesRange.new(0xFF.toByte(), 0)
         assertEquals(0, range.start().toInt() and 0xFF)
         assertEquals(0xFF, range.end().toInt() and 0xFF)
     }
 
     @Test
-    fun class_canonicalize_unicode() {
+    fun classCanonicalizeUnicode() {
         var cls = uclass(c('a') to c('c'), c('x') to c('z'))
         var expected = listOf(c('a') to c('c'), c('x') to c('z'))
         assertEquals(expected, uranges(cls))
@@ -152,7 +152,7 @@ class HirTest {
     }
 
     @Test
-    fun class_canonicalize_bytes() {
+    fun classCanonicalizeBytes() {
         var cls = bclass(c('a') to c('c'), c('x') to c('z'))
         var expected = listOf(c('a') to c('c'), c('x') to c('z'))
         assertEquals(expected, branges(cls))
@@ -183,7 +183,7 @@ class HirTest {
     }
 
     @Test
-    fun class_case_fold_unicode() {
+    fun classCaseFoldUnicode() {
         var cls = uclass(c('C') to c('F'), c('A') to c('G'), c('D') to c('J'), c('A') to c('C'), c('M') to c('P'), c('L') to c('S'), c('c') to c('f'))
         var expected = uclass(c('A') to c('J'), c('L') to c('S'), c('a') to c('j'), c('l') to c('s'), 0x017F to 0x017F)
         assertEquals(expected, ucasefold(cls))
@@ -216,13 +216,13 @@ class HirTest {
     }
 
     @Test
-    fun class_case_fold_unicode_disabled() {
+    fun classCaseFoldUnicodeDisabled() {
         val cls = uclass(c('C') to c('F'), c('A') to c('G'), c('D') to c('J'), c('A') to c('C'), c('M') to c('P'), c('L') to c('S'), c('c') to c('f'))
         assertTrue(cls.tryCaseFoldSimple().isSuccess)
     }
 
     @Test
-    fun class_case_fold_unicode_disabled_panics() {
+    fun classCaseFoldUnicodeDisabledPanics() {
         val cls = uclass(c('C') to c('F'), c('A') to c('G'), c('D') to c('J'), c('A') to c('C'), c('M') to c('P'), c('L') to c('S'), c('c') to c('f'))
         val expected = uclass(c('A') to c('J'), c('L') to c('S'), c('a') to c('j'), c('l') to c('s'), 0x017F to 0x017F)
         cls.caseFoldSimple()
@@ -230,7 +230,7 @@ class HirTest {
     }
 
     @Test
-    fun class_case_fold_bytes() {
+    fun classCaseFoldBytes() {
         var cls = bclass(c('C') to c('F'), c('A') to c('G'), c('D') to c('J'), c('A') to c('C'), c('M') to c('P'), c('L') to c('S'), c('c') to c('f'))
         var expected = bclass(c('A') to c('J'), c('L') to c('S'), c('a') to c('j'), c('l') to c('s'))
         assertEquals(expected, bcasefold(cls))
@@ -263,7 +263,7 @@ class HirTest {
     }
 
     @Test
-    fun class_negate_unicode() {
+    fun classNegateUnicode() {
         var cls = uclass(c('a') to c('a'))
         var expected = uclass(0 to 0x60, c('b') to 0x10FFFF)
         assertEquals(expected, unegate(cls))
@@ -314,7 +314,7 @@ class HirTest {
     }
 
     @Test
-    fun class_negate_bytes() {
+    fun classNegateBytes() {
         var cls = bclass(c('a') to c('a'))
         var expected = bclass(0 to 0x60, c('b') to 0xFF)
         assertEquals(expected, bnegate(cls))
@@ -349,7 +349,7 @@ class HirTest {
     }
 
     @Test
-    fun class_union_unicode() {
+    fun classUnionUnicode() {
         val cls1 = uclass(c('a') to c('g'), c('m') to c('t'), c('A') to c('C'))
         val cls2 = uclass(c('a') to c('z'))
         val expected = uclass(c('a') to c('z'), c('A') to c('C'))
@@ -357,7 +357,7 @@ class HirTest {
     }
 
     @Test
-    fun class_union_bytes() {
+    fun classUnionBytes() {
         val cls1 = bclass(c('a') to c('g'), c('m') to c('t'), c('A') to c('C'))
         val cls2 = bclass(c('a') to c('z'))
         val expected = bclass(c('a') to c('z'), c('A') to c('C'))
@@ -365,7 +365,7 @@ class HirTest {
     }
 
     @Test
-    fun class_intersect_unicode() {
+    fun classIntersectUnicode() {
         var cls1 = uclass()
         var cls2 = uclass(c('a') to c('a'))
         var expected = uclass()
@@ -438,7 +438,7 @@ class HirTest {
     }
 
     @Test
-    fun class_intersect_bytes() {
+    fun classIntersectBytes() {
         var cls1 = bclass()
         var cls2 = bclass(c('a') to c('a'))
         var expected = bclass()
@@ -511,7 +511,7 @@ class HirTest {
     }
 
     @Test
-    fun class_difference_unicode() {
+    fun classDifferenceUnicode() {
         var cls1 = uclass(c('a') to c('a'))
         var cls2 = uclass(c('a') to c('a'))
         var expected = uclass()
@@ -574,7 +574,7 @@ class HirTest {
     }
 
     @Test
-    fun class_difference_bytes() {
+    fun classDifferenceBytes() {
         var cls1 = bclass(c('a') to c('a'))
         var cls2 = bclass(c('a') to c('a'))
         var expected = bclass()
@@ -637,7 +637,7 @@ class HirTest {
     }
 
     @Test
-    fun class_symmetric_difference_unicode() {
+    fun classSymmetricDifferenceUnicode() {
         val cls1 = uclass(c('a') to c('m'))
         val cls2 = uclass(c('g') to c('t'))
         val expected = uclass(c('a') to c('f'), c('n') to c('t'))
@@ -645,7 +645,7 @@ class HirTest {
     }
 
     @Test
-    fun class_symmetric_difference_bytes() {
+    fun classSymmetricDifferenceBytes() {
         val cls1 = bclass(c('a') to c('m'))
         val cls2 = bclass(c('g') to c('t'))
         val expected = bclass(c('a') to c('f'), c('n') to c('t'))
@@ -658,7 +658,7 @@ class HirTest {
     // API, so this keeps the same nested expression construction in common
     // code.
     @Test
-    fun no_stack_overflow_on_drop() {
+    fun noStackOverflowOnDrop() {
         var expr = Hir.empty()
         for (i in 0 until 100) {
             expr = Hir.capture(Capture(index = 1u, name = null, sub = expr))
@@ -671,7 +671,7 @@ class HirTest {
     }
 
     @Test
-    fun look_set_iter() {
+    fun lookSetIter() {
         var set = LookSet.empty()
         assertEquals(0, set.count())
 
@@ -689,7 +689,7 @@ class HirTest {
     }
 
     @Test
-    fun look_set_debug() {
+    fun lookSetDebug() {
         var res = LookSet.empty().toString()
         assertEquals("∅", res)
         res = LookSet.full().toString()

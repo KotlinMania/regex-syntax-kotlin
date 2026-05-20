@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class AstTest {
     @Test
-    fun no_stack_overflow_on_drop() {
+    fun noStackOverflowOnDrop() {
         // Rust uses a thread with an explicit stack size to test that its
         // destructor for Ast can handle arbitrarily sized expressions in
         // constant stack space. Kotlin commonTest has no portable
@@ -29,9 +29,9 @@ class AstTest {
     // exists because the size of `Ast` was at one point over 200 bytes on a
     // 64-bit target. Wow.
     @Test
-    fun ast_size() {
+    fun astSize() {
         val max = 1
-        val size = ast_variants().maxOf { ast_payload_words(it) }
+        val size = astVariants().maxOf { astPayloadWords(it) }
         assertTrue(
             size <= max,
             "Ast size of $size payload words is bigger than suggested max $max",
@@ -40,7 +40,7 @@ class AstTest {
 
     private fun span(): Span = Span.splat(Position.new(0, 0, 0))
 
-    private fun ast_variants(): List<Ast> {
+    private fun astVariants(): List<Ast> {
         val empty = Ast.empty(span())
         val flags = Flags(span(), mutableListOf())
         val setFlags = SetFlags(span(), flags)
@@ -64,7 +64,7 @@ class AstTest {
         )
     }
 
-    private fun ast_payload_words(ast: Ast): Int = when (ast) {
+    private fun astPayloadWords(ast: Ast): Int = when (ast) {
         is Ast.Empty -> 1
         is Ast.Flags -> 1
         is Ast.Literal -> 1

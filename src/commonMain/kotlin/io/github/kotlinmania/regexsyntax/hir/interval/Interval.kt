@@ -1,4 +1,4 @@
-// port-lint: source src/hir/interval.rs
+// port-lint: source hir/interval.rs
 package io.github.kotlinmania.regexsyntax.hir.interval
 
 /*
