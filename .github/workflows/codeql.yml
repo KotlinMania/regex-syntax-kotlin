@@ -9,7 +9,7 @@ name: "CodeQL Advanced"
 #
 # Three matrix entries cover the languages CodeQL detects in this repo:
 #   - actions             (source-only)
-#   - java-kotlin         (manual build via compileAndroidMain — see note)
+#   - java-kotlin         (manual build via setupAndroidSdk + compileAndroidMain — see note)
 #   - javascript-typescript (source-only)
 #
 # For java-kotlin, the matrix-shared `Initialize CodeQL -> Perform CodeQL
@@ -17,7 +17,7 @@ name: "CodeQL Advanced"
 # for that language:
 #
 #   1. JDK + Gradle setup (the other two languages need no toolchain).
-#   2. A `./gradlew compileAndroidMain compileKotlinJs compileKotlinWasmJs`
+#   2. A `./gradlew setupAndroidSdk compileAndroidMain compileKotlinJs compileKotlinWasmJs`
 #      invocation under the CodeQL build tracer.
 #
 # This is a strict-KMP project with no JVM target, so the autobuild
@@ -107,6 +107,7 @@ jobs:
         if: matrix.build-mode == 'manual'
         run: |
           ./gradlew \
+            setupAndroidSdk \
             compileAndroidMain \
             compileKotlinJs \
             compileKotlinWasmJs \
