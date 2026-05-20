@@ -1,4 +1,4 @@
-// port-lint: source src/ast/visitor.rs
+// port-lint: source ast/visitor.rs
 package io.github.kotlinmania.regexsyntax.ast.visitor
 
 import io.github.kotlinmania.regexsyntax.ast.Alternation

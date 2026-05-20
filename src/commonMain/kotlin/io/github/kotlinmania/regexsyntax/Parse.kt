@@ -1,4 +1,4 @@
-// port-lint: source src/lib.rs
+// port-lint: source lib.rs
 package io.github.kotlinmania.regexsyntax
 
 import io.github.kotlinmania.regexsyntax.hir.Hir
@@ -17,4 +17,3 @@ import io.github.kotlinmania.regexsyntax.parser.parse as parserParse
  * `Ast`, then you should use [io.github.kotlinmania.regexsyntax.ast.parse.Parser].
  */
 fun parse(pattern: String): Result<Hir> = parserParse(pattern)
-

@@ -336,7 +336,7 @@ class LiteralTest {
     // the logic for effectively aborting literal extraction when the seqs get
     // too big.
     @Test
-    fun anything_small_limits() {
+    fun anythingSmallLimits() {
         fun prefixes(pattern: String): Seq =
             Extractor.new()
                 .kind(ExtractKind.Prefix)
@@ -374,7 +374,7 @@ class LiteralTest {
     }
 
     @Test
-    fun odds_and_ends() {
+    fun oddsAndEnds() {
         assertEquals(Seq.infinite() to seq(I("a")), e(""".a"""))
         assertEquals(seq(I("a")) to Seq.infinite(), e("""a."""))
         assertEquals(infinite(), e("""a|."""))
@@ -429,7 +429,7 @@ class LiteralTest {
     // code in Extractor::union to try and trim down the literal sequences
     // if the union would blow the limits set.
     @Test
-    fun holmes_alt() {
+    fun holmesAlt() {
         val pre = prefixes("""(?i)Sherlock|Holmes|Watson|Irene|Adler|John|Baker""")
         assertTrue(pre.len()!! > 0)
         pre.optimizeForPrefixByPreference()
@@ -443,7 +443,7 @@ class LiteralTest {
     // time and isn't materially impacted by these sorts of pathological
     // repeats.
     @Test
-    fun crazy_repeats() {
+    fun crazyRepeats() {
         assertEquals(inexact(listOf(E("")), listOf(E(""))), e("""(?:){4294967295}"""))
         assertEquals(inexact(listOf(E("")), listOf(E(""))), e("""(?:){64}{64}{64}{64}{64}{64}"""))
         assertEquals(inexact(listOf(E("")), listOf(E(""))), e("""x{0}{4294967295}"""))

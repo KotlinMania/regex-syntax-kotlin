@@ -1,4 +1,4 @@
-// port-lint: source src/hir/visitor.rs
+// port-lint: source hir/visitor.rs
 package io.github.kotlinmania.regexsyntax.hir.visitor
 
 import io.github.kotlinmania.regexsyntax.hir.Capture

@@ -409,8 +409,8 @@ internal val V16_0: Array<IntArray> = arrayOf(
 )
 
 internal val V1_1: Array<IntArray> = buildList<IntArray> {
-    v1_1Chunk0()
-    v1_1Chunk1()
+    v1p1Chunk0()
+    v1p1Chunk1()
 }.toTypedArray()
 
 internal val V2_0: Array<IntArray> = arrayOf(
@@ -1567,7 +1567,7 @@ internal val BY_NAME: Array<Pair<String, Array<IntArray>>> = arrayOf(
     "V9_0" to V9_0,
 )
 
-private fun MutableList<IntArray>.v1_1Chunk0() {
+private fun MutableList<IntArray>.v1p1Chunk0() {
     add(intArrayOf(0, 501))
     add(intArrayOf(506, 535))
     add(intArrayOf(592, 680))
@@ -1770,7 +1770,7 @@ private fun MutableList<IntArray>.v1_1Chunk0() {
     add(intArrayOf(8029, 8029))
 }
 
-private fun MutableList<IntArray>.v1_1Chunk1() {
+private fun MutableList<IntArray>.v1p1Chunk1() {
     add(intArrayOf(8031, 8061))
     add(intArrayOf(8064, 8116))
     add(intArrayOf(8118, 8132))

@@ -3,13 +3,13 @@
 package io.github.kotlinmania.regexsyntax.unicodetables.perlword
 
 internal val PERL_WORD: Array<IntArray> = buildList<IntArray> {
-    perl_wordChunk0()
-    perl_wordChunk1()
-    perl_wordChunk2()
-    perl_wordChunk3()
+    perlWordChunk0()
+    perlWordChunk1()
+    perlWordChunk2()
+    perlWordChunk3()
 }.toTypedArray()
 
-private fun MutableList<IntArray>.perl_wordChunk0() {
+private fun MutableList<IntArray>.perlWordChunk0() {
     add(intArrayOf(48, 57))
     add(intArrayOf(65, 90))
     add(intArrayOf(95, 95))
@@ -212,7 +212,7 @@ private fun MutableList<IntArray>.perl_wordChunk0() {
     add(intArrayOf(3902, 3911))
 }
 
-private fun MutableList<IntArray>.perl_wordChunk1() {
+private fun MutableList<IntArray>.perlWordChunk1() {
     add(intArrayOf(3913, 3948))
     add(intArrayOf(3953, 3972))
     add(intArrayOf(3974, 3991))
@@ -415,7 +415,7 @@ private fun MutableList<IntArray>.perl_wordChunk1() {
     add(intArrayOf(64112, 64217))
 }
 
-private fun MutableList<IntArray>.perl_wordChunk2() {
+private fun MutableList<IntArray>.perlWordChunk2() {
     add(intArrayOf(64256, 64262))
     add(intArrayOf(64275, 64279))
     add(intArrayOf(64285, 64296))
@@ -618,7 +618,7 @@ private fun MutableList<IntArray>.perl_wordChunk2() {
     add(intArrayOf(72263, 72263))
 }
 
-private fun MutableList<IntArray>.perl_wordChunk3() {
+private fun MutableList<IntArray>.perlWordChunk3() {
     add(intArrayOf(72272, 72345))
     add(intArrayOf(72349, 72349))
     add(intArrayOf(72368, 72440))

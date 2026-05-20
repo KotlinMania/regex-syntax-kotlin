@@ -1,4 +1,4 @@
-// port-lint: source src/debug.rs
+// port-lint: source debug.rs
 package io.github.kotlinmania.regexsyntax.debug
 
 /*

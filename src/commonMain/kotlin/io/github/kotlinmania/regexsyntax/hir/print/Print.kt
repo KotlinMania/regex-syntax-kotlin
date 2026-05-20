@@ -1,4 +1,4 @@
-// port-lint: source src/hir/print.rs
+// port-lint: source hir/print.rs
 package io.github.kotlinmania.regexsyntax.hir.print
 
 /*

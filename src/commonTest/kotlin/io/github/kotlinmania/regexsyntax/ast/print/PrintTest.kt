@@ -7,10 +7,10 @@ import kotlin.test.assertEquals
 
 class PrintTest {
     private fun roundtrip(given: String) {
-        roundtrip_with({ it }, given)
+        roundtripWith({ it }, given)
     }
 
-    private fun roundtrip_with(f: (ParserBuilder) -> ParserBuilder, given: String) {
+    private fun roundtripWith(f: (ParserBuilder) -> ParserBuilder, given: String) {
         val builder = ParserBuilder.new()
         val ast = f(builder).build().parse(given).getOrThrow()
 
@@ -21,10 +21,10 @@ class PrintTest {
     }
 
     @Test
-    fun print_literal() {
+    fun printLiteral() {
         roundtrip("a")
         roundtrip("\\[")
-        roundtrip_with({ it.octal(true) }, "\\141")
+        roundtripWith({ it.octal(true) }, "\\141")
         roundtrip("\\x61")
         roundtrip("\\x7F")
         roundtrip("\\u0061")
@@ -44,19 +44,19 @@ class PrintTest {
     }
 
     @Test
-    fun print_dot() {
+    fun printDot() {
         roundtrip(".")
     }
 
     @Test
-    fun print_concat() {
+    fun printConcat() {
         roundtrip("ab")
         roundtrip("abcde")
         roundtrip("a(bcd)ef")
     }
 
     @Test
-    fun print_alternation() {
+    fun printAlternation() {
         roundtrip("a|b")
         roundtrip("a|b|c|d|e")
         roundtrip("|a|b|c|d|e")
@@ -65,7 +65,7 @@ class PrintTest {
     }
 
     @Test
-    fun print_assertion() {
+    fun printAssertion() {
         roundtrip("^")
         roundtrip("$")
         roundtrip("\\A")
@@ -75,7 +75,7 @@ class PrintTest {
     }
 
     @Test
-    fun print_repetition() {
+    fun printRepetition() {
         roundtrip("a?")
         roundtrip("a??")
         roundtrip("a*")
@@ -91,7 +91,7 @@ class PrintTest {
     }
 
     @Test
-    fun print_flags() {
+    fun printFlags() {
         roundtrip("(?i)")
         roundtrip("(?-i)")
         roundtrip("(?s-i)")
@@ -100,7 +100,7 @@ class PrintTest {
     }
 
     @Test
-    fun print_group() {
+    fun printGroup() {
         roundtrip("(?i:a)")
         roundtrip("(?P<foo>a)")
         roundtrip("(?<foo>a)")
@@ -108,7 +108,7 @@ class PrintTest {
     }
 
     @Test
-    fun print_class() {
+    fun printClass() {
         roundtrip("[abc]")
         roundtrip("[a-z]")
         roundtrip("[^a-z]")

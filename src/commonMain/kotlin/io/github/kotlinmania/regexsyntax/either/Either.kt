@@ -1,4 +1,4 @@
-// port-lint: source src/either.rs
+// port-lint: source either.rs
 package io.github.kotlinmania.regexsyntax.either
 
 /**

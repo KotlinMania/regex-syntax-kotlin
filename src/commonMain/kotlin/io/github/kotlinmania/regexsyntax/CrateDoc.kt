@@ -1,4 +1,4 @@
-// port-lint: source src/lib.rs
+// port-lint: source lib.rs
 package io.github.kotlinmania.regexsyntax
 
 /**
@@ -56,7 +56,7 @@ package io.github.kotlinmania.regexsyntax
  * A key feature of this library is that it is safe to use with end user facing input. This plays
  * a significant role in the internal implementation. In particular:
  *
- * 1. Parsers provide a `nest_limit` option that permits callers to control how deeply nested a
+ * 1. Parsers provide a `nestLimit` option that permits callers to control how deeply nested a
  *    regular expression is allowed to be. This makes it possible to do case analysis over an `Ast`
  *    or an `Hir` using recursion without worrying about stack overflow.
  * 2. Since relying on a particular stack size is brittle, this crate goes to great lengths to
@@ -87,4 +87,3 @@ package io.github.kotlinmania.regexsyntax
  * availability. This Kotlin port does not preserve feature gating; Unicode tables are shipped as
  * Kotlin source under [io.github.kotlinmania.regexsyntax.unicodetables].
  */
-

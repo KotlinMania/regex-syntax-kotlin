@@ -1,4 +1,4 @@
-// port-lint: source src/ast/parse.rs
+// port-lint: source ast/parse.rs
 package io.github.kotlinmania.regexsyntax.ast.parse
 
 import io.github.kotlinmania.regexsyntax.ast.ErrorKind

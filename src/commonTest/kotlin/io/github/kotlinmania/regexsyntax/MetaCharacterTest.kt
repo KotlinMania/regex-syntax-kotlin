@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class MetaCharacterTest {
     @Test
-    fun escape_meta() {
+    fun escapeMeta() {
         assertEquals(
             """\\\.\+\*\?\(\)\|\[\]\{\}\^\$\#\&\-\~""",
             escape("""\.+*?()|[]{}^$#&-~"""),
@@ -16,13 +16,13 @@ class MetaCharacterTest {
     }
 
     @Test
-    fun word_byte() {
+    fun wordByte() {
         assertTrue(isWordByte('a'.code.toByte()))
         assertFalse(isWordByte('-'.code.toByte()))
     }
 
     @Test
-    fun word_char() {
+    fun wordChar() {
         assertTrue(isWordCharacter('a'.code), "ASCII")
         assertTrue(isWordCharacter('à'.code), "Latin-1")
         assertTrue(isWordCharacter('β'.code), "Greek")
@@ -37,12 +37,12 @@ class MetaCharacterTest {
     }
 
     @Test
-    fun word_char_disabled_panic() {
+    fun wordCharDisabledPanic() {
         assertTrue(isWordCharacter('a'.code))
     }
 
     @Test
-    fun word_char_disabled_error() {
+    fun wordCharDisabledError() {
         assertTrue(tryIsWordCharacter('a'.code).isSuccess)
     }
 }
