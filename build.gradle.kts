@@ -199,10 +199,18 @@ kotlin {
         binaries.framework { baseName = "RegexSyntax"; xcf.add(this) }
     }
     iosSimulatorArm64 {
-        binaries.framework { baseName = "RegexSyntax"; xcf.add(this) }
+        binaries.framework {
+            baseName = "RegexSyntax"
+            isStatic = true
+            xcf.add(this)
+        }
     }
     iosX64 {
-        binaries.framework { baseName = "RegexSyntax"; xcf.add(this) }
+        binaries.framework {
+            baseName = "RegexSyntax"
+            isStatic = true
+            xcf.add(this)
+        }
     }
 
     tvosArm64 {
