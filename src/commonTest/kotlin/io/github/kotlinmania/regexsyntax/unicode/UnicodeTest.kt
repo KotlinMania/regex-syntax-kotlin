@@ -3,6 +3,7 @@ package io.github.kotlinmania.regexsyntax.unicode
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -26,6 +27,15 @@ class UnicodeTest {
     fun simpleFoldA() {
         assertEquals(intArrayOf('A'.code).toList(), simpleFoldOk('a'.code).toList())
         assertEquals(intArrayOf('a'.code).toList(), simpleFoldOk('A'.code).toList())
+    }
+
+    @Test
+    fun simpleFoldRequiresIncreasingCodepoints() {
+        val folder = SimpleCaseFolder.new().getOrThrow()
+        folder.mapping('b'.code)
+        assertFailsWith<IllegalStateException> {
+            folder.mapping('a'.code)
+        }
     }
 
     @Test
