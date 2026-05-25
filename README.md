@@ -277,11 +277,10 @@ While this repository used to provide its own benchmark suite, it has since
 been moved to [rebar](https://github.com/BurntSushi/rebar). The benchmarks are
 quite extensive, and there are many more than what is shown in rebar's README
 (which is just limited to a "curated" set meant to compare performance between
-regex engines). To run all of this crate's benchmarks, first start by cloning
-and installing `rebar`:
+regex engines). To run all of this crate's benchmarks, first start from a
+prepared `rebar` checkout:
 
 ```text
-$ git clone https://github.com/BurntSushi/rebar
 $ cd rebar
 $ cargo install --path ./
 ```
