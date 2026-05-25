@@ -2,7 +2,6 @@ name: CI
 
 on:
   workflow_dispatch:
-
 # Least-privilege default for any inline job in this file. The reusable
 # workflows invoked below declare their own permissions; this top-level
 # block only applies to direct jobs in ci.yml itself.
@@ -19,9 +18,8 @@ permissions:
 # CodeQL workflows live in .github/workflows/codeql.yml and are NOT invoked
 # from here — they have their own trigger and run independently.
 #
-# This orchestrator is intentionally manual-only. Do not add branch events here;
-# reusable platform workflows are invoked from this workflow through
-# `workflow_call`.
+# This orchestrator is manual-only. Do not add branch events here; the called
+# platform workflows stay reusable-only via `workflow_call`.
 
 # Each `uses:` job below declares its own `permissions:` block. For a job
 # that calls a reusable workflow, the permissions value sets a CEILING on
