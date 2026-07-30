@@ -139,9 +139,9 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
         return fmtClassSetBinaryOpKind(ast.kind)
     }
 
-    private fun writeStr(s: String): Result<Unit> = runCatching { wtr.append(s); Unit }
+    private fun writeStr(s: String): Result<Unit> = runCatching { wtr.append(s) }.map { }
 
-    private fun writeChar(c: Char): Result<Unit> = runCatching { wtr.append(c); Unit }
+    private fun writeChar(c: Char): Result<Unit> = runCatching { wtr.append(c) }.map { }
 
     private fun writeCodepoint(codepoint: Int): Result<Unit> = runCatching {
         require(codepoint in 0..0x10FFFF) { "Invalid Unicode scalar value: $codepoint" }
@@ -155,8 +155,7 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
             wtr.append(high.toChar())
             wtr.append(low.toChar())
         }
-        Unit
-    }
+    }.map { }
 
     private fun fmtGroupPre(ast: Group): Result<Unit> {
         return when (val k = ast.kind) {
