@@ -622,7 +622,7 @@ internal class ParserI(
         val stack = parser().stackGroup
         val last = stack.lastOrNull()
         if (last is GroupState.Alternation) {
-            last.value.asts.add(concat.intoAst())
+            last.value.addAst(concat.intoAst())
             return
         }
         stack.add(GroupState.Alternation(io.github.kotlinmania.regexsyntax.ast.Alternation(
@@ -656,7 +656,7 @@ internal class ParserI(
                         set.flags.flagState(Flag.IgnoreWhitespace)?.let {
                             parser().ignoreWhitespace = it
                         }
-                        concat.asts.add(Ast.Flags(set))
+                        concat.addAst(Ast.Flags(set))
                         Result.success(concat)
                     }
                     is io.github.kotlinmania.regexsyntax.either.Either.Right -> {
@@ -731,14 +731,14 @@ internal class ParserI(
         
         val finalAst = if (alt != null) {
             val finalAlt = alt.copy(span = alt.span.copy(end = finalGroupConcat.span.end))
-            finalAlt.asts.add(finalGroupConcat.intoAst())
+            finalAlt.addAst(finalGroupConcat.intoAst())
             Ast.Alternation(finalAlt)
         } else {
             finalGroupConcat.intoAst()
         }
         
         val finalGroup = group.copy(span = group.span.copy(end = pos()), ast = finalAst)
-        priorConcat.asts.add(Ast.Group(finalGroup))
+        priorConcat.addAst(Ast.Group(finalGroup))
         return Result.success(priorConcat)
     }
 
@@ -760,7 +760,7 @@ internal class ParserI(
                 is GroupState.Alternation -> {
                     val alt = state.value
                     val finalAlt = alt.copy(span = alt.span.copy(end = pos()))
-                    finalAlt.asts.add(finalConcat.intoAst())
+                    finalAlt.addAst(finalConcat.intoAst())
                     Result.success(Ast.Alternation(finalAlt))
                 }
                 is GroupState.Group -> {
@@ -921,7 +921,7 @@ internal class ParserI(
                 ')' -> popGroup(concat)
                 '|' -> pushAlternate(concat)
                 '[' -> parseSetClass().map { cls ->
-                    concat.asts.add(Ast.ClassBracketed(cls))
+                    concat.addAst(Ast.ClassBracketed(cls))
                     concat
                 }
                 '?' -> parseUncountedRepetition(concat, RepetitionKind.ZeroOrOne)
@@ -929,7 +929,7 @@ internal class ParserI(
                 '+' -> parseUncountedRepetition(concat, RepetitionKind.OneOrMore)
                 '{' -> parseCountedRepetition(concat)
                 else -> parsePrimitive().map { prim ->
-                    concat.asts.add(prim.intoAst())
+                    concat.addAst(prim.intoAst())
                     concat
                 }
             }
@@ -963,7 +963,7 @@ internal class ParserI(
     ): Result<Concat> {
         val start = pos()
         val ast = if (concat.asts.isNotEmpty()) {
-            concat.asts.removeAt(concat.asts.size - 1)
+            concat.removeLastAst()
         } else {
             return Result.failure(AstException(error(Span.splat(start), ErrorKind.RepetitionMissing)))
         }
@@ -979,7 +979,7 @@ internal class ParserI(
         val greedy = !bumpIf("?")
         val opSpan = Span(opStart, pos())
         val span = Span(ast.span().start, pos())
-        concat.asts.add(Ast.Repetition(Repetition(
+        concat.addAst(Ast.Repetition(Repetition(
             span = span,
             op = RepetitionOp(opSpan, kind),
             greedy = greedy,
@@ -994,7 +994,7 @@ internal class ParserI(
     private fun parseCountedRepetition(concat: Concat): Result<Concat> {
         val start = pos()
         val ast = if (concat.asts.isNotEmpty()) {
-            concat.asts.removeAt(concat.asts.size - 1)
+            concat.removeLastAst()
         } else {
             return Result.failure(AstException(error(Span.splat(start), ErrorKind.RepetitionMissing)))
         }
@@ -1058,7 +1058,7 @@ internal class ParserI(
             return Result.failure(AstException(error(opSpan, ErrorKind.RepetitionCountInvalid)))
         }
 
-        concat.asts.add(Ast.Repetition(Repetition(
+        concat.addAst(Ast.Repetition(Repetition(
             span = ast.span().withEnd(pos()),
             op = RepetitionOp(opSpan, RepetitionKind.Range(range)),
             greedy = greedy,

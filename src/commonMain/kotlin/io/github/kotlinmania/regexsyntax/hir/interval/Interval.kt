@@ -465,112 +465,112 @@ interface Interval<I : Interval<I, B>, B> : Comparable<I> {
 
     /** The factory carrying this interval's bound-type-static operations. */
     fun factory(): IntervalFactory<I, B>
+}
 
-    /**
-     * Union the given overlapping range into this range.
-     *
-     * If the two ranges aren't contiguous, then this returns `null`.
-     */
-    fun union(other: I): I? {
-        if (!isContiguous(other)) {
-            return null
+/**
+ * Union the given overlapping range into this range.
+ *
+ * If the two ranges aren't contiguous, then this returns `null`.
+ */
+internal fun <I : Interval<I, B>, B> I.union(other: I): I? {
+    if (!isContiguous(other)) {
+        return null
+    }
+    val f = factory()
+    val lower = if (f.cmp(lower(), other.lower()) <= 0) lower() else other.lower()
+    val upper = if (f.cmp(upper(), other.upper()) >= 0) upper() else other.upper()
+    return f.create(lower, upper)
+}
+
+/**
+ * Intersect this range with the given range and return the result.
+ *
+ * If the intersection is empty, then this returns `null`.
+ */
+internal fun <I : Interval<I, B>, B> I.intersect(other: I): I? {
+    val f = factory()
+    val lower = if (f.cmp(lower(), other.lower()) >= 0) lower() else other.lower()
+    val upper = if (f.cmp(upper(), other.upper()) <= 0) upper() else other.upper()
+    return if (f.cmp(lower, upper) <= 0) f.create(lower, upper) else null
+}
+
+/**
+ * Subtract the given range from this range and return the resulting
+ * ranges.
+ *
+ * If subtraction would result in an empty range, then no ranges are
+ * returned.
+ */
+internal fun <I : Interval<I, B>, B> I.difference(other: I): Pair<I?, I?> {
+    val f = factory()
+    if (isSubset(other)) {
+        return Pair(null, null)
+    }
+    if (isIntersectionEmpty(other)) {
+        return Pair(f.create(lower(), upper()), null)
+    }
+    val addLower = f.cmp(other.lower(), lower()) > 0
+    val addUpper = f.cmp(other.upper(), upper()) < 0
+    // We know this because !this.isSubset(other) and the ranges have
+    // a non-empty intersection.
+    check(addLower || addUpper)
+    var first: I? = null
+    var second: I? = null
+    if (addLower) {
+        val upper = f.decrement(other.lower())
+        first = f.create(lower(), upper)
+    }
+    if (addUpper) {
+        val lower = f.increment(other.upper())
+        val range = f.create(lower, upper())
+        if (first == null) {
+            first = range
+        } else {
+            second = range
         }
-        val f = factory()
-        val lower = if (f.cmp(lower(), other.lower()) <= 0) lower() else other.lower()
-        val upper = if (f.cmp(upper(), other.upper()) >= 0) upper() else other.upper()
-        return f.create(lower, upper)
     }
+    return Pair(first, second)
+}
 
-    /**
-     * Intersect this range with the given range and return the result.
-     *
-     * If the intersection is empty, then this returns `null`.
-     */
-    fun intersect(other: I): I? {
-        val f = factory()
-        val lower = if (f.cmp(lower(), other.lower()) >= 0) lower() else other.lower()
-        val upper = if (f.cmp(upper(), other.upper()) <= 0) upper() else other.upper()
-        return if (f.cmp(lower, upper) <= 0) f.create(lower, upper) else null
-    }
+/**
+ * Returns true if and only if the two ranges are contiguous. Two ranges
+ * are contiguous if and only if the ranges are either overlapping or
+ * adjacent.
+ */
+internal fun <I : Interval<I, B>, B> I.isContiguous(other: I): Boolean {
+    val f = factory()
+    val lower1 = f.boundAsInt(lower()).toLong() and 0xFFFF_FFFFL
+    val upper1 = f.boundAsInt(upper()).toLong() and 0xFFFF_FFFFL
+    val lower2 = f.boundAsInt(other.lower()).toLong() and 0xFFFF_FFFFL
+    val upper2 = f.boundAsInt(other.upper()).toLong() and 0xFFFF_FFFFL
+    val maxLower = if (lower1 >= lower2) lower1 else lower2
+    val minUpper = if (upper1 <= upper2) upper1 else upper2
+    // Saturating add by 1 — if minUpper is at the max u32 value, the
+    // increment saturates instead of wrapping.
+    val saturated = if (minUpper == 0xFFFF_FFFFL) minUpper else minUpper + 1L
+    return maxLower <= saturated
+}
 
-    /**
-     * Subtract the given range from this range and return the resulting
-     * ranges.
-     *
-     * If subtraction would result in an empty range, then no ranges are
-     * returned.
-     */
-    fun difference(other: I): Pair<I?, I?> {
-        val f = factory()
-        if (isSubset(other)) {
-            return Pair(null, null)
-        }
-        if (isIntersectionEmpty(other)) {
-            return Pair(f.create(lower(), upper()), null)
-        }
-        val addLower = f.cmp(other.lower(), lower()) > 0
-        val addUpper = f.cmp(other.upper(), upper()) < 0
-        // We know this because !this.isSubset(other) and the ranges have
-        // a non-empty intersection.
-        check(addLower || addUpper)
-        var first: I? = null
-        var second: I? = null
-        if (addLower) {
-            val upper = f.decrement(other.lower())
-            first = f.create(lower(), upper)
-        }
-        if (addUpper) {
-            val lower = f.increment(other.upper())
-            val range = f.create(lower, upper())
-            if (first == null) {
-                first = range
-            } else {
-                second = range
-            }
-        }
-        return Pair(first, second)
-    }
+/**
+ * Returns true if and only if the intersection of this range and the
+ * other range is empty.
+ */
+internal fun <I : Interval<I, B>, B> I.isIntersectionEmpty(other: I): Boolean {
+    val f = factory()
+    val maxLower = if (f.cmp(lower(), other.lower()) >= 0) lower() else other.lower()
+    val minUpper = if (f.cmp(upper(), other.upper()) <= 0) upper() else other.upper()
+    return f.cmp(maxLower, minUpper) > 0
+}
 
-    /**
-     * Returns true if and only if the two ranges are contiguous. Two ranges
-     * are contiguous if and only if the ranges are either overlapping or
-     * adjacent.
-     */
-    fun isContiguous(other: I): Boolean {
-        val f = factory()
-        val lower1 = f.boundAsInt(lower()).toLong() and 0xFFFF_FFFFL
-        val upper1 = f.boundAsInt(upper()).toLong() and 0xFFFF_FFFFL
-        val lower2 = f.boundAsInt(other.lower()).toLong() and 0xFFFF_FFFFL
-        val upper2 = f.boundAsInt(other.upper()).toLong() and 0xFFFF_FFFFL
-        val maxLower = if (lower1 >= lower2) lower1 else lower2
-        val minUpper = if (upper1 <= upper2) upper1 else upper2
-        // Saturating add by 1 — if minUpper is at the max u32 value, the
-        // increment saturates instead of wrapping.
-        val saturated = if (minUpper == 0xFFFF_FFFFL) minUpper else minUpper + 1L
-        return maxLower <= saturated
-    }
-
-    /**
-     * Returns true if and only if the intersection of this range and the
-     * other range is empty.
-     */
-    fun isIntersectionEmpty(other: I): Boolean {
-        val f = factory()
-        val maxLower = if (f.cmp(lower(), other.lower()) >= 0) lower() else other.lower()
-        val minUpper = if (f.cmp(upper(), other.upper()) <= 0) upper() else other.upper()
-        return f.cmp(maxLower, minUpper) > 0
-    }
-
-    /** Returns true if and only if this range is a subset of the other range. */
-    fun isSubset(other: I): Boolean {
-        val f = factory()
-        val lower1 = lower()
-        val upper1 = upper()
-        val lower2 = other.lower()
-        val upper2 = other.upper()
-        return (f.cmp(lower2, lower1) <= 0 && f.cmp(lower1, upper2) <= 0) &&
-            (f.cmp(lower2, upper1) <= 0 && f.cmp(upper1, upper2) <= 0)
-    }
+/** Returns true if and only if this range is a subset of the other range. */
+internal fun <I : Interval<I, B>, B> I.isSubset(other: I): Boolean {
+    val f = factory()
+    val lower1 = lower()
+    val upper1 = upper()
+    val lower2 = other.lower()
+    val upper2 = other.upper()
+    return (f.cmp(lower2, lower1) <= 0 && f.cmp(lower1, upper2) <= 0) &&
+        (f.cmp(lower2, upper1) <= 0 && f.cmp(upper1, upper2) <= 0)
 }
 
 /**

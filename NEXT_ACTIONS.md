@@ -5,9 +5,9 @@ Based on AST analysis, here are the concrete next steps.
 ## Summary
 
 - **Files Present:** 33/33 (100.0%)
-- **Function parity:** 620/739 matched (target 1170) — 83.9%
+- **Function parity:** 620/739 matched (target 1168) — 83.9%
 - **Class/type parity:** 119/134 matched (target 279) — 88.8%
-- **Combined symbol parity:** 739/873 matched (target 1449) — 84.7%
+- **Combined symbol parity:** 739/873 matched (target 1447) — 84.7%
 - **Average inline-code cosine:** 0.52 (function body across 29 matched files)
 - **Average documentation cosine:** 0.42 (doc text across 29 matched files)
 - **Cheat-zeroed Files:** 14
@@ -33,7 +33,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Similarity:** 0.34
 - **Dependents:** 1
 - **Priority Score:** 1034706.6
-- **Functions:** 36/39 matched (target 50)
+- **Functions:** 36/39 matched (target 51)
 - **Missing functions:** `class`, `simple_fold_ok`, `contains_case_map`
 - **Types:** 8/8 matched (target 18)
 - **Missing types:** _none_
@@ -174,7 +174,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Similarity:** 0.63
 - **Dependents:** 0
 - **Priority Score:** 52903.7
-- **Functions:** 20/23 matched (target 43)
+- **Functions:** 20/23 matched (target 37)
 - **Missing functions:** `rutf8`, `never_accepts_surrogate_codepoints`, `encode_surrogate`
 - **Types:** 4/6 matched (target 9)
 - **Missing types:** `IntoIter`, `Item`
@@ -197,7 +197,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Similarity:** 0.00
 - **Dependents:** 0
 - **Priority Score:** 38710.0
-- **Functions:** 43/46 matched (target 68)
+- **Functions:** 43/46 matched (target 71)
 - **Missing functions:** `arbitrary`, `size_hint`, `drop`
 - **Types:** 41/41 matched (target 105)
 - **Missing types:** _none_
@@ -412,13 +412,3 @@ For each file to be considered "complete":
 - Documentation ported
 - port-lint header present
 
-## Next Commands
-
-```bash
-# Initialize task queue for systematic porting
-cd tools/ast_distance
-./ast_distance --init-tasks ../../tmp/regex-syntax/src rust ../../src kotlin tasks.json ../../AGENTS.md
-
-# Get next high-priority task
-./ast_distance --assign tasks.json <agent-id>
-```

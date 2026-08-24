@@ -29,6 +29,7 @@ import io.github.kotlinmania.regexsyntax.hir.interval.Interval
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalFactory
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSet
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSetIter
+import io.github.kotlinmania.regexsyntax.hir.interval.isIntersectionEmpty
 import io.github.kotlinmania.regexsyntax.unicode.CaseFoldError
 import io.github.kotlinmania.regexsyntax.unicode.SimpleCaseFolder
 import io.github.kotlinmania.regexsyntax.debug.Byte as DebugByte

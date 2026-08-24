@@ -101,22 +101,16 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     /** One byte range. */
     data class One(val r: Utf8Range) : Utf8Sequence()
     /** Two successive byte ranges. */
-    data class Two(val rs: Array<Utf8Range>) : Utf8Sequence() {
+    data class Two(val rs: List<Utf8Range>) : Utf8Sequence() {
         init { check(rs.size == 2) }
-        override fun equals(other: Any?): Boolean = other is Two && rs.contentEquals(other.rs)
-        override fun hashCode(): Int = rs.contentHashCode()
     }
     /** Three successive byte ranges. */
-    data class Three(val rs: Array<Utf8Range>) : Utf8Sequence() {
+    data class Three(val rs: List<Utf8Range>) : Utf8Sequence() {
         init { check(rs.size == 3) }
-        override fun equals(other: Any?): Boolean = other is Three && rs.contentEquals(other.rs)
-        override fun hashCode(): Int = rs.contentHashCode()
     }
     /** Four successive byte ranges. */
-    data class Four(val rs: Array<Utf8Range>) : Utf8Sequence() {
+    data class Four(val rs: List<Utf8Range>) : Utf8Sequence() {
         init { check(rs.size == 4) }
-        override fun equals(other: Any?): Boolean = other is Four && rs.contentEquals(other.rs)
-        override fun hashCode(): Int = rs.contentHashCode()
     }
 
     companion object {
@@ -129,16 +123,16 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
         internal fun fromEncodedRange(start: ByteArray, startLen: Int, end: ByteArray, endLen: Int): Utf8Sequence {
             check(startLen == endLen)
             return when (startLen) {
-                2 -> Two(arrayOf(
+                2 -> Two(listOf(
                     Utf8Range.new(start[0], end[0]),
                     Utf8Range.new(start[1], end[1]),
                 ))
-                3 -> Three(arrayOf(
+                3 -> Three(listOf(
                     Utf8Range.new(start[0], end[0]),
                     Utf8Range.new(start[1], end[1]),
                     Utf8Range.new(start[2], end[2]),
                 ))
-                4 -> Four(arrayOf(
+                4 -> Four(listOf(
                     Utf8Range.new(start[0], end[0]),
                     Utf8Range.new(start[1], end[1]),
                     Utf8Range.new(start[2], end[2]),
@@ -152,9 +146,9 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     /** Returns the underlying sequence of byte ranges as a list. */
     fun asSlice(): List<Utf8Range> = when (this) {
         is One -> listOf(r)
-        is Two -> rs.toList()
-        is Three -> rs.toList()
-        is Four -> rs.toList()
+        is Two -> rs
+        is Three -> rs
+        is Four -> rs
     }
 
     /**
@@ -189,9 +183,9 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
      */
     fun reverse(): Utf8Sequence = when (this) {
         is One -> this
-        is Two -> Two(arrayOf(rs[1], rs[0]))
-        is Three -> Three(arrayOf(rs[2], rs[1], rs[0]))
-        is Four -> Four(arrayOf(rs[3], rs[2], rs[1], rs[0]))
+        is Two -> Two(listOf(rs[1], rs[0]))
+        is Three -> Three(listOf(rs[2], rs[1], rs[0]))
+        is Four -> Four(listOf(rs[3], rs[2], rs[1], rs[0]))
     }
 
     /**
