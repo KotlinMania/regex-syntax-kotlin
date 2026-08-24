@@ -444,7 +444,7 @@ data class WithComments(
     /** The actual ast. */
     val ast: Ast,
     /** All comments found in the original regular expression. */
-    val comments: MutableList<Comment>,
+    val comments: List<Comment>,
 )
 
 /**
@@ -601,7 +601,7 @@ data class Alternation(
     /** The span of this alternation. */
     val span: Span,
     /** The alternate regular expressions. */
-    val asts: MutableList<Ast>,
+    val asts: List<Ast>,
 ) {
     /**
      * Return this alternation as an AST.
@@ -612,8 +612,12 @@ data class Alternation(
      */
     fun intoAst(): Ast = when (asts.size) {
         0 -> Ast.empty(span)
-        1 -> asts.removeAt(asts.size - 1)
+        1 -> asts[0]
         else -> Ast.alternation(this)
+    }
+
+    internal fun addAst(ast: Ast) {
+        (asts as? MutableList<Ast>)?.add(ast)
     }
 }
 
@@ -622,7 +626,7 @@ data class Concat(
     /** The span of this concatenation. */
     val span: Span,
     /** The concatenation regular expressions. */
-    val asts: MutableList<Ast>,
+    val asts: List<Ast>,
 ) {
     /**
      * Return this concatenation as an AST.
@@ -633,9 +637,16 @@ data class Concat(
      */
     fun intoAst(): Ast = when (asts.size) {
         0 -> Ast.empty(span)
-        1 -> asts.removeAt(asts.size - 1)
+        1 -> asts[0]
         else -> Ast.concat(this)
     }
+
+    internal fun addAst(ast: Ast) {
+        (asts as? MutableList<Ast>)?.add(ast)
+    }
+
+    internal fun removeLastAst(): Ast =
+        (asts as? MutableList<Ast>)?.removeAt(asts.size - 1) ?: error("empty asts")
 }
 
 /**
@@ -1097,7 +1108,7 @@ data class ClassSetUnion(
      */
     var span: Span,
     /** The sequence of items that make up this union. */
-    val items: MutableList<ClassSetItem>,
+    val items: List<ClassSetItem>,
 ) {
     /**
      * Push a new item in this union.
@@ -1116,7 +1127,7 @@ data class ClassSetUnion(
             span = span.copy(start = item.span().start)
         }
         span = span.copy(end = item.span().end)
-        items.add(item)
+        (items as? MutableList<ClassSetItem>)?.add(item)
     }
 
     /**
@@ -1129,7 +1140,7 @@ data class ClassSetUnion(
      */
     fun intoItem(): ClassSetItem = when (items.size) {
         0 -> ClassSetItem.Empty(span)
-        1 -> items.removeAt(items.size - 1)
+        1 -> items[0]
         else -> ClassSetItem.Union(this)
     }
 }
@@ -1371,7 +1382,7 @@ data class Flags(
      * A sequence of flag items. Each item is either a flag or a negation
      * operator.
      */
-    val items: MutableList<FlagsItem>,
+    val items: List<FlagsItem>,
 ) {
     /**
      * Add the given item to this sequence of flags.
@@ -1386,7 +1397,7 @@ data class Flags(
                 return i
             }
         }
-        items.add(item)
+        (items as? MutableList<FlagsItem>)?.add(item)
         return null
     }
 
