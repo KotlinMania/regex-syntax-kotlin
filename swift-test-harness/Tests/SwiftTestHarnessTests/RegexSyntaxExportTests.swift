@@ -1,8 +1,10 @@
+import Testing
 import RegexSyntax
 
-@main
+@Suite("RegexSyntax Swift Export Tests")
 struct RegexSyntaxExportTests {
-    static func main() {
-        print("RegexSyntax swift module imported cleanly")
+    @Test("Verify RegexSyntax module imports and can be referenced")
+    func smokeTest() {
+        #expect(true)
     }
 }
