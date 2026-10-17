@@ -44,7 +44,6 @@ private class PrinterBuilder {
  * and this specific HIR representation.)
  */
 class Printer {
-
     /**
      * Print the given [Hir] to the given writer.
      *
@@ -61,7 +60,9 @@ class Printer {
     }
 }
 
-private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
+private class Writer(
+    val wtr: Appendable,
+) : Visitor<Unit, Throwable> {
     override fun finish(): Result<Unit> = Result.success(Unit)
 
     override fun visitPre(hir: Hir): Result<Unit> {
@@ -110,76 +111,78 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
                     wtr.append(")")
                 }
             }
-            is HirKind.Class -> when (val cls = k.value) {
-                is Class.Unicode -> {
-                    if (cls.value.ranges().isEmpty()) {
-                        wtr.append("[a&&b]")
-                        return Result.success(Unit)
-                    }
-                    wtr.append("[")
-                    for (range in cls.value.iter()) {
-                        when {
-                            range.start() == range.end() -> {
-                                writeLiteralChar(wtr, range.start())
-                            }
-                            range.start() + 1 == range.end() -> {
-                                writeLiteralChar(wtr, range.start())
-                                writeLiteralChar(wtr, range.end())
-                            }
-                            else -> {
-                                writeLiteralChar(wtr, range.start())
-                                wtr.append("-")
-                                writeLiteralChar(wtr, range.end())
+            is HirKind.Class ->
+                when (val cls = k.value) {
+                    is Class.Unicode -> {
+                        if (cls.value.ranges().isEmpty()) {
+                            wtr.append("[a&&b]")
+                            return Result.success(Unit)
+                        }
+                        wtr.append("[")
+                        for (range in cls.value.iter()) {
+                            when {
+                                range.start() == range.end() -> {
+                                    writeLiteralChar(wtr, range.start())
+                                }
+                                range.start() + 1 == range.end() -> {
+                                    writeLiteralChar(wtr, range.start())
+                                    writeLiteralChar(wtr, range.end())
+                                }
+                                else -> {
+                                    writeLiteralChar(wtr, range.start())
+                                    wtr.append("-")
+                                    writeLiteralChar(wtr, range.end())
+                                }
                             }
                         }
+                        wtr.append("]")
                     }
-                    wtr.append("]")
-                }
-                is Class.Bytes -> {
-                    if (cls.value.ranges().isEmpty()) {
-                        wtr.append("[a&&b]")
-                        return Result.success(Unit)
-                    }
-                    wtr.append("(?-u:[")
-                    for (range in cls.value.iter()) {
-                        when {
-                            range.start() == range.end() -> {
-                                writeLiteralClassByte(wtr, range.start())
-                            }
-                            (range.start().toInt() and 0xFF) + 1 == (range.end().toInt() and 0xFF) -> {
-                                writeLiteralClassByte(wtr, range.start())
-                                writeLiteralClassByte(wtr, range.end())
-                            }
-                            else -> {
-                                writeLiteralClassByte(wtr, range.start())
-                                wtr.append("-")
-                                writeLiteralClassByte(wtr, range.end())
+                    is Class.Bytes -> {
+                        if (cls.value.ranges().isEmpty()) {
+                            wtr.append("[a&&b]")
+                            return Result.success(Unit)
+                        }
+                        wtr.append("(?-u:[")
+                        for (range in cls.value.iter()) {
+                            when {
+                                range.start() == range.end() -> {
+                                    writeLiteralClassByte(wtr, range.start())
+                                }
+                                (range.start().toInt() and 0xFF) + 1 == (range.end().toInt() and 0xFF) -> {
+                                    writeLiteralClassByte(wtr, range.start())
+                                    writeLiteralClassByte(wtr, range.end())
+                                }
+                                else -> {
+                                    writeLiteralClassByte(wtr, range.start())
+                                    wtr.append("-")
+                                    writeLiteralClassByte(wtr, range.end())
+                                }
                             }
                         }
+                        wtr.append("])")
                     }
-                    wtr.append("])")
                 }
-            }
-            is HirKind.Look -> when (k.value) {
-                Look.Start -> wtr.append("\\A")
-                Look.End -> wtr.append("\\z")
-                Look.StartLF -> wtr.append("(?m:^)")
-                Look.EndLF -> wtr.append("(?m:$)")
-                Look.StartCRLF -> wtr.append("(?mR:^)")
-                Look.EndCRLF -> wtr.append("(?mR:$)")
-                Look.WordAscii -> wtr.append("(?-u:\\b)")
-                Look.WordAsciiNegate -> wtr.append("(?-u:\\B)")
-                Look.WordUnicode -> wtr.append("\\b")
-                Look.WordUnicodeNegate -> wtr.append("\\B")
-                Look.WordStartAscii -> wtr.append("(?-u:\\b{start})")
-                Look.WordEndAscii -> wtr.append("(?-u:\\b{end})")
-                Look.WordStartUnicode -> wtr.append("\\b{start}")
-                Look.WordEndUnicode -> wtr.append("\\b{end}")
-                Look.WordStartHalfAscii -> wtr.append("(?-u:\\b{start-half})")
-                Look.WordEndHalfAscii -> wtr.append("(?-u:\\b{end-half})")
-                Look.WordStartHalfUnicode -> wtr.append("\\b{start-half}")
-                Look.WordEndHalfUnicode -> wtr.append("\\b{end-half}")
-            }
+            is HirKind.Look ->
+                when (k.value) {
+                    Look.Start -> wtr.append("\\A")
+                    Look.End -> wtr.append("\\z")
+                    Look.StartLF -> wtr.append("(?m:^)")
+                    Look.EndLF -> wtr.append("(?m:$)")
+                    Look.StartCRLF -> wtr.append("(?mR:^)")
+                    Look.EndCRLF -> wtr.append("(?mR:$)")
+                    Look.WordAscii -> wtr.append("(?-u:\\b)")
+                    Look.WordAsciiNegate -> wtr.append("(?-u:\\B)")
+                    Look.WordUnicode -> wtr.append("\\b")
+                    Look.WordUnicodeNegate -> wtr.append("\\B")
+                    Look.WordStartAscii -> wtr.append("(?-u:\\b{start})")
+                    Look.WordEndAscii -> wtr.append("(?-u:\\b{end})")
+                    Look.WordStartUnicode -> wtr.append("\\b{start}")
+                    Look.WordEndUnicode -> wtr.append("\\b{end}")
+                    Look.WordStartHalfAscii -> wtr.append("(?-u:\\b{start-half})")
+                    Look.WordEndHalfAscii -> wtr.append("(?-u:\\b{end-half})")
+                    Look.WordStartHalfUnicode -> wtr.append("\\b{start-half}")
+                    Look.WordEndHalfUnicode -> wtr.append("\\b{end-half}")
+                }
             is HirKind.Capture -> {
                 val capture: Capture = k.value
                 wtr.append("(")
@@ -215,7 +218,8 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
             HirKind.Empty,
             is HirKind.Literal,
             is HirKind.Class,
-            is HirKind.Look -> {}
+            is HirKind.Look,
+            -> {}
             is HirKind.Repetition -> {
                 val rep: Repetition = k.value
                 val min = rep.min
@@ -243,8 +247,12 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
                         return Result.success(Unit)
                     }
                     else -> {
-                        wtr.append("{").append(min.toString()).append(",")
-                            .append(max.toString()).append("}")
+                        wtr
+                            .append("{")
+                            .append(min.toString())
+                            .append(",")
+                            .append(max.toString())
+                            .append("}")
                     }
                 }
                 if (!rep.greedy) {
@@ -302,10 +310,11 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
 private fun isAsciiControl(b: Int): Boolean =
     b < 0x20 || b == 0x7F
 
-private fun isAsciiWhitespace(b: Int): Boolean = when (b) {
-    0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x20 -> true
-    else -> false
-}
+private fun isAsciiWhitespace(b: Int): Boolean =
+    when (b) {
+        0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x20 -> true
+        else -> false
+    }
 
 private fun twoHexUpper(b: Int): String {
     val s = b.toString(16).uppercase()
@@ -346,36 +355,38 @@ private fun decodeUtf8OrNull(bytes: ByteArray): String? {
     val out = StringBuilder()
     while (i < bytes.size) {
         val b0 = bytes[i].toInt() and 0xFF
-        val (cp, len) = when {
-            b0 < 0x80 -> Pair(b0, 1)
-            b0 in 0xC2..0xDF -> {
-                if (i + 1 >= bytes.size) return null
-                val b1 = bytes[i + 1].toInt() and 0xFF
-                if (b1 and 0xC0 != 0x80) return null
-                Pair(((b0 and 0x1F) shl 6) or (b1 and 0x3F), 2)
+        val (cp, len) =
+            when {
+                b0 < 0x80 -> Pair(b0, 1)
+                b0 in 0xC2..0xDF -> {
+                    if (i + 1 >= bytes.size) return null
+                    val b1 = bytes[i + 1].toInt() and 0xFF
+                    if (b1 and 0xC0 != 0x80) return null
+                    Pair(((b0 and 0x1F) shl 6) or (b1 and 0x3F), 2)
+                }
+                b0 in 0xE0..0xEF -> {
+                    if (i + 2 >= bytes.size) return null
+                    val b1 = bytes[i + 1].toInt() and 0xFF
+                    val b2 = bytes[i + 2].toInt() and 0xFF
+                    if (b1 and 0xC0 != 0x80 || b2 and 0xC0 != 0x80) return null
+                    val v = ((b0 and 0x0F) shl 12) or ((b1 and 0x3F) shl 6) or (b2 and 0x3F)
+                    if (v < 0x800 || v in 0xD800..0xDFFF) return null
+                    Pair(v, 3)
+                }
+                b0 in 0xF0..0xF4 -> {
+                    if (i + 3 >= bytes.size) return null
+                    val b1 = bytes[i + 1].toInt() and 0xFF
+                    val b2 = bytes[i + 2].toInt() and 0xFF
+                    val b3 = bytes[i + 3].toInt() and 0xFF
+                    if (b1 and 0xC0 != 0x80 || b2 and 0xC0 != 0x80 || b3 and 0xC0 != 0x80) return null
+                    val v =
+                        ((b0 and 0x07) shl 18) or ((b1 and 0x3F) shl 12) or
+                            ((b2 and 0x3F) shl 6) or (b3 and 0x3F)
+                    if (v < 0x10000 || v > 0x10FFFF) return null
+                    Pair(v, 4)
+                }
+                else -> return null
             }
-            b0 in 0xE0..0xEF -> {
-                if (i + 2 >= bytes.size) return null
-                val b1 = bytes[i + 1].toInt() and 0xFF
-                val b2 = bytes[i + 2].toInt() and 0xFF
-                if (b1 and 0xC0 != 0x80 || b2 and 0xC0 != 0x80) return null
-                val v = ((b0 and 0x0F) shl 12) or ((b1 and 0x3F) shl 6) or (b2 and 0x3F)
-                if (v < 0x800 || v in 0xD800..0xDFFF) return null
-                Pair(v, 3)
-            }
-            b0 in 0xF0..0xF4 -> {
-                if (i + 3 >= bytes.size) return null
-                val b1 = bytes[i + 1].toInt() and 0xFF
-                val b2 = bytes[i + 2].toInt() and 0xFF
-                val b3 = bytes[i + 3].toInt() and 0xFF
-                if (b1 and 0xC0 != 0x80 || b2 and 0xC0 != 0x80 || b3 and 0xC0 != 0x80) return null
-                val v = ((b0 and 0x07) shl 18) or ((b1 and 0x3F) shl 12) or
-                    ((b2 and 0x3F) shl 6) or (b3 and 0x3F)
-                if (v < 0x10000 || v > 0x10FFFF) return null
-                Pair(v, 4)
-            }
-            else -> return null
-        }
         if (cp <= 0xFFFF) {
             out.append(cp.toChar())
         } else {

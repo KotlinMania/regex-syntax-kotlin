@@ -1,13 +1,10 @@
 // port-lint: source ast/parse.rs
 package io.github.kotlinmania.regexsyntax.ast.parse
 
-import io.github.kotlinmania.regexsyntax.ast.ErrorKind
+import io.github.kotlinmania.regexsyntax.ast.Alternation
 import io.github.kotlinmania.regexsyntax.ast.Assertion
 import io.github.kotlinmania.regexsyntax.ast.AssertionKind
-import io.github.kotlinmania.regexsyntax.ast.Position
-import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.ast.Ast
-import io.github.kotlinmania.regexsyntax.ast.Alternation
 import io.github.kotlinmania.regexsyntax.ast.CaptureName
 import io.github.kotlinmania.regexsyntax.ast.ClassAscii
 import io.github.kotlinmania.regexsyntax.ast.ClassAsciiKind
@@ -25,6 +22,7 @@ import io.github.kotlinmania.regexsyntax.ast.ClassUnicodeKind
 import io.github.kotlinmania.regexsyntax.ast.ClassUnicodeOpKind
 import io.github.kotlinmania.regexsyntax.ast.Comment
 import io.github.kotlinmania.regexsyntax.ast.Concat
+import io.github.kotlinmania.regexsyntax.ast.ErrorKind
 import io.github.kotlinmania.regexsyntax.ast.Flag
 import io.github.kotlinmania.regexsyntax.ast.Flags
 import io.github.kotlinmania.regexsyntax.ast.FlagsItem
@@ -34,13 +32,15 @@ import io.github.kotlinmania.regexsyntax.ast.GroupKind
 import io.github.kotlinmania.regexsyntax.ast.HexLiteralKind
 import io.github.kotlinmania.regexsyntax.ast.Literal
 import io.github.kotlinmania.regexsyntax.ast.LiteralKind
+import io.github.kotlinmania.regexsyntax.ast.Position
 import io.github.kotlinmania.regexsyntax.ast.Repetition
 import io.github.kotlinmania.regexsyntax.ast.RepetitionKind
 import io.github.kotlinmania.regexsyntax.ast.RepetitionOp
 import io.github.kotlinmania.regexsyntax.ast.RepetitionRange
 import io.github.kotlinmania.regexsyntax.ast.SetFlags
+import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.ast.SpecialLiteralKind
-import io.github.kotlinmania.regexsyntax.ast.parse.WithComments
+import io.github.kotlinmania.regexsyntax.ast.WithComments
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -109,35 +109,39 @@ class ParseTest {
         val kind: ErrorKind,
     )
 
-    private fun expectAstException(t: Throwable): AstException = when (t) {
-        is AstException -> t
-        else -> (t.cause as? AstException) ?: throw t
-    }
+    private fun expectAstException(t: Throwable): AstException =
+        when (t) {
+            is AstException -> t
+            else -> (t.cause as? AstException) ?: throw t
+        }
 
     private fun parseErr(pattern: String): TestError {
         val result = parser(pattern).parse()
-        val ex = result.fold(
-            onSuccess = { ast -> fail("expected parse failure for pattern=$pattern, got ast=$ast") },
-            onFailure = { t -> expectAstException(t) }
-        )
+        val ex =
+            result.fold(
+                onSuccess = { ast -> fail("expected parse failure for pattern=$pattern, got ast=$ast") },
+                onFailure = { t -> expectAstException(t) },
+            )
         return TestError(ex.err.span(), ex.err.kind())
     }
 
-    private fun group(start: Int, endExclusive: Int, index: UInt, ast: Ast): Ast = Ast.group(
-        Group(
-            span = spanEx(start, endExclusive),
-            kind = GroupKind.CaptureIndex(index),
-            ast = ast,
-        ),
-    )
-
-    private fun flagSet(pat: String, start: Int, endExclusive: Int, flag: Flag, negated: Boolean): Ast {
-        val items = mutableListOf(
-            FlagsItem(
-                span = spanRangeEx(pat, endExclusive - 2, endExclusive - 1),
-                kind = FlagsItemKind.Flag(flag),
+    private fun group(start: Int, endExclusive: Int, index: UInt, ast: Ast): Ast =
+        Ast.group(
+            Group(
+                span = spanEx(start, endExclusive),
+                kind = GroupKind.CaptureIndex(index),
+                ast = ast,
             ),
         )
+
+    private fun flagSet(pat: String, start: Int, endExclusive: Int, flag: Flag, negated: Boolean): Ast {
+        val items =
+            mutableListOf(
+                FlagsItem(
+                    span = spanRangeEx(pat, endExclusive - 2, endExclusive - 1),
+                    kind = FlagsItemKind.Flag(flag),
+                ),
+            )
         if (negated) {
             items.add(
                 0,
@@ -150,10 +154,11 @@ class ParseTest {
         return Ast.flags(
             SetFlags(
                 span = spanRangeEx(pat, start, endExclusive),
-                flags = Flags(
-                    span = spanRangeEx(pat, start + 2, endExclusive - 1),
-                    items = items,
-                ),
+                flags =
+                    Flags(
+                        span = spanRangeEx(pat, start + 2, endExclusive - 1),
+                        items = items,
+                    ),
             ),
         )
     }
@@ -182,10 +187,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 2),
-                    op = RepetitionOp(
-                        span = spanEx(1, 2),
-                        kind = RepetitionKind.OneOrMore,
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 2),
+                            kind = RepetitionKind.OneOrMore,
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -210,22 +216,25 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 3),
-                    op = RepetitionOp(
-                        span = spanEx(2, 3),
-                        kind = RepetitionKind.ZeroOrMore,
-                    ),
-                    greedy = true,
-                    ast = Ast.repetition(
-                        Repetition(
-                            span = spanEx(0, 2),
-                            op = RepetitionOp(
-                                span = spanEx(1, 2),
-                                kind = RepetitionKind.OneOrMore,
-                            ),
-                            greedy = true,
-                            ast = lit('a'.code, 0),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(2, 3),
+                            kind = RepetitionKind.ZeroOrMore,
                         ),
-                    ),
+                    greedy = true,
+                    ast =
+                        Ast.repetition(
+                            Repetition(
+                                span = spanEx(0, 2),
+                                op =
+                                    RepetitionOp(
+                                        span = spanEx(1, 2),
+                                        kind = RepetitionKind.OneOrMore,
+                                    ),
+                                greedy = true,
+                                ast = lit('a'.code, 0),
+                            ),
+                        ),
                 ),
             ),
             parserNestLimit("a+*", 2u).parse().getOrThrow(),
@@ -268,69 +277,77 @@ class ParseTest {
 
     private fun parseErrNestLimit(pattern: String, nestLimit: UInt): TestError {
         val result = parserNestLimit(pattern, nestLimit).parse()
-        val ex = result.fold(
-            onSuccess = { ast -> fail("expected parse failure for nestLimit=$nestLimit pattern=$pattern, got ast=$ast") },
-            onFailure = { t -> expectAstException(t) }
-        )
+        val ex =
+            result.fold(
+                onSuccess = { ast -> fail("expected parse failure for nestLimit=$nestLimit pattern=$pattern, got ast=$ast") },
+                onFailure = { t -> expectAstException(t) },
+            )
         return TestError(ex.err.span(), ex.err.kind())
     }
 
     private fun lit(c: Int, start: Int): Ast = litWith(c, spanEx(start, start + utf8Len(c)))
 
-    private fun litWith(c: Int, span: Span): Ast = Ast.literal(
-        Literal(
-            span = span,
-            kind = LiteralKind.Verbatim,
-            c = c,
-        ),
-    )
+    private fun litWith(c: Int, span: Span): Ast =
+        Ast.literal(
+            Literal(
+                span = span,
+                kind = LiteralKind.Verbatim,
+                c = c,
+            ),
+        )
 
-    private fun metaLit(c: Int, span: Span): Ast = Ast.literal(
-        Literal(
-            span = span,
-            kind = LiteralKind.Meta,
-            c = c,
-        ),
-    )
+    private fun metaLit(c: Int, span: Span): Ast =
+        Ast.literal(
+            Literal(
+                span = span,
+                kind = LiteralKind.Meta,
+                c = c,
+            ),
+        )
 
-    private fun concat(start: Int, endExclusive: Int, asts: List<Ast>): Ast = Ast.concat(
-        Concat(
-            span = spanEx(start, endExclusive),
-            asts = asts.toMutableList(),
-        ),
-    )
+    private fun concat(start: Int, endExclusive: Int, asts: List<Ast>): Ast =
+        Ast.concat(
+            Concat(
+                span = spanEx(start, endExclusive),
+                asts = asts.toMutableList(),
+            ),
+        )
 
-    private fun concatWith(span: Span, asts: List<Ast>): Ast = Ast.concat(
-        Concat(
-            span = span,
-            asts = asts.toMutableList(),
-        ),
-    )
+    private fun concatWith(span: Span, asts: List<Ast>): Ast =
+        Ast.concat(
+            Concat(
+                span = span,
+                asts = asts.toMutableList(),
+            ),
+        )
 
-    private fun alt(start: Int, endExclusive: Int, asts: List<Ast>): Ast = Ast.alternation(
-        Alternation(
-            span = spanEx(start, endExclusive),
-            asts = asts.toMutableList(),
-        ),
-    )
+    private fun alt(start: Int, endExclusive: Int, asts: List<Ast>): Ast =
+        Ast.alternation(
+            Alternation(
+                span = spanEx(start, endExclusive),
+                asts = asts.toMutableList(),
+            ),
+        )
 
-    private fun utf8Len(c: Int): Int = when {
-        c <= 0x7F -> 1
-        c <= 0x7FF -> 2
-        c <= 0xFFFF -> 3
-        else -> 4
-    }
+    private fun utf8Len(c: Int): Int =
+        when {
+            c <= 0x7F -> 1
+            c <= 0x7FF -> 2
+            c <= 0xFFFF -> 3
+            else -> 4
+        }
 
     @Test
     fun parseComments() {
-        val pat = """
-        (?x)
-        # This is comment 1.
-        foo # This is comment 2.
-          # This is comment 3.
-        bar
-        # This is comment 4.
-        """.trimIndent()
+        val pat =
+            """
+            (?x)
+            # This is comment 1.
+            foo # This is comment 2.
+              # This is comment 3.
+            bar
+            # This is comment 4.
+            """.trimIndent()
 
         val astc: WithComments = parser(pat).parseWithComments().getOrThrow()
         assertEquals(
@@ -453,17 +470,19 @@ class ParseTest {
                         Ast.group(
                             Group(
                                 span = spanRangeEx(pat, 2, 9),
-                                kind = GroupKind.NonCapturing(
-                                    Flags(
-                                        span = spanRangeEx(pat, 4, 5),
-                                        items = mutableListOf(
-                                            FlagsItem(
-                                                span = spanRangeEx(pat, 4, 5),
-                                                kind = FlagsItemKind.Flag(Flag.IgnoreWhitespace),
-                                            ),
+                                kind =
+                                    GroupKind.NonCapturing(
+                                        Flags(
+                                            span = spanRangeEx(pat, 4, 5),
+                                            items =
+                                                mutableListOf(
+                                                    FlagsItem(
+                                                        span = spanRangeEx(pat, 4, 5),
+                                                        kind = FlagsItemKind.Flag(Flag.IgnoreWhitespace),
+                                                    ),
+                                                ),
                                         ),
                                     ),
-                                ),
                                 ast = litWith('a'.code, spanRangeEx(pat, 6, 7)),
                             ),
                         ),
@@ -486,14 +505,16 @@ class ParseTest {
                         Ast.group(
                             Group(
                                 span = spanRangeEx(pat, 4, pat.length),
-                                kind = GroupKind.CaptureName(
-                                    startsWithP = true,
-                                    name = CaptureName(
-                                        span = spanRangeEx(pat, 9, 12),
-                                        name = "foo",
-                                        index = 1u,
+                                kind =
+                                    GroupKind.CaptureName(
+                                        startsWithP = true,
+                                        name =
+                                            CaptureName(
+                                                span = spanRangeEx(pat, 9, 12),
+                                                name = "foo",
+                                                index = 1u,
+                                            ),
                                     ),
-                                ),
                                 ast = litWith('a'.code, spanRangeEx(pat, 14, 15)),
                             ),
                         ),
@@ -533,12 +554,13 @@ class ParseTest {
                         Ast.group(
                             Group(
                                 span = spanRangeEx(pat, 4, pat.length),
-                                kind = GroupKind.NonCapturing(
-                                    Flags(
-                                        span = spanRangeEx(pat, 8, 8),
-                                        items = mutableListOf(),
+                                kind =
+                                    GroupKind.NonCapturing(
+                                        Flags(
+                                            span = spanRangeEx(pat, 8, 8),
+                                            items = mutableListOf(),
+                                        ),
                                     ),
-                                ),
                                 ast = litWith('a'.code, spanRangeEx(pat, 11, 12)),
                             ),
                         ),
@@ -642,10 +664,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 2),
-                    op = RepetitionOp(
-                        span = spanEx(1, 2),
-                        kind = RepetitionKind.ZeroOrMore,
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 2),
+                            kind = RepetitionKind.ZeroOrMore,
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -656,10 +679,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 2),
-                    op = RepetitionOp(
-                        span = spanEx(1, 2),
-                        kind = RepetitionKind.OneOrMore,
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 2),
+                            kind = RepetitionKind.OneOrMore,
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -671,10 +695,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 2),
-                    op = RepetitionOp(
-                        span = spanEx(1, 2),
-                        kind = RepetitionKind.ZeroOrOne,
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 2),
+                            kind = RepetitionKind.ZeroOrOne,
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -685,10 +710,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 3),
-                    op = RepetitionOp(
-                        span = spanEx(1, 3),
-                        kind = RepetitionKind.ZeroOrOne,
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 3),
+                            kind = RepetitionKind.ZeroOrOne,
+                        ),
                     greedy = false,
                     ast = lit('a'.code, 0),
                 ),
@@ -699,10 +725,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 2),
-                    op = RepetitionOp(
-                        span = spanEx(1, 2),
-                        kind = RepetitionKind.ZeroOrOne,
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 2),
+                            kind = RepetitionKind.ZeroOrOne,
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -717,10 +744,11 @@ class ParseTest {
                     Ast.repetition(
                         Repetition(
                             span = spanEx(0, 2),
-                            op = RepetitionOp(
-                                span = spanEx(1, 2),
-                                kind = RepetitionKind.ZeroOrOne,
-                            ),
+                            op =
+                                RepetitionOp(
+                                    span = spanEx(1, 2),
+                                    kind = RepetitionKind.ZeroOrOne,
+                                ),
                             greedy = true,
                             ast = lit('a'.code, 0),
                         ),
@@ -738,10 +766,11 @@ class ParseTest {
                     Ast.repetition(
                         Repetition(
                             span = spanEx(0, 3),
-                            op = RepetitionOp(
-                                span = spanEx(1, 3),
-                                kind = RepetitionKind.ZeroOrOne,
-                            ),
+                            op =
+                                RepetitionOp(
+                                    span = spanEx(1, 3),
+                                    kind = RepetitionKind.ZeroOrOne,
+                                ),
                             greedy = false,
                             ast = lit('a'.code, 0),
                         ),
@@ -760,10 +789,11 @@ class ParseTest {
                     Ast.repetition(
                         Repetition(
                             span = spanEx(1, 3),
-                            op = RepetitionOp(
-                                span = spanEx(2, 3),
-                                kind = RepetitionKind.ZeroOrOne,
-                            ),
+                            op =
+                                RepetitionOp(
+                                    span = spanEx(2, 3),
+                                    kind = RepetitionKind.ZeroOrOne,
+                                ),
                             greedy = true,
                             ast = lit('b'.code, 1),
                         ),
@@ -776,17 +806,19 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 5),
-                    op = RepetitionOp(
-                        span = spanEx(4, 5),
-                        kind = RepetitionKind.ZeroOrOne,
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(4, 5),
+                            kind = RepetitionKind.ZeroOrOne,
+                        ),
                     greedy = true,
-                    ast = group(
-                        0,
-                        4,
-                        1u,
-                        concat(1, 3, listOf(lit('a'.code, 1), lit('b'.code, 2))),
-                    ),
+                    ast =
+                        group(
+                            0,
+                            4,
+                            1u,
+                            concat(1, 3, listOf(lit('a'.code, 1), lit('b'.code, 2))),
+                        ),
                 ),
             ),
             parser("(ab)?").parse().getOrThrow(),
@@ -800,10 +832,11 @@ class ParseTest {
                     Ast.repetition(
                         Repetition(
                             span = spanEx(1, 3),
-                            op = RepetitionOp(
-                                span = spanEx(2, 3),
-                                kind = RepetitionKind.ZeroOrOne,
-                            ),
+                            op =
+                                RepetitionOp(
+                                    span = spanEx(2, 3),
+                                    kind = RepetitionKind.ZeroOrOne,
+                                ),
                             greedy = true,
                             ast = lit('a'.code, 1),
                         ),
@@ -891,10 +924,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 4),
-                    op = RepetitionOp(
-                        span = spanEx(1, 4),
-                        kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 4),
+                            kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -905,10 +939,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 5),
-                    op = RepetitionOp(
-                        span = spanEx(1, 5),
-                        kind = RepetitionKind.Range(RepetitionRange.AtLeast(5u)),
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 5),
+                            kind = RepetitionKind.Range(RepetitionRange.AtLeast(5u)),
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -919,10 +954,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 6),
-                    op = RepetitionOp(
-                        span = spanEx(1, 6),
-                        kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u)),
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 6),
+                            kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u)),
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -933,10 +969,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 5),
-                    op = RepetitionOp(
-                        span = spanEx(1, 5),
-                        kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 5),
+                            kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
+                        ),
                     greedy = false,
                     ast = lit('a'.code, 0),
                 ),
@@ -952,10 +989,11 @@ class ParseTest {
                     Ast.repetition(
                         Repetition(
                             span = spanEx(1, 5),
-                            op = RepetitionOp(
-                                span = spanEx(2, 5),
-                                kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
-                            ),
+                            op =
+                                RepetitionOp(
+                                    span = spanEx(2, 5),
+                                    kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
+                                ),
                             greedy = true,
                             ast = lit('b'.code, 1),
                         ),
@@ -973,10 +1011,11 @@ class ParseTest {
                     Ast.repetition(
                         Repetition(
                             span = spanEx(1, 5),
-                            op = RepetitionOp(
-                                span = spanEx(2, 5),
-                                kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
-                            ),
+                            op =
+                                RepetitionOp(
+                                    span = spanEx(2, 5),
+                                    kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
+                                ),
                             greedy = true,
                             ast = lit('b'.code, 1),
                         ),
@@ -991,10 +1030,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 6),
-                    op = RepetitionOp(
-                        span = spanEx(1, 6),
-                        kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 6),
+                            kind = RepetitionKind.Range(RepetitionRange.Exactly(5u)),
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -1005,10 +1045,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 10),
-                    op = RepetitionOp(
-                        span = spanEx(1, 10),
-                        kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u)),
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 10),
+                            kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u)),
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -1019,10 +1060,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 5),
-                    op = RepetitionOp(
-                        span = spanEx(1, 5),
-                        kind = RepetitionKind.Range(RepetitionRange.Bounded(0u, 9u)),
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 5),
+                            kind = RepetitionKind.Range(RepetitionRange.Bounded(0u, 9u)),
+                        ),
                     greedy = true,
                     ast = lit('a'.code, 0),
                 ),
@@ -1033,10 +1075,11 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 8),
-                    op = RepetitionOp(
-                        span = spanEx(1, 8),
-                        kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u)),
-                    ),
+                    op =
+                        RepetitionOp(
+                            span = spanEx(1, 8),
+                            kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u)),
+                        ),
                     greedy = false,
                     ast = lit('a'.code, 0),
                 ),
@@ -1047,17 +1090,19 @@ class ParseTest {
             Ast.repetition(
                 Repetition(
                     span = spanEx(0, 7),
-                    op = RepetitionOp(
-                        span = spanEx(2, 7),
-                        kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u)),
-                    ),
-                    greedy = true,
-                    ast = Ast.assertion(
-                        Assertion(
-                            span = spanEx(0, 2),
-                            kind = AssertionKind.WordBoundary,
+                    op =
+                        RepetitionOp(
+                            span = spanEx(2, 7),
+                            kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u)),
                         ),
-                    ),
+                    greedy = true,
+                    ast =
+                        Ast.assertion(
+                            Assertion(
+                                span = spanEx(0, 2),
+                                kind = AssertionKind.WordBoundary,
+                            ),
+                        ),
                 ),
             ),
             parser("\\b{5,9}").parse().getOrThrow(),
@@ -1216,11 +1261,12 @@ class ParseTest {
             Ast.alternation(
                 Alternation(
                     span = spanEx(0, 8),
-                    asts = mutableListOf(
-                        concat(0, 2, listOf(lit('a'.code, 0), lit('x'.code, 1))),
-                        concat(3, 5, listOf(lit('b'.code, 3), lit('y'.code, 4))),
-                        concat(6, 8, listOf(lit('c'.code, 6), lit('z'.code, 7))),
-                    ),
+                    asts =
+                        mutableListOf(
+                            concat(0, 2, listOf(lit('a'.code, 0), lit('x'.code, 1))),
+                            concat(3, 5, listOf(lit('b'.code, 3), lit('y'.code, 4))),
+                            concat(6, 8, listOf(lit('c'.code, 6), lit('z'.code, 7))),
+                        ),
                 ),
             ),
             parser("ax|by|cz").parse().getOrThrow(),
@@ -1233,11 +1279,12 @@ class ParseTest {
                 Ast.alternation(
                     Alternation(
                         span = spanEx(1, 9),
-                        asts = mutableListOf(
-                            concat(1, 3, listOf(lit('a'.code, 1), lit('x'.code, 2))),
-                            concat(4, 6, listOf(lit('b'.code, 4), lit('y'.code, 5))),
-                            concat(7, 9, listOf(lit('c'.code, 7), lit('z'.code, 8))),
-                        ),
+                        asts =
+                            mutableListOf(
+                                concat(1, 3, listOf(lit('a'.code, 1), lit('x'.code, 2))),
+                                concat(4, 6, listOf(lit('b'.code, 4), lit('y'.code, 5))),
+                                concat(7, 9, listOf(lit('c'.code, 7), lit('z'.code, 8))),
+                            ),
                     ),
                 ),
             ),
@@ -1380,15 +1427,17 @@ class ParseTest {
             Ast.flags(
                 SetFlags(
                     span = spanEx(0, 4),
-                    flags = Flags(
-                        span = spanEx(2, 3),
-                        items = mutableListOf(
-                            FlagsItem(
-                                span = spanEx(2, 3),
-                                kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
-                            ),
+                    flags =
+                        Flags(
+                            span = spanEx(2, 3),
+                            items =
+                                mutableListOf(
+                                    FlagsItem(
+                                        span = spanEx(2, 3),
+                                        kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
+                                    ),
+                                ),
                         ),
-                    ),
                 ),
             ),
             parser("(?i)").parse().getOrThrow(),
@@ -1397,19 +1446,21 @@ class ParseTest {
             Ast.flags(
                 SetFlags(
                     span = spanEx(0, 5),
-                    flags = Flags(
-                        span = spanEx(2, 4),
-                        items = mutableListOf(
-                            FlagsItem(
-                                span = spanEx(2, 3),
-                                kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
-                            ),
-                            FlagsItem(
-                                span = spanEx(3, 4),
-                                kind = FlagsItemKind.Flag(Flag.SwapGreed),
-                            ),
+                    flags =
+                        Flags(
+                            span = spanEx(2, 4),
+                            items =
+                                mutableListOf(
+                                    FlagsItem(
+                                        span = spanEx(2, 3),
+                                        kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
+                                    ),
+                                    FlagsItem(
+                                        span = spanEx(3, 4),
+                                        kind = FlagsItemKind.Flag(Flag.SwapGreed),
+                                    ),
+                                ),
                         ),
-                    ),
                 ),
             ),
             parser("(?iU)").parse().getOrThrow(),
@@ -1418,23 +1469,25 @@ class ParseTest {
             Ast.flags(
                 SetFlags(
                     span = spanEx(0, 6),
-                    flags = Flags(
-                        span = spanEx(2, 5),
-                        items = mutableListOf(
-                            FlagsItem(
-                                span = spanEx(2, 3),
-                                kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
-                            ),
-                            FlagsItem(
-                                span = spanEx(3, 4),
-                                kind = FlagsItemKind.Negation,
-                            ),
-                            FlagsItem(
-                                span = spanEx(4, 5),
-                                kind = FlagsItemKind.Flag(Flag.SwapGreed),
-                            ),
+                    flags =
+                        Flags(
+                            span = spanEx(2, 5),
+                            items =
+                                mutableListOf(
+                                    FlagsItem(
+                                        span = spanEx(2, 3),
+                                        kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
+                                    ),
+                                    FlagsItem(
+                                        span = spanEx(3, 4),
+                                        kind = FlagsItemKind.Negation,
+                                    ),
+                                    FlagsItem(
+                                        span = spanEx(4, 5),
+                                        kind = FlagsItemKind.Flag(Flag.SwapGreed),
+                                    ),
+                                ),
                         ),
-                    ),
                 ),
             ),
             parser("(?i-U)").parse().getOrThrow(),
@@ -1465,13 +1518,14 @@ class ParseTest {
                 Group(
                     span = spanEx(0, 4),
                     kind = GroupKind.CaptureIndex(1u),
-                    ast = Ast.group(
-                        Group(
-                            span = spanEx(1, 3),
-                            kind = GroupKind.CaptureIndex(2u),
-                            ast = Ast.empty(spanEx(2, 2)),
+                    ast =
+                        Ast.group(
+                            Group(
+                                span = spanEx(1, 3),
+                                kind = GroupKind.CaptureIndex(2u),
+                                ast = Ast.empty(spanEx(2, 2)),
+                            ),
                         ),
-                    ),
                 ),
             ),
             parser("(())").parse().getOrThrow(),
@@ -1481,12 +1535,13 @@ class ParseTest {
             Ast.group(
                 Group(
                     span = spanEx(0, 5),
-                    kind = GroupKind.NonCapturing(
-                        Flags(
-                            span = spanEx(2, 2),
-                            items = mutableListOf(),
+                    kind =
+                        GroupKind.NonCapturing(
+                            Flags(
+                                span = spanEx(2, 2),
+                                items = mutableListOf(),
+                            ),
                         ),
-                    ),
                     ast = lit('a'.code, 3),
                 ),
             ),
@@ -1497,17 +1552,19 @@ class ParseTest {
             Ast.group(
                 Group(
                     span = spanEx(0, 6),
-                    kind = GroupKind.NonCapturing(
-                        Flags(
-                            span = spanEx(2, 3),
-                            items = mutableListOf(
-                                FlagsItem(
-                                    span = spanEx(2, 3),
-                                    kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
-                                ),
+                    kind =
+                        GroupKind.NonCapturing(
+                            Flags(
+                                span = spanEx(2, 3),
+                                items =
+                                    mutableListOf(
+                                        FlagsItem(
+                                            span = spanEx(2, 3),
+                                            kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
+                                        ),
+                                    ),
                             ),
                         ),
-                    ),
                     ast = lit('a'.code, 4),
                 ),
             ),
@@ -1517,25 +1574,27 @@ class ParseTest {
             Ast.group(
                 Group(
                     span = spanEx(0, 8),
-                    kind = GroupKind.NonCapturing(
-                        Flags(
-                            span = spanEx(2, 5),
-                            items = mutableListOf(
-                                FlagsItem(
-                                    span = spanEx(2, 3),
-                                    kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
-                                ),
-                                FlagsItem(
-                                    span = spanEx(3, 4),
-                                    kind = FlagsItemKind.Negation,
-                                ),
-                                FlagsItem(
-                                    span = spanEx(4, 5),
-                                    kind = FlagsItemKind.Flag(Flag.SwapGreed),
-                                ),
+                    kind =
+                        GroupKind.NonCapturing(
+                            Flags(
+                                span = spanEx(2, 5),
+                                items =
+                                    mutableListOf(
+                                        FlagsItem(
+                                            span = spanEx(2, 3),
+                                            kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
+                                        ),
+                                        FlagsItem(
+                                            span = spanEx(3, 4),
+                                            kind = FlagsItemKind.Negation,
+                                        ),
+                                        FlagsItem(
+                                            span = spanEx(4, 5),
+                                            kind = FlagsItemKind.Flag(Flag.SwapGreed),
+                                        ),
+                                    ),
                             ),
                         ),
-                    ),
                     ast = lit('a'.code, 6),
                 ),
             ),
@@ -1606,14 +1665,16 @@ class ParseTest {
             Ast.group(
                 Group(
                     span = spanEx(0, 7),
-                    kind = GroupKind.CaptureName(
-                        startsWithP = false,
-                        name = CaptureName(
-                            span = spanEx(3, 4),
-                            name = "a",
-                            index = 1u,
+                    kind =
+                        GroupKind.CaptureName(
+                            startsWithP = false,
+                            name =
+                                CaptureName(
+                                    span = spanEx(3, 4),
+                                    name = "a",
+                                    index = 1u,
+                                ),
                         ),
-                    ),
                     ast = lit('z'.code, 5),
                 ),
             ),
@@ -1623,14 +1684,16 @@ class ParseTest {
             Ast.group(
                 Group(
                     span = spanEx(0, 8),
-                    kind = GroupKind.CaptureName(
-                        startsWithP = true,
-                        name = CaptureName(
-                            span = spanEx(4, 5),
-                            name = "a",
-                            index = 1u,
+                    kind =
+                        GroupKind.CaptureName(
+                            startsWithP = true,
+                            name =
+                                CaptureName(
+                                    span = spanEx(4, 5),
+                                    name = "a",
+                                    index = 1u,
+                                ),
                         ),
-                    ),
                     ast = lit('z'.code, 6),
                 ),
             ),
@@ -1640,14 +1703,16 @@ class ParseTest {
             Ast.group(
                 Group(
                     span = spanEx(0, 10),
-                    kind = GroupKind.CaptureName(
-                        startsWithP = true,
-                        name = CaptureName(
-                            span = spanEx(4, 7),
-                            name = "abc",
-                            index = 1u,
+                    kind =
+                        GroupKind.CaptureName(
+                            startsWithP = true,
+                            name =
+                                CaptureName(
+                                    span = spanEx(4, 7),
+                                    name = "abc",
+                                    index = 1u,
+                                ),
                         ),
-                    ),
                     ast = lit('z'.code, 8),
                 ),
             ),
@@ -1658,14 +1723,16 @@ class ParseTest {
             Ast.group(
                 Group(
                     span = spanEx(0, 10),
-                    kind = GroupKind.CaptureName(
-                        startsWithP = true,
-                        name = CaptureName(
-                            span = spanEx(4, 7),
-                            name = "a_1",
-                            index = 1u,
+                    kind =
+                        GroupKind.CaptureName(
+                            startsWithP = true,
+                            name =
+                                CaptureName(
+                                    span = spanEx(4, 7),
+                                    name = "a_1",
+                                    index = 1u,
+                                ),
                         ),
-                    ),
                     ast = lit('z'.code, 8),
                 ),
             ),
@@ -1676,14 +1743,16 @@ class ParseTest {
             Ast.group(
                 Group(
                     span = spanEx(0, 10),
-                    kind = GroupKind.CaptureName(
-                        startsWithP = true,
-                        name = CaptureName(
-                            span = spanEx(4, 7),
-                            name = "a.1",
-                            index = 1u,
+                    kind =
+                        GroupKind.CaptureName(
+                            startsWithP = true,
+                            name =
+                                CaptureName(
+                                    span = spanEx(4, 7),
+                                    name = "a.1",
+                                    index = 1u,
+                                ),
                         ),
-                    ),
                     ast = lit('z'.code, 8),
                 ),
             ),
@@ -1694,14 +1763,16 @@ class ParseTest {
             Ast.group(
                 Group(
                     span = spanEx(0, 11),
-                    kind = GroupKind.CaptureName(
-                        startsWithP = true,
-                        name = CaptureName(
-                            span = spanEx(4, 8),
-                            name = "a[1]",
-                            index = 1u,
+                    kind =
+                        GroupKind.CaptureName(
+                            startsWithP = true,
+                            name =
+                                CaptureName(
+                                    span = spanEx(4, 8),
+                                    name = "a[1]",
+                                    index = 1u,
+                                ),
                         ),
-                    ),
                     ast = lit('z'.code, 9),
                 ),
             ),
@@ -1714,14 +1785,16 @@ class ParseTest {
                 Ast.group(
                     Group(
                         span = nspan(npos(0, 1, 1), npos(pat.length, 1, pat.length + 1)),
-                        kind = GroupKind.CaptureName(
-                            startsWithP = true,
-                            name = CaptureName(
-                                span = nspan(npos(4, 1, 5), npos(6, 1, 7)),
-                                name = "a¾",
-                                index = 1u,
+                        kind =
+                            GroupKind.CaptureName(
+                                startsWithP = true,
+                                name =
+                                    CaptureName(
+                                        span = nspan(npos(4, 1, 5), npos(6, 1, 7)),
+                                        name = "a¾",
+                                        index = 1u,
+                                    ),
                             ),
-                        ),
                         ast = Ast.empty(nspan(npos(7, 1, 8), npos(7, 1, 8))),
                     ),
                 ),
@@ -1734,14 +1807,16 @@ class ParseTest {
                 Ast.group(
                     Group(
                         span = nspan(npos(0, 1, 1), npos(pat.length, 1, pat.length + 1)),
-                        kind = GroupKind.CaptureName(
-                            startsWithP = true,
-                            name = CaptureName(
-                                span = nspan(npos(4, 1, 5), npos(6, 1, 7)),
-                                name = "名字",
-                                index = 1u,
+                        kind =
+                            GroupKind.CaptureName(
+                                startsWithP = true,
+                                name =
+                                    CaptureName(
+                                        span = nspan(npos(4, 1, 5), npos(6, 1, 7)),
+                                        name = "名字",
+                                        index = 1u,
+                                    ),
                             ),
-                        ),
                         ast = Ast.empty(nspan(npos(7, 1, 8), npos(7, 1, 8))),
                     ),
                 ),
@@ -1852,35 +1927,39 @@ class ParseTest {
     @Test
     fun parseFlags() {
         fun parseFlagsOk(pat: String): Flags = parser(pat).parseFlags().getOrThrow()
+
         fun parseFlagsErr(pat: String): TestError {
-            val ex = parser(pat).parseFlags().fold(
-                onSuccess = { flags -> fail("expected parseFlags failure for pattern=$pat, got flags=$flags") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseFlags().fold(
+                    onSuccess = { flags -> fail("expected parseFlags failure for pattern=$pat, got flags=$flags") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
         assertEquals(
             Flags(
                 span = spanEx(0, 1),
-                items = mutableListOf(
-                    FlagsItem(
-                        span = spanEx(0, 1),
-                        kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
+                items =
+                    mutableListOf(
+                        FlagsItem(
+                            span = spanEx(0, 1),
+                            kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
+                        ),
                     ),
-                ),
             ),
             parseFlagsOk("i:"),
         )
         assertEquals(
             Flags(
                 span = spanEx(0, 1),
-                items = mutableListOf(
-                    FlagsItem(
-                        span = spanEx(0, 1),
-                        kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
+                items =
+                    mutableListOf(
+                        FlagsItem(
+                            span = spanEx(0, 1),
+                            kind = FlagsItemKind.Flag(Flag.CaseInsensitive),
+                        ),
                     ),
-                ),
             ),
             parseFlagsOk("i)"),
         )
@@ -1888,11 +1967,12 @@ class ParseTest {
         assertEquals(
             Flags(
                 span = spanEx(0, 3),
-                items = mutableListOf(
-                    FlagsItem(spanEx(0, 1), FlagsItemKind.Flag(Flag.CaseInsensitive)),
-                    FlagsItem(spanEx(1, 2), FlagsItemKind.Flag(Flag.DotMatchesNewLine)),
-                    FlagsItem(spanEx(2, 3), FlagsItemKind.Flag(Flag.SwapGreed)),
-                ),
+                items =
+                    mutableListOf(
+                        FlagsItem(spanEx(0, 1), FlagsItemKind.Flag(Flag.CaseInsensitive)),
+                        FlagsItem(spanEx(1, 2), FlagsItemKind.Flag(Flag.DotMatchesNewLine)),
+                        FlagsItem(spanEx(2, 3), FlagsItemKind.Flag(Flag.SwapGreed)),
+                    ),
             ),
             parseFlagsOk("isU:"),
         )
@@ -1900,36 +1980,39 @@ class ParseTest {
         assertEquals(
             Flags(
                 span = spanEx(0, 4),
-                items = mutableListOf(
-                    FlagsItem(spanEx(0, 1), FlagsItemKind.Negation),
-                    FlagsItem(spanEx(1, 2), FlagsItemKind.Flag(Flag.CaseInsensitive)),
-                    FlagsItem(spanEx(2, 3), FlagsItemKind.Flag(Flag.DotMatchesNewLine)),
-                    FlagsItem(spanEx(3, 4), FlagsItemKind.Flag(Flag.SwapGreed)),
-                ),
+                items =
+                    mutableListOf(
+                        FlagsItem(spanEx(0, 1), FlagsItemKind.Negation),
+                        FlagsItem(spanEx(1, 2), FlagsItemKind.Flag(Flag.CaseInsensitive)),
+                        FlagsItem(spanEx(2, 3), FlagsItemKind.Flag(Flag.DotMatchesNewLine)),
+                        FlagsItem(spanEx(3, 4), FlagsItemKind.Flag(Flag.SwapGreed)),
+                    ),
             ),
             parseFlagsOk("-isU:"),
         )
         assertEquals(
             Flags(
                 span = spanEx(0, 4),
-                items = mutableListOf(
-                    FlagsItem(spanEx(0, 1), FlagsItemKind.Flag(Flag.CaseInsensitive)),
-                    FlagsItem(spanEx(1, 2), FlagsItemKind.Negation),
-                    FlagsItem(spanEx(2, 3), FlagsItemKind.Flag(Flag.DotMatchesNewLine)),
-                    FlagsItem(spanEx(3, 4), FlagsItemKind.Flag(Flag.SwapGreed)),
-                ),
+                items =
+                    mutableListOf(
+                        FlagsItem(spanEx(0, 1), FlagsItemKind.Flag(Flag.CaseInsensitive)),
+                        FlagsItem(spanEx(1, 2), FlagsItemKind.Negation),
+                        FlagsItem(spanEx(2, 3), FlagsItemKind.Flag(Flag.DotMatchesNewLine)),
+                        FlagsItem(spanEx(3, 4), FlagsItemKind.Flag(Flag.SwapGreed)),
+                    ),
             ),
             parseFlagsOk("i-sU:"),
         )
         assertEquals(
             Flags(
                 span = spanEx(0, 4),
-                items = mutableListOf(
-                    FlagsItem(spanEx(0, 1), FlagsItemKind.Flag(Flag.CaseInsensitive)),
-                    FlagsItem(spanEx(1, 2), FlagsItemKind.Negation),
-                    FlagsItem(spanEx(2, 3), FlagsItemKind.Flag(Flag.DotMatchesNewLine)),
-                    FlagsItem(spanEx(3, 4), FlagsItemKind.Flag(Flag.CRLF)),
-                ),
+                items =
+                    mutableListOf(
+                        FlagsItem(spanEx(0, 1), FlagsItemKind.Flag(Flag.CaseInsensitive)),
+                        FlagsItem(spanEx(1, 2), FlagsItemKind.Negation),
+                        FlagsItem(spanEx(2, 3), FlagsItemKind.Flag(Flag.DotMatchesNewLine)),
+                        FlagsItem(spanEx(3, 4), FlagsItemKind.Flag(Flag.CRLF)),
+                    ),
             ),
             parseFlagsOk("i-sR:"),
         )
@@ -1988,11 +2071,13 @@ class ParseTest {
     @Test
     fun parseFlag() {
         fun parseFlagOk(pat: String): Flag = parser(pat).parseFlag().getOrThrow()
+
         fun parseFlagErr(pat: String): TestError {
-            val ex = parser(pat).parseFlag().fold(
-                onSuccess = { flag -> fail("expected parseFlag failure for pattern=$pat, got flag=$flag") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseFlag().fold(
+                    onSuccess = { flag -> fail("expected parseFlag failure for pattern=$pat, got flag=$flag") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -2038,15 +2123,24 @@ class ParseTest {
         )
 
         assertEquals(
-            Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(spanEx(0, 1), LiteralKind.Verbatim, 'a'.code)),
+            Primitive.Literal(
+                io.github.kotlinmania.regexsyntax.ast
+                    .Literal(spanEx(0, 1), LiteralKind.Verbatim, 'a'.code),
+            ),
             parsePrimOk("a"),
         )
         assertEquals(
-            Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(spanEx(0, 1), LiteralKind.Verbatim, '|'.code)),
+            Primitive.Literal(
+                io.github.kotlinmania.regexsyntax.ast
+                    .Literal(spanEx(0, 1), LiteralKind.Verbatim, '|'.code),
+            ),
             parsePrimOk("|"),
         )
         assertEquals(
-            Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(spanRangeEx("☃", 0, 1), LiteralKind.Verbatim, '☃'.code)),
+            Primitive.Literal(
+                io.github.kotlinmania.regexsyntax.ast
+                    .Literal(spanRangeEx("☃", 0, 1), LiteralKind.Verbatim, '☃'.code),
+            ),
             parsePrimOk("☃"),
         )
     }
@@ -2054,30 +2148,39 @@ class ParseTest {
     @Test
     fun parseEscape() {
         fun parsePrimOk(pat: String): Primitive = parser(pat).parsePrimitive().getOrThrow()
+
         fun parseEscapeErr(pat: String): TestError {
-            val ex = parser(pat).parseEscape().fold(
-                onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseEscape().fold(
+                    onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
         assertEquals(
-            Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(spanEx(0, 2), LiteralKind.Meta, '|'.code)),
+            Primitive.Literal(
+                io.github.kotlinmania.regexsyntax.ast
+                    .Literal(spanEx(0, 2), LiteralKind.Meta, '|'.code),
+            ),
             parsePrimOk("\\|"),
         )
 
-        val specials = listOf(
-            Triple("\\a", 0x07, SpecialLiteralKind.Bell),
-            Triple("\\f", 0x0C, SpecialLiteralKind.FormFeed),
-            Triple("\\t", '\t'.code, SpecialLiteralKind.Tab),
-            Triple("\\n", '\n'.code, SpecialLiteralKind.LineFeed),
-            Triple("\\r", '\r'.code, SpecialLiteralKind.CarriageReturn),
-            Triple("\\v", 0x0B, SpecialLiteralKind.VerticalTab),
-        )
+        val specials =
+            listOf(
+                Triple("\\a", 0x07, SpecialLiteralKind.Bell),
+                Triple("\\f", 0x0C, SpecialLiteralKind.FormFeed),
+                Triple("\\t", '\t'.code, SpecialLiteralKind.Tab),
+                Triple("\\n", '\n'.code, SpecialLiteralKind.LineFeed),
+                Triple("\\r", '\r'.code, SpecialLiteralKind.CarriageReturn),
+                Triple("\\v", 0x0B, SpecialLiteralKind.VerticalTab),
+            )
         for ((pat, c, kind) in specials) {
             assertEquals(
-                Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(spanEx(0, 2), LiteralKind.Special(kind), c)),
+                Primitive.Literal(
+                    io.github.kotlinmania.regexsyntax.ast
+                        .Literal(spanEx(0, 2), LiteralKind.Special(kind), c),
+                ),
                 parsePrimOk(pat),
             )
         }
@@ -2127,7 +2230,10 @@ class ParseTest {
         for (c in listOf('!', '@', '%', '"', '\'', '/', ' ')) {
             val pat = "\\$c"
             assertEquals(
-                Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(spanEx(0, 2), LiteralKind.Superfluous, c.code)),
+                Primitive.Literal(
+                    io.github.kotlinmania.regexsyntax.ast
+                        .Literal(spanEx(0, 2), LiteralKind.Superfluous, c.code),
+                ),
                 parsePrimOk(pat),
             )
         }
@@ -2161,10 +2267,11 @@ class ParseTest {
                 kind = ErrorKind.SpecialWordOrRepetitionUnexpectedEof,
             ),
             run {
-                val ex = parserIgnoreWhitespace("\\b{ ").parseEscape().fold(
-                    onSuccess = { prim -> fail("expected parseEscape failure for pattern=\\\\b{  (ignore whitespace), got prim=$prim") },
-                    onFailure = { t -> expectAstException(t) }
-                )
+                val ex =
+                    parserIgnoreWhitespace("\\b{ ").parseEscape().fold(
+                        onSuccess = { prim -> fail("expected parseEscape failure for pattern=\\\\b{  (ignore whitespace), got prim=$prim") },
+                        onFailure = { t -> expectAstException(t) },
+                    )
                 TestError(ex.err.span(), ex.err.kind())
             },
         )
@@ -2209,10 +2316,11 @@ class ParseTest {
     @Test
     fun parseUnsupportedBackreference() {
         fun parseEscapeErr(pat: String): TestError {
-            val ex = parser(pat).parseEscape().fold(
-                onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseEscape().fold(
+                    onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -2235,11 +2343,13 @@ class ParseTest {
     @Test
     fun parseOctal() {
         fun parseEscapeOk(p: ParserI): Primitive = p.parseEscape().getOrThrow()
+
         fun parseEscapeErr(p: ParserI): TestError {
-            val ex = p.parseEscape().fold(
-                onSuccess = { prim -> fail("expected parseEscape failure, got prim=$prim") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                p.parseEscape().fold(
+                    onSuccess = { prim -> fail("expected parseEscape failure, got prim=$prim") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -2335,11 +2445,13 @@ class ParseTest {
     @Test
     fun parseHexTwo() {
         fun parseEscapeOk(pat: String): Primitive = parser(pat).parseEscape().getOrThrow()
+
         fun parseEscapeErr(pat: String): TestError {
-            val ex = parser(pat).parseEscape().fold(
-                onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseEscape().fold(
+                    onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -2383,11 +2495,13 @@ class ParseTest {
     @Test
     fun parseHexFour() {
         fun parseEscapeOk(pat: String): Primitive = parser(pat).parseEscape().getOrThrow()
+
         fun parseEscapeErr(pat: String): TestError {
-            val ex = parser(pat).parseEscape().fold(
-                onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseEscape().fold(
+                    onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -2453,11 +2567,13 @@ class ParseTest {
     @Test
     fun parseHexEight() {
         fun parseEscapeOk(pat: String): Primitive = parser(pat).parseEscape().getOrThrow()
+
         fun parseEscapeErr(pat: String): TestError {
-            val ex = parser(pat).parseEscape().fold(
-                onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseEscape().fold(
+                    onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -2490,11 +2606,13 @@ class ParseTest {
     @Test
     fun parseHexBrace() {
         fun parseEscapeOk(pat: String): Primitive = parser(pat).parseEscape().getOrThrow()
+
         fun parseEscapeErr(pat: String): TestError {
-            val ex = parser(pat).parseEscape().fold(
-                onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseEscape().fold(
+                    onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -2562,11 +2680,13 @@ class ParseTest {
     @Test
     fun parseDecimal() {
         fun parseDecimalOk(pat: String): UInt = parser(pat).parseDecimal().getOrThrow()
+
         fun parseDecimalErr(pat: String): TestError {
-            val ex = parser(pat).parseDecimal().fold(
-                onSuccess = { n -> fail("expected parseDecimal failure for pattern=$pat, got n=$n") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseDecimal().fold(
+                    onSuccess = { n -> fail("expected parseDecimal failure for pattern=$pat, got n=$n") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -2615,48 +2735,58 @@ class ParseTest {
             )
 
         fun itemset(item: ClassSetItem): ClassSet = ClassSet.Item(item)
+
         fun itemAscii(cls: ClassAscii): ClassSetItem = ClassSetItem.Ascii(cls)
+
         fun itemUnicode(cls: ClassUnicode): ClassSetItem = ClassSetItem.Unicode(cls)
+
         fun itemPerl(cls: ClassPerl): ClassSetItem = ClassSetItem.Perl(cls)
+
         fun itemBracket(cls: ClassBracketed): ClassSetItem = ClassSetItem.Bracketed(cls)
 
-        fun lit(span: Span, c: Char): ClassSetItem = ClassSetItem.Literal(
-            io.github.kotlinmania.regexsyntax.ast.Literal(
-                span = span,
-                kind = LiteralKind.Verbatim,
-                c = c.code,
-            ),
-        )
+        fun lit(span: Span, c: Char): ClassSetItem =
+            ClassSetItem.Literal(
+                io.github.kotlinmania.regexsyntax.ast.Literal(
+                    span = span,
+                    kind = LiteralKind.Verbatim,
+                    c = c.code,
+                ),
+            )
 
         fun empty(span: Span): ClassSetItem = ClassSetItem.Empty(span)
 
         fun range(span: Span, start: Char, end: Char): ClassSetItem {
-            val pos1 = span.start.copy(
-                offset = span.start.offset + utf8Len(start.code),
-                column = span.start.column + 1,
-            )
-            val pos2 = span.end.copy(
-                offset = span.end.offset - utf8Len(end.code),
-                column = span.end.column - 1,
-            )
+            val pos1 =
+                span.start.copy(
+                    offset = span.start.offset + utf8Len(start.code),
+                    column = span.start.column + 1,
+                )
+            val pos2 =
+                span.end.copy(
+                    offset = span.end.offset - utf8Len(end.code),
+                    column = span.end.column - 1,
+                )
             return ClassSetItem.Range(
                 ClassSetRange(
                     span = span,
-                    start = io.github.kotlinmania.regexsyntax.ast.Literal(
-                        span = Span(span.start, pos1),
-                        kind = LiteralKind.Verbatim,
-                        c = start.code,
-                    ),
-                    end = io.github.kotlinmania.regexsyntax.ast.Literal(
-                        span = Span(pos2, span.end),
-                        kind = LiteralKind.Verbatim,
-                        c = end.code,
-                    ),
+                    start =
+                        io.github.kotlinmania.regexsyntax.ast.Literal(
+                            span = Span(span.start, pos1),
+                            kind = LiteralKind.Verbatim,
+                            c = start.code,
+                        ),
+                    end =
+                        io.github.kotlinmania.regexsyntax.ast.Literal(
+                            span = Span(pos2, span.end),
+                            kind = LiteralKind.Verbatim,
+                            c = end.code,
+                        ),
                 ),
             )
         }
 
         fun alnum(span: Span, negated: Boolean): ClassAscii = ClassAscii(span, ClassAsciiKind.Alnum, negated)
+
         fun lower(span: Span, negated: Boolean): ClassAscii = ClassAscii(span, ClassAsciiKind.Lower, negated)
 
         assertEquals(
@@ -2674,15 +2804,16 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 13),
                     negated = false,
-                    kind = itemset(
-                        itemBracket(
-                            ClassBracketed(
-                                span = spanEx(1, 12),
-                                negated = false,
-                                kind = itemset(itemAscii(alnum(spanEx(2, 11), false))),
+                    kind =
+                        itemset(
+                            itemBracket(
+                                ClassBracketed(
+                                    span = spanEx(1, 12),
+                                    negated = false,
+                                    kind = itemset(itemAscii(alnum(spanEx(2, 11), false))),
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parser("[[[:alnum:]]]").parse().getOrThrow(),
@@ -2692,11 +2823,12 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 22),
                     negated = false,
-                    kind = intersection(
-                        spanEx(1, 21),
-                        itemset(itemAscii(alnum(spanEx(1, 10), false))),
-                        itemset(itemAscii(lower(spanEx(12, 21), false))),
-                    ),
+                    kind =
+                        intersection(
+                            spanEx(1, 21),
+                            itemset(itemAscii(alnum(spanEx(1, 10), false))),
+                            itemset(itemAscii(lower(spanEx(12, 21), false))),
+                        ),
                 ),
             ),
             parser("[[:alnum:]&&[:lower:]]").parse().getOrThrow(),
@@ -2706,11 +2838,12 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 22),
                     negated = false,
-                    kind = difference(
-                        spanEx(1, 21),
-                        itemset(itemAscii(alnum(spanEx(1, 10), false))),
-                        itemset(itemAscii(lower(spanEx(12, 21), false))),
-                    ),
+                    kind =
+                        difference(
+                            spanEx(1, 21),
+                            itemset(itemAscii(alnum(spanEx(1, 10), false))),
+                            itemset(itemAscii(lower(spanEx(12, 21), false))),
+                        ),
                 ),
             ),
             parser("[[:alnum:]--[:lower:]]").parse().getOrThrow(),
@@ -2720,11 +2853,12 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 22),
                     negated = false,
-                    kind = symdifference(
-                        spanEx(1, 21),
-                        itemset(itemAscii(alnum(spanEx(1, 10), false))),
-                        itemset(itemAscii(lower(spanEx(12, 21), false))),
-                    ),
+                    kind =
+                        symdifference(
+                            spanEx(1, 21),
+                            itemset(itemAscii(alnum(spanEx(1, 10), false))),
+                            itemset(itemAscii(lower(spanEx(12, 21), false))),
+                        ),
                 ),
             ),
             parser("[[:alnum:]~~[:lower:]]").parse().getOrThrow(),
@@ -2739,19 +2873,20 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 5),
                     negated = false,
-                    kind = union(
-                        spanEx(1, 4),
-                        listOf(
-                            lit(spanEx(1, 2), 'a'),
-                            ClassSetItem.Literal(
-                                io.github.kotlinmania.regexsyntax.ast.Literal(
-                                    span = spanEx(2, 4),
-                                    kind = LiteralKind.Meta,
-                                    c = ']'.code,
+                    kind =
+                        union(
+                            spanEx(1, 4),
+                            listOf(
+                                lit(spanEx(1, 2), 'a'),
+                                ClassSetItem.Literal(
+                                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                                        span = spanEx(2, 4),
+                                        kind = LiteralKind.Meta,
+                                        c = ']'.code,
+                                    ),
                                 ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parser("[a\\]]").parse().getOrThrow(),
@@ -2761,20 +2896,21 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 6),
                     negated = false,
-                    kind = union(
-                        spanEx(1, 5),
-                        listOf(
-                            lit(spanEx(1, 2), 'a'),
-                            ClassSetItem.Literal(
-                                io.github.kotlinmania.regexsyntax.ast.Literal(
-                                    span = spanEx(2, 4),
-                                    kind = LiteralKind.Meta,
-                                    c = '-'.code,
+                    kind =
+                        union(
+                            spanEx(1, 5),
+                            listOf(
+                                lit(spanEx(1, 2), 'a'),
+                                ClassSetItem.Literal(
+                                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                                        span = spanEx(2, 4),
+                                        kind = LiteralKind.Meta,
+                                        c = '-'.code,
+                                    ),
                                 ),
+                                lit(spanEx(4, 5), 'z'),
                             ),
-                            lit(spanEx(4, 5), 'z'),
                         ),
-                    ),
                 ),
             ),
             parser("[a\\-z]").parse().getOrThrow(),
@@ -2814,15 +2950,16 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 5),
                     negated = false,
-                    kind = itemset(
-                        itemUnicode(
-                            ClassUnicode(
-                                span = spanEx(1, 4),
-                                negated = false,
-                                kind = ClassUnicodeKind.OneLetter('L'.code),
+                    kind =
+                        itemset(
+                            itemUnicode(
+                                ClassUnicode(
+                                    span = spanEx(1, 4),
+                                    negated = false,
+                                    kind = ClassUnicodeKind.OneLetter('L'.code),
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parser("[\\pL]").parse().getOrThrow(),
@@ -2832,15 +2969,16 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 4),
                     negated = false,
-                    kind = itemset(
-                        itemPerl(
-                            ClassPerl(
-                                span = spanEx(1, 3),
-                                kind = ClassPerlKind.Word,
-                                negated = false,
+                    kind =
+                        itemset(
+                            itemPerl(
+                                ClassPerl(
+                                    span = spanEx(1, 3),
+                                    kind = ClassPerlKind.Word,
+                                    negated = false,
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parser("[\\w]").parse().getOrThrow(),
@@ -2850,14 +2988,15 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 6),
                     negated = false,
-                    kind = union(
-                        spanEx(1, 5),
-                        listOf(
-                            lit(spanEx(1, 2), 'a'),
-                            itemPerl(ClassPerl(spanEx(2, 4), ClassPerlKind.Word, false)),
-                            lit(spanEx(4, 5), 'z'),
+                    kind =
+                        union(
+                            spanEx(1, 5),
+                            listOf(
+                                lit(spanEx(1, 2), 'a'),
+                                itemPerl(ClassPerl(spanEx(2, 4), ClassPerlKind.Word, false)),
+                                lit(spanEx(4, 5), 'z'),
+                            ),
                         ),
-                    ),
                 ),
             ),
             parser("[a\\wz]").parse().getOrThrow(),
@@ -2878,13 +3017,14 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 8),
                     negated = false,
-                    kind = union(
-                        spanEx(1, 7),
-                        listOf(
-                            range(spanEx(1, 4), 'a', 'c'),
-                            range(spanEx(4, 7), 'x', 'z'),
+                    kind =
+                        union(
+                            spanEx(1, 7),
+                            listOf(
+                                range(spanEx(1, 4), 'a', 'c'),
+                                range(spanEx(4, 7), 'x', 'z'),
+                            ),
                         ),
-                    ),
                 ),
             ),
             parser("[a-cx-z]").parse().getOrThrow(),
@@ -2894,17 +3034,18 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 12),
                     negated = false,
-                    kind = intersection(
-                        spanEx(1, 11),
-                        itemset(itemPerl(ClassPerl(spanEx(1, 3), ClassPerlKind.Word, false))),
-                        union(
-                            spanEx(5, 11),
-                            listOf(
-                                range(spanEx(5, 8), 'a', 'c'),
-                                range(spanEx(8, 11), 'x', 'z'),
+                    kind =
+                        intersection(
+                            spanEx(1, 11),
+                            itemset(itemPerl(ClassPerl(spanEx(1, 3), ClassPerlKind.Word, false))),
+                            union(
+                                spanEx(5, 11),
+                                listOf(
+                                    range(spanEx(5, 8), 'a', 'c'),
+                                    range(spanEx(8, 11), 'x', 'z'),
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parser("[\\w&&a-cx-z]").parse().getOrThrow(),
@@ -2914,17 +3055,18 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 12),
                     negated = false,
-                    kind = intersection(
-                        spanEx(1, 11),
-                        union(
-                            spanEx(1, 7),
-                            listOf(
-                                range(spanEx(1, 4), 'a', 'c'),
-                                range(spanEx(4, 7), 'x', 'z'),
+                    kind =
+                        intersection(
+                            spanEx(1, 11),
+                            union(
+                                spanEx(1, 7),
+                                listOf(
+                                    range(spanEx(1, 4), 'a', 'c'),
+                                    range(spanEx(4, 7), 'x', 'z'),
+                                ),
                             ),
+                            itemset(itemPerl(ClassPerl(spanEx(9, 11), ClassPerlKind.Word, false))),
                         ),
-                        itemset(itemPerl(ClassPerl(spanEx(9, 11), ClassPerlKind.Word, false))),
-                    ),
                 ),
             ),
             parser("[a-cx-z&&\\w]").parse().getOrThrow(),
@@ -2934,15 +3076,16 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 9),
                     negated = false,
-                    kind = difference(
-                        spanEx(1, 8),
+                    kind =
                         difference(
-                            spanEx(1, 5),
-                            itemset(lit(spanEx(1, 2), 'a')),
-                            itemset(lit(spanEx(4, 5), 'b')),
+                            spanEx(1, 8),
+                            difference(
+                                spanEx(1, 5),
+                                itemset(lit(spanEx(1, 2), 'a')),
+                                itemset(lit(spanEx(4, 5), 'b')),
+                            ),
+                            itemset(lit(spanEx(7, 8), 'c')),
                         ),
-                        itemset(lit(spanEx(7, 8), 'c')),
-                    ),
                 ),
             ),
             parser("[a--b--c]").parse().getOrThrow(),
@@ -2952,15 +3095,16 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 9),
                     negated = false,
-                    kind = symdifference(
-                        spanEx(1, 8),
+                    kind =
                         symdifference(
-                            spanEx(1, 5),
-                            itemset(lit(spanEx(1, 2), 'a')),
-                            itemset(lit(spanEx(4, 5), 'b')),
+                            spanEx(1, 8),
+                            symdifference(
+                                spanEx(1, 5),
+                                itemset(lit(spanEx(1, 2), 'a')),
+                                itemset(lit(spanEx(4, 5), 'b')),
+                            ),
+                            itemset(lit(spanEx(7, 8), 'c')),
                         ),
-                        itemset(lit(spanEx(7, 8), 'c')),
-                    ),
                 ),
             ),
             parser("[a~~b~~c]").parse().getOrThrow(),
@@ -2970,19 +3114,20 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 7),
                     negated = false,
-                    kind = intersection(
-                        spanEx(1, 6),
-                        itemset(
-                            ClassSetItem.Literal(
-                                io.github.kotlinmania.regexsyntax.ast.Literal(
-                                    span = spanEx(1, 3),
-                                    kind = LiteralKind.Meta,
-                                    c = '^'.code,
+                    kind =
+                        intersection(
+                            spanEx(1, 6),
+                            itemset(
+                                ClassSetItem.Literal(
+                                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                                        span = spanEx(1, 3),
+                                        kind = LiteralKind.Meta,
+                                        c = '^'.code,
+                                    ),
                                 ),
                             ),
+                            itemset(lit(spanEx(5, 6), '^')),
                         ),
-                        itemset(lit(spanEx(5, 6), '^')),
-                    ),
                 ),
             ),
             parser("[\\^&&^]").parse().getOrThrow(),
@@ -2992,19 +3137,20 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 7),
                     negated = false,
-                    kind = intersection(
-                        spanEx(1, 6),
-                        itemset(
-                            ClassSetItem.Literal(
-                                io.github.kotlinmania.regexsyntax.ast.Literal(
-                                    span = spanEx(1, 3),
-                                    kind = LiteralKind.Meta,
-                                    c = '&'.code,
+                    kind =
+                        intersection(
+                            spanEx(1, 6),
+                            itemset(
+                                ClassSetItem.Literal(
+                                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                                        span = spanEx(1, 3),
+                                        kind = LiteralKind.Meta,
+                                        c = '&'.code,
+                                    ),
                                 ),
                             ),
+                            itemset(lit(spanEx(5, 6), '&')),
                         ),
-                        itemset(lit(spanEx(5, 6), '&')),
-                    ),
                 ),
             ),
             parser("[\\&&&&]").parse().getOrThrow(),
@@ -3014,15 +3160,16 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 6),
                     negated = false,
-                    kind = intersection(
-                        spanEx(1, 5),
+                    kind =
                         intersection(
-                            spanEx(1, 3),
-                            itemset(empty(spanEx(1, 1))),
-                            itemset(empty(spanEx(3, 3))),
+                            spanEx(1, 5),
+                            intersection(
+                                spanEx(1, 3),
+                                itemset(empty(spanEx(1, 1))),
+                                itemset(empty(spanEx(3, 3))),
+                            ),
+                            itemset(empty(spanEx(5, 5))),
                         ),
-                        itemset(empty(spanEx(5, 5))),
-                    ),
                 ),
             ),
             parser("[&&&&]").parse().getOrThrow(),
@@ -3034,23 +3181,26 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 5),
                     negated = false,
-                    kind = itemset(
-                        ClassSetItem.Range(
-                            ClassSetRange(
-                                span = spanEx(1, 4),
-                                start = io.github.kotlinmania.regexsyntax.ast.Literal(
-                                    span = spanEx(1, 2),
-                                    kind = LiteralKind.Verbatim,
-                                    c = '☃'.code,
-                                ),
-                                end = io.github.kotlinmania.regexsyntax.ast.Literal(
-                                    span = spanEx(3, 4),
-                                    kind = LiteralKind.Verbatim,
-                                    c = '⛄'.code,
+                    kind =
+                        itemset(
+                            ClassSetItem.Range(
+                                ClassSetRange(
+                                    span = spanEx(1, 4),
+                                    start =
+                                        io.github.kotlinmania.regexsyntax.ast.Literal(
+                                            span = spanEx(1, 2),
+                                            kind = LiteralKind.Verbatim,
+                                            c = '☃'.code,
+                                        ),
+                                    end =
+                                        io.github.kotlinmania.regexsyntax.ast.Literal(
+                                            span = spanEx(3, 4),
+                                            kind = LiteralKind.Verbatim,
+                                            c = '⛄'.code,
+                                        ),
                                 ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parser(pat).parse().getOrThrow(),
@@ -3065,19 +3215,20 @@ class ParseTest {
                 ClassBracketed(
                     span = spanEx(0, 5),
                     negated = false,
-                    kind = union(
-                        spanEx(1, 4),
-                        listOf(
-                            lit(spanEx(1, 2), ']'),
-                            ClassSetItem.Literal(
-                                io.github.kotlinmania.regexsyntax.ast.Literal(
-                                    span = spanEx(2, 4),
-                                    kind = LiteralKind.Meta,
-                                    c = '['.code,
+                    kind =
+                        union(
+                            spanEx(1, 4),
+                            listOf(
+                                lit(spanEx(1, 2), ']'),
+                                ClassSetItem.Literal(
+                                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                                        span = spanEx(2, 4),
+                                        kind = LiteralKind.Meta,
+                                        c = '['.code,
+                                    ),
                                 ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parser("[]\\[]").parse().getOrThrow(),
@@ -3091,15 +3242,16 @@ class ParseTest {
                         ClassBracketed(
                             span = spanEx(0, 4),
                             negated = false,
-                            kind = itemset(
-                                ClassSetItem.Literal(
-                                    io.github.kotlinmania.regexsyntax.ast.Literal(
-                                        span = spanEx(1, 3),
-                                        kind = LiteralKind.Meta,
-                                        c = '['.code,
+                            kind =
+                                itemset(
+                                    ClassSetItem.Literal(
+                                        io.github.kotlinmania.regexsyntax.ast.Literal(
+                                            span = spanEx(1, 3),
+                                            kind = LiteralKind.Meta,
+                                            c = '['.code,
+                                        ),
                                     ),
                                 ),
-                            ),
                         ),
                     ),
                     Ast.Literal(
@@ -3125,10 +3277,11 @@ class ParseTest {
 
         fun parseErrIgnoreWhitespace(pat: String): TestError {
             val res = parserIgnoreWhitespace(pat).parse()
-            val ex = res.fold(
-                onSuccess = { ast -> fail("expected parse failure for ignoreWhitespace pattern=$pat, got ast=$ast") },
-                onFailure = { t -> expectAstException(t) },
-            )
+            val ex =
+                res.fold(
+                    onSuccess = { ast -> fail("expected parse failure for ignoreWhitespace pattern=$pat, got ast=$ast") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
         assertEquals(TestError(spanEx(0, 1), ErrorKind.ClassUnclosed), parseErrIgnoreWhitespace("[a "))
@@ -3144,18 +3297,20 @@ class ParseTest {
             parserIgnoreWhitespace(pat).parseSetClassOpen().getOrThrow()
 
         fun parseSetClassOpenErr(pat: String): TestError {
-            val ex = parser(pat).parseSetClassOpen().fold(
-                onSuccess = { pair -> fail("expected parseSetClassOpen failure for pattern=$pat, got pair=$pair") },
-                onFailure = { t -> expectAstException(t) },
-            )
+            val ex =
+                parser(pat).parseSetClassOpen().fold(
+                    onSuccess = { pair -> fail("expected parseSetClassOpen failure for pattern=$pat, got pair=$pair") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
         fun parseSetClassOpenErrIgnoreWhitespace(pat: String): TestError {
-            val ex = parserIgnoreWhitespace(pat).parseSetClassOpen().fold(
-                onSuccess = { pair -> fail("expected parseSetClassOpen failure for ignoreWhitespace pattern=$pat, got pair=$pair") },
-                onFailure = { t -> expectAstException(t) },
-            )
+            val ex =
+                parserIgnoreWhitespace(pat).parseSetClassOpen().fold(
+                    onSuccess = { pair -> fail("expected parseSetClassOpen failure for ignoreWhitespace pattern=$pat, got pair=$pair") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -3212,15 +3367,16 @@ class ParseTest {
                 ),
                 ClassSetUnion(
                     span = spanEx(1, 2),
-                    items = mutableListOf(
-                        ClassSetItem.Literal(
-                            io.github.kotlinmania.regexsyntax.ast.Literal(
-                                span = spanEx(1, 2),
-                                kind = LiteralKind.Verbatim,
-                                c = '-'.code,
+                    items =
+                        mutableListOf(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(1, 2),
+                                    kind = LiteralKind.Verbatim,
+                                    c = '-'.code,
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parseSetClassOpenOk("[-a]"),
@@ -3234,15 +3390,16 @@ class ParseTest {
                 ),
                 ClassSetUnion(
                     span = spanEx(2, 3),
-                    items = mutableListOf(
-                        ClassSetItem.Literal(
-                            io.github.kotlinmania.regexsyntax.ast.Literal(
-                                span = spanEx(2, 3),
-                                kind = LiteralKind.Verbatim,
-                                c = '-'.code,
+                    items =
+                        mutableListOf(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(2, 3),
+                                    kind = LiteralKind.Verbatim,
+                                    c = '-'.code,
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parseSetClassOpenOkIgnoreWhitespace("[ - a]"),
@@ -3256,15 +3413,16 @@ class ParseTest {
                 ),
                 ClassSetUnion(
                     span = spanEx(2, 3),
-                    items = mutableListOf(
-                        ClassSetItem.Literal(
-                            io.github.kotlinmania.regexsyntax.ast.Literal(
-                                span = spanEx(2, 3),
-                                kind = LiteralKind.Verbatim,
-                                c = '-'.code,
+                    items =
+                        mutableListOf(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(2, 3),
+                                    kind = LiteralKind.Verbatim,
+                                    c = '-'.code,
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parseSetClassOpenOk("[^-a]"),
@@ -3278,22 +3436,23 @@ class ParseTest {
                 ),
                 ClassSetUnion(
                     span = spanEx(1, 3),
-                    items = mutableListOf(
-                        ClassSetItem.Literal(
-                            io.github.kotlinmania.regexsyntax.ast.Literal(
-                                span = spanEx(1, 2),
-                                kind = LiteralKind.Verbatim,
-                                c = '-'.code,
+                    items =
+                        mutableListOf(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(1, 2),
+                                    kind = LiteralKind.Verbatim,
+                                    c = '-'.code,
+                                ),
+                            ),
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(2, 3),
+                                    kind = LiteralKind.Verbatim,
+                                    c = '-'.code,
+                                ),
                             ),
                         ),
-                        ClassSetItem.Literal(
-                            io.github.kotlinmania.regexsyntax.ast.Literal(
-                                span = spanEx(2, 3),
-                                kind = LiteralKind.Verbatim,
-                                c = '-'.code,
-                            ),
-                        ),
-                    ),
                 ),
             ),
             parseSetClassOpenOk("[--a]"),
@@ -3307,15 +3466,16 @@ class ParseTest {
                 ),
                 ClassSetUnion(
                     span = spanEx(1, 2),
-                    items = mutableListOf(
-                        ClassSetItem.Literal(
-                            io.github.kotlinmania.regexsyntax.ast.Literal(
-                                span = spanEx(1, 2),
-                                kind = LiteralKind.Verbatim,
-                                c = ']'.code,
+                    items =
+                        mutableListOf(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(1, 2),
+                                    kind = LiteralKind.Verbatim,
+                                    c = ']'.code,
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parseSetClassOpenOk("[]a]"),
@@ -3329,15 +3489,16 @@ class ParseTest {
                 ),
                 ClassSetUnion(
                     span = spanEx(2, 3),
-                    items = mutableListOf(
-                        ClassSetItem.Literal(
-                            io.github.kotlinmania.regexsyntax.ast.Literal(
-                                span = spanEx(2, 3),
-                                kind = LiteralKind.Verbatim,
-                                c = ']'.code,
+                    items =
+                        mutableListOf(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(2, 3),
+                                    kind = LiteralKind.Verbatim,
+                                    c = ']'.code,
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parseSetClassOpenOkIgnoreWhitespace("[ ] a]"),
@@ -3351,15 +3512,16 @@ class ParseTest {
                 ),
                 ClassSetUnion(
                     span = spanEx(2, 3),
-                    items = mutableListOf(
-                        ClassSetItem.Literal(
-                            io.github.kotlinmania.regexsyntax.ast.Literal(
-                                span = spanEx(2, 3),
-                                kind = LiteralKind.Verbatim,
-                                c = ']'.code,
+                    items =
+                        mutableListOf(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(2, 3),
+                                    kind = LiteralKind.Verbatim,
+                                    c = ']'.code,
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parseSetClassOpenOk("[^]a]"),
@@ -3373,15 +3535,16 @@ class ParseTest {
                 ),
                 ClassSetUnion(
                     span = spanEx(1, 2),
-                    items = mutableListOf(
-                        ClassSetItem.Literal(
-                            io.github.kotlinmania.regexsyntax.ast.Literal(
-                                span = spanEx(1, 2),
-                                kind = LiteralKind.Verbatim,
-                                c = '-'.code,
+                    items =
+                        mutableListOf(
+                            ClassSetItem.Literal(
+                                io.github.kotlinmania.regexsyntax.ast.Literal(
+                                    span = spanEx(1, 2),
+                                    kind = LiteralKind.Verbatim,
+                                    c = '-'.code,
+                                ),
                             ),
                         ),
-                    ),
                 ),
             ),
             parseSetClassOpenOk("[-]a]"),
@@ -3397,10 +3560,11 @@ class ParseTest {
         assertEquals(
             TestError(spanEx(4, 4), ErrorKind.ClassUnclosed),
             run {
-                val ex = parser("(?x)[-#]").parseWithComments().fold(
-                    onSuccess = { wc -> fail("expected parseWithComments failure, got $wc") },
-                    onFailure = { t -> expectAstException(t) },
-                )
+                val ex =
+                    parser("(?x)[-#]").parseWithComments().fold(
+                        onSuccess = { wc -> fail("expected parseWithComments failure, got $wc") },
+                        onFailure = { t -> expectAstException(t) },
+                    )
                 TestError(ex.err.span(), ex.err.kind())
             },
         )
@@ -3456,11 +3620,13 @@ class ParseTest {
     @Test
     fun parseUnicodeClass() {
         fun parseEscapeOk(pat: String): Primitive = parser(pat).parseEscape().getOrThrow()
+
         fun parseEscapeErr(pat: String): TestError {
-            val ex = parser(pat).parseEscape().fold(
-                onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
-                onFailure = { t -> expectAstException(t) }
-            )
+            val ex =
+                parser(pat).parseEscape().fold(
+                    onSuccess = { prim -> fail("expected parseEscape failure for pattern=$pat, got prim=$prim") },
+                    onFailure = { t -> expectAstException(t) },
+                )
             return TestError(ex.err.span(), ex.err.kind())
         }
 
@@ -3629,41 +3795,42 @@ class ParseTest {
     // the default limit too aggressively.
     @Test
     fun regression454NestTooBig() {
-        val pattern = """
-        2(?:
-          [45]\\d{3}|
-          7(?:
-            1[0-267]|
-            2[0-289]|
-            3[0-29]|
-            4[01]|
-            5[1-3]|
-            6[013]|
-            7[0178]|
-            91
-          )|
-          8(?:
-            0[125]|
-            [139][1-6]|
-            2[0157-9]|
-            41|
-            6[1-35]|
-            7[1-5]|
-            8[1-8]|
-            90
-          )|
-          9(?:
-            0[0-2]|
-            1[0-4]|
-            2[568]|
-            3[3-6]|
-            5[5-7]|
-            6[0167]|
-            7[15]|
-            8[0146-9]
-          )
-        )\\d{4}
-        """.trimIndent()
+        val pattern =
+            """
+            2(?:
+              [45]\\d{3}|
+              7(?:
+                1[0-267]|
+                2[0-289]|
+                3[0-29]|
+                4[01]|
+                5[1-3]|
+                6[013]|
+                7[0178]|
+                91
+              )|
+              8(?:
+                0[125]|
+                [139][1-6]|
+                2[0157-9]|
+                41|
+                6[1-35]|
+                7[1-5]|
+                8[1-8]|
+                90
+              )|
+              9(?:
+                0[0-2]|
+                1[0-4]|
+                2[568]|
+                3[3-6]|
+                5[5-7]|
+                6[0167]|
+                7[15]|
+                8[0146-9]
+              )
+            )\\d{4}
+            """.trimIndent()
         assertTrue(parserNestLimit(pattern, 50u).parse().isSuccess)
     }
 

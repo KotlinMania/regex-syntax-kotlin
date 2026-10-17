@@ -1,8 +1,6 @@
 // port-lint: source hir/literal.rs
 package io.github.kotlinmania.regexsyntax.hir.literal
 
-import io.github.kotlinmania.regexsyntax.debug.Bytes as DebugBytes
-import io.github.kotlinmania.regexsyntax.hir.Capture
 import io.github.kotlinmania.regexsyntax.hir.Class
 import io.github.kotlinmania.regexsyntax.hir.ClassBytes
 import io.github.kotlinmania.regexsyntax.hir.ClassUnicode
@@ -12,6 +10,7 @@ import io.github.kotlinmania.regexsyntax.hir.Repetition
 import io.github.kotlinmania.regexsyntax.hir.codepointUtf8Len
 import io.github.kotlinmania.regexsyntax.hir.encodeUtf8
 import io.github.kotlinmania.regexsyntax.rank.BYTE_FREQUENCIES
+import io.github.kotlinmania.regexsyntax.debug.Bytes as DebugBytes
 
 /**
  * Provides literal extraction from [Hir] expressions.
@@ -28,38 +27,41 @@ class Extractor private constructor(
 ) {
     companion object {
         /** Create a new extractor with a default configuration. */
-        fun new(): Extractor = Extractor(
-            kind = ExtractKind.Prefix,
-            limitClass = 10,
-            limitRepeat = 10,
-            limitLiteralLen = 100,
-            limitTotal = 250,
-        )
+        fun new(): Extractor =
+            Extractor(
+                kind = ExtractKind.Prefix,
+                limitClass = 10,
+                limitRepeat = 10,
+                limitLiteralLen = 100,
+                limitTotal = 250,
+            )
     }
 
     /** Execute the extractor and return a sequence of literals. */
-    fun extract(hir: Hir): Seq {
-        return when (val kind = hir.kind()) {
+    fun extract(hir: Hir): Seq =
+        when (val kind = hir.kind()) {
             is HirKind.Empty,
-            is HirKind.Look -> Seq.singleton(Literal.exact(byteArrayOf()))
+            is HirKind.Look,
+            -> Seq.singleton(Literal.exact(byteArrayOf()))
             is HirKind.Literal -> {
                 val seq = Seq.singleton(Literal.exact(kind.value.bytes.copyOf()))
                 enforceLiteralLen(seq)
                 seq
             }
-            is HirKind.Class -> when (val cls = kind.value) {
-                is Class.Unicode -> extractClassUnicode(cls.value)
-                is Class.Bytes -> extractClassBytes(cls.value)
-            }
+            is HirKind.Class ->
+                when (val cls = kind.value) {
+                    is Class.Unicode -> extractClassUnicode(cls.value)
+                    is Class.Bytes -> extractClassBytes(cls.value)
+                }
             is HirKind.Repetition -> extractRepetition(kind.value)
             is HirKind.Capture -> extract(kind.value.sub)
-            is HirKind.Concat -> when (this.kind) {
-                ExtractKind.Prefix -> extractConcat(kind.items)
-                ExtractKind.Suffix -> extractConcat(kind.items.asReversed())
-            }
+            is HirKind.Concat ->
+                when (this.kind) {
+                    ExtractKind.Prefix -> extractConcat(kind.items)
+                    ExtractKind.Suffix -> extractConcat(kind.items.asReversed())
+                }
             is HirKind.Alternation -> extractAlternation(kind.items)
         }
-    }
 
     /**
      * Set the kind of literal sequence to extract from a [Hir] expression.
@@ -132,9 +134,11 @@ class Extractor private constructor(
         val limit = limitRepeat.toUInt()
         var seq = Seq.singleton(Literal.exact(byteArrayOf()))
         val repeat = if (rep.min > limit) limitRepeat else rep.min.toInt()
-        for (i in 0 until repeat) {
+        var step = 0
+        while (step < repeat) {
             if (seq.isInexact()) break
             seq = cross(seq, subseq.clone())
+            step++
         }
         if (rep.max == null || rep.max != rep.min || rep.min > limit) {
             seq.makeInexact()
@@ -250,8 +254,11 @@ class Extractor private constructor(
 enum class ExtractKind {
     /** Extracts only prefix literals from a regex. */
     Prefix,
+
     /** Extracts only suffix literals from a regex. */
-    Suffix;
+    Suffix,
+
+    ;
 
     /** Returns true if this kind is the [Prefix] variant. */
     fun isPrefix(): Boolean = this == Prefix
@@ -409,13 +416,14 @@ class Seq private constructor(
     /** Unions [other] into this one at the position of the first zero-length literal. */
     fun unionIntoEmpty(other: Seq) {
         val otherLits = other.literals
-        val drained = if (otherLits == null) {
-            null
-        } else {
-            val copy = otherLits.toList()
-            otherLits.clear()
-            copy
-        }
+        val drained =
+            if (otherLits == null) {
+                null
+            } else {
+                val copy = otherLits.toList()
+                otherLits.clear()
+                copy
+            }
         val lits1 = literals ?: return
         val firstEmpty = lits1.indexOfFirst { it.isEmpty() }
         if (firstEmpty < 0) return
@@ -819,15 +827,23 @@ private class PreferenceTrie {
 }
 
 private sealed class Inserted {
-    class Ok(val index: Int) : Inserted()
-    class Err(val index: Int) : Inserted()
+    class Ok(
+        val index: Int,
+    ) : Inserted()
+
+    class Err(
+        val index: Int,
+    ) : Inserted()
 }
 
 private class State(
     val transitions: MutableList<Transition> = mutableListOf(),
 )
 
-private data class Transition(val byte: Byte, val state: Int)
+private data class Transition(
+    val byte: Byte,
+    val state: Int,
+)
 
 private fun MutableList<Transition>.binarySearchByByte(byte: Byte): Int {
     val needle = byte.toInt() and 0xFF

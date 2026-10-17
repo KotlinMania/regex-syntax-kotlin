@@ -168,31 +168,44 @@ class PrintTest {
     // See: https://github.com/rust-lang/regex/issues/731
     @Test
     fun regressionRepetitionConcat() {
-        var expr = Hir.concat(listOf(
-            Hir.literal("x".encodeToByteArray()),
-            Hir.repetition(Repetition(
-                min = 1u,
-                max = null,
-                greedy = true,
-                sub = Hir.literal("ab".encodeToByteArray()),
-            )),
-            Hir.literal("y".encodeToByteArray()),
-        ))
+        var expr =
+            Hir.concat(
+                listOf(
+                    Hir.literal("x".encodeToByteArray()),
+                    Hir.repetition(
+                        Repetition(
+                            min = 1u,
+                            max = null,
+                            greedy = true,
+                            sub = Hir.literal("ab".encodeToByteArray()),
+                        ),
+                    ),
+                    Hir.literal("y".encodeToByteArray()),
+                ),
+            )
         assertEquals("(?:x(?:ab)+y)", expr.toString())
 
-        expr = Hir.concat(listOf(
-            Hir.look(Look.Start),
-            Hir.repetition(Repetition(
-                min = 1u,
-                max = null,
-                greedy = true,
-                sub = Hir.concat(listOf(
+        expr =
+            Hir.concat(
+                listOf(
                     Hir.look(Look.Start),
+                    Hir.repetition(
+                        Repetition(
+                            min = 1u,
+                            max = null,
+                            greedy = true,
+                            sub =
+                                Hir.concat(
+                                    listOf(
+                                        Hir.look(Look.Start),
+                                        Hir.look(Look.End),
+                                    ),
+                                ),
+                        ),
+                    ),
                     Hir.look(Look.End),
-                )),
-            )),
-            Hir.look(Look.End),
-        ))
+                ),
+            )
         assertEquals("(?:\\A\\A\\z\\z)", expr.toString())
     }
 
@@ -202,34 +215,50 @@ class PrintTest {
     // See: https://github.com/rust-lang/regex/issues/731
     @Test
     fun regressionRepetitionAlternation() {
-        var expr = Hir.concat(listOf(
-            Hir.literal("ab".encodeToByteArray()),
-            Hir.repetition(Repetition(
-                min = 1u,
-                max = null,
-                greedy = true,
-                sub = Hir.alternation(listOf(
-                    Hir.literal("cd".encodeToByteArray()),
-                    Hir.literal("ef".encodeToByteArray()),
-                )),
-            )),
-            Hir.literal("gh".encodeToByteArray()),
-        ))
+        var expr =
+            Hir.concat(
+                listOf(
+                    Hir.literal("ab".encodeToByteArray()),
+                    Hir.repetition(
+                        Repetition(
+                            min = 1u,
+                            max = null,
+                            greedy = true,
+                            sub =
+                                Hir.alternation(
+                                    listOf(
+                                        Hir.literal("cd".encodeToByteArray()),
+                                        Hir.literal("ef".encodeToByteArray()),
+                                    ),
+                                ),
+                        ),
+                    ),
+                    Hir.literal("gh".encodeToByteArray()),
+                ),
+            )
         assertEquals("(?:(?:ab)(?:(?:cd)|(?:ef))+(?:gh))", expr.toString())
 
-        expr = Hir.concat(listOf(
-            Hir.look(Look.Start),
-            Hir.repetition(Repetition(
-                min = 1u,
-                max = null,
-                greedy = true,
-                sub = Hir.alternation(listOf(
+        expr =
+            Hir.concat(
+                listOf(
                     Hir.look(Look.Start),
+                    Hir.repetition(
+                        Repetition(
+                            min = 1u,
+                            max = null,
+                            greedy = true,
+                            sub =
+                                Hir.alternation(
+                                    listOf(
+                                        Hir.look(Look.Start),
+                                        Hir.look(Look.End),
+                                    ),
+                                ),
+                        ),
+                    ),
                     Hir.look(Look.End),
-                )),
-            )),
-            Hir.look(Look.End),
-        ))
+                ),
+            )
         assertEquals("(?:\\A(?:\\A|\\z)\\z)", expr.toString())
     }
 
@@ -246,22 +275,32 @@ class PrintTest {
     // See: https://github.com/rust-lang/regex/issues/516
     @Test
     fun regressionAlternationConcat() {
-        var expr = Hir.concat(listOf(
-            Hir.literal("ab".encodeToByteArray()),
-            Hir.alternation(listOf(
-                Hir.literal("mn".encodeToByteArray()),
-                Hir.literal("xy".encodeToByteArray()),
-            )),
-        ))
+        var expr =
+            Hir.concat(
+                listOf(
+                    Hir.literal("ab".encodeToByteArray()),
+                    Hir.alternation(
+                        listOf(
+                            Hir.literal("mn".encodeToByteArray()),
+                            Hir.literal("xy".encodeToByteArray()),
+                        ),
+                    ),
+                ),
+            )
         assertEquals("(?:(?:ab)(?:(?:mn)|(?:xy)))", expr.toString())
 
-        expr = Hir.concat(listOf(
-            Hir.look(Look.Start),
-            Hir.alternation(listOf(
-                Hir.look(Look.Start),
-                Hir.look(Look.End),
-            )),
-        ))
+        expr =
+            Hir.concat(
+                listOf(
+                    Hir.look(Look.Start),
+                    Hir.alternation(
+                        listOf(
+                            Hir.look(Look.Start),
+                            Hir.look(Look.End),
+                        ),
+                    ),
+                ),
+            )
         assertEquals("(?:\\A(?:\\A|\\z))", expr.toString())
     }
 }

@@ -3,7 +3,20 @@ package io.github.kotlinmania.regexsyntax.unicode
 
 import io.github.kotlinmania.regexsyntax.hir.ClassUnicode
 import io.github.kotlinmania.regexsyntax.hir.ClassUnicodeRange
+import io.github.kotlinmania.regexsyntax.unicodetables.casefoldingsimple.CASE_FOLDING_SIMPLE
+import io.github.kotlinmania.regexsyntax.unicodetables.perlword.PERL_WORD
+import io.github.kotlinmania.regexsyntax.unicodetables.propertynames.PROPERTY_NAMES
+import io.github.kotlinmania.regexsyntax.unicodetables.propertyvalues.PROPERTY_VALUES
 import io.github.kotlinmania.regexsyntax.unicodetables.age.BY_NAME as AGE_BY_NAME
+import io.github.kotlinmania.regexsyntax.unicodetables.age.V10_0 as AGE_V10_0
+import io.github.kotlinmania.regexsyntax.unicodetables.age.V11_0 as AGE_V11_0
+import io.github.kotlinmania.regexsyntax.unicodetables.age.V12_0 as AGE_V12_0
+import io.github.kotlinmania.regexsyntax.unicodetables.age.V12_1 as AGE_V12_1
+import io.github.kotlinmania.regexsyntax.unicodetables.age.V13_0 as AGE_V13_0
+import io.github.kotlinmania.regexsyntax.unicodetables.age.V14_0 as AGE_V14_0
+import io.github.kotlinmania.regexsyntax.unicodetables.age.V15_0 as AGE_V15_0
+import io.github.kotlinmania.regexsyntax.unicodetables.age.V15_1 as AGE_V15_1
+import io.github.kotlinmania.regexsyntax.unicodetables.age.V16_0 as AGE_V16_0
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V1_1 as AGE_V1_1
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V2_0 as AGE_V2_0
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V2_1 as AGE_V2_1
@@ -22,23 +35,10 @@ import io.github.kotlinmania.regexsyntax.unicodetables.age.V6_3 as AGE_V6_3
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V7_0 as AGE_V7_0
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V8_0 as AGE_V8_0
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V9_0 as AGE_V9_0
-import io.github.kotlinmania.regexsyntax.unicodetables.age.V10_0 as AGE_V10_0
-import io.github.kotlinmania.regexsyntax.unicodetables.age.V11_0 as AGE_V11_0
-import io.github.kotlinmania.regexsyntax.unicodetables.age.V12_0 as AGE_V12_0
-import io.github.kotlinmania.regexsyntax.unicodetables.age.V12_1 as AGE_V12_1
-import io.github.kotlinmania.regexsyntax.unicodetables.age.V13_0 as AGE_V13_0
-import io.github.kotlinmania.regexsyntax.unicodetables.age.V14_0 as AGE_V14_0
-import io.github.kotlinmania.regexsyntax.unicodetables.age.V15_0 as AGE_V15_0
-import io.github.kotlinmania.regexsyntax.unicodetables.age.V15_1 as AGE_V15_1
-import io.github.kotlinmania.regexsyntax.unicodetables.age.V16_0 as AGE_V16_0
-import io.github.kotlinmania.regexsyntax.unicodetables.casefoldingsimple.CASE_FOLDING_SIMPLE
 import io.github.kotlinmania.regexsyntax.unicodetables.generalcategory.BY_NAME as GENCAT_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.graphemeclusterbreak.BY_NAME as GCB_BY_NAME
-import io.github.kotlinmania.regexsyntax.unicodetables.perlword.PERL_WORD
 import io.github.kotlinmania.regexsyntax.unicodetables.propertybool.BY_NAME as PROPBOOL_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.propertybool.WHITE_SPACE as PROPBOOL_WHITE_SPACE
-import io.github.kotlinmania.regexsyntax.unicodetables.propertynames.PROPERTY_NAMES
-import io.github.kotlinmania.regexsyntax.unicodetables.propertyvalues.PROPERTY_VALUES
 import io.github.kotlinmania.regexsyntax.unicodetables.script.BY_NAME as SCRIPT_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.scriptextension.BY_NAME as SCRIPTEXT_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.sentencebreak.BY_NAME as SB_BY_NAME
@@ -205,14 +205,15 @@ class SimpleCaseFolder private constructor(
      */
     fun overlaps(start: Int, end: Int): Boolean {
         check(start <= end)
-        val r = binarySearchBy(table.size) { i ->
-            val c = table[i].first
-            when {
-                start <= c && c <= end -> 0
-                c > end -> 1
-                else -> -1
+        val r =
+            binarySearchBy(table.size) { i ->
+                val c = table[i].first
+                when {
+                    start <= c && c <= end -> 0
+                    c > end -> 1
+                    else -> -1
+                }
             }
-        }
         return r is BinarySearchResult.Ok
     }
 
@@ -221,9 +222,7 @@ class SimpleCaseFolder private constructor(
      * `c` does not occur, then this returns an `i` such that `table[i-1].0 <
      * c` and `table[i].0 > c`.
      */
-    private fun get(c: Int): BinarySearchResult {
-        return binarySearchByKey(table.size, c) { i -> table[i].first }
-    }
+    private fun get(c: Int): BinarySearchResult = binarySearchByKey(table.size, c) { i -> table[i].first }
 
     companion object {
         private val EMPTY_MAPPING = IntArray(0)
@@ -253,7 +252,9 @@ sealed class ClassQuery {
      * Return a class corresponding to a Unicode binary property, named by
      * a single letter.
      */
-    data class OneLetter(val c: Int) : ClassQuery()
+    data class OneLetter(
+        val c: Int,
+    ) : ClassQuery()
 
     /**
      * Return a class corresponding to a Unicode binary property.
@@ -262,7 +263,9 @@ sealed class ClassQuery {
      * general category values and script values are permitted here as if
      * they were a binary property.
      */
-    data class Binary(val name: String) : ClassQuery()
+    data class Binary(
+        val name: String,
+    ) : ClassQuery()
 
     /**
      * Return a class corresponding to all codepoints whose property
@@ -289,36 +292,43 @@ sealed class ClassQuery {
 
                 val canonNameRes = canonicalProp(propertyName)
                 if (canonNameRes.isFailure) return Result.failure(canonNameRes.exceptionOrNull()!!)
-                val canonName = canonNameRes.getOrNull()
-                    ?: return Result.failure(UnicodeErrorException(Error.PropertyNotFound))
-                Result.success(when (canonName) {
-                    "General_Category" -> {
-                        val canonRes = canonicalGencat(propertyValue)
-                        if (canonRes.isFailure) return Result.failure(canonRes.exceptionOrNull()!!)
-                        val canon = canonRes.getOrNull()
-                            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
-                        CanonicalClassQuery.GeneralCategory(canon)
-                    }
-                    "Script" -> {
-                        val canonRes = canonicalScript(propertyValue)
-                        if (canonRes.isFailure) return Result.failure(canonRes.exceptionOrNull()!!)
-                        val canon = canonRes.getOrNull()
-                            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
-                        CanonicalClassQuery.Script(canon)
-                    }
-                    else -> {
-                        val valsRes = propertyValues(canonName)
-                        if (valsRes.isFailure) return Result.failure(valsRes.exceptionOrNull()!!)
-                        val vals = valsRes.getOrNull()
-                            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
-                        val canonVal = canonicalValue(vals, propertyValue)
-                            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
-                        CanonicalClassQuery.ByValue(
-                            propertyName = canonName,
-                            propertyValue = canonVal,
-                        )
-                    }
-                })
+                val canonName =
+                    canonNameRes.getOrNull()
+                        ?: return Result.failure(UnicodeErrorException(Error.PropertyNotFound))
+                Result.success(
+                    when (canonName) {
+                        "General_Category" -> {
+                            val canonRes = canonicalGencat(propertyValue)
+                            if (canonRes.isFailure) return Result.failure(canonRes.exceptionOrNull()!!)
+                            val canon =
+                                canonRes.getOrNull()
+                                    ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+                            CanonicalClassQuery.GeneralCategory(canon)
+                        }
+                        "Script" -> {
+                            val canonRes = canonicalScript(propertyValue)
+                            if (canonRes.isFailure) return Result.failure(canonRes.exceptionOrNull()!!)
+                            val canon =
+                                canonRes.getOrNull()
+                                    ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+                            CanonicalClassQuery.Script(canon)
+                        }
+                        else -> {
+                            val valsRes = propertyValues(canonName)
+                            if (valsRes.isFailure) return Result.failure(valsRes.exceptionOrNull()!!)
+                            val vals =
+                                valsRes.getOrNull()
+                                    ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+                            val canonVal =
+                                canonicalValue(vals, propertyValue)
+                                    ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+                            CanonicalClassQuery.ByValue(
+                                propertyName = canonName,
+                                propertyValue = canonVal,
+                            )
+                        }
+                    },
+                )
             }
         }
     }
@@ -375,13 +385,19 @@ sealed class ClassQuery {
  */
 internal sealed class CanonicalClassQuery {
     /** The canonical binary property name. */
-    data class Binary(val name: String) : CanonicalClassQuery()
+    data class Binary(
+        val name: String,
+    ) : CanonicalClassQuery()
 
     /** The canonical general category name. */
-    data class GeneralCategory(val name: String) : CanonicalClassQuery()
+    data class GeneralCategory(
+        val name: String,
+    ) : CanonicalClassQuery()
 
     /** The canonical script name. */
-    data class Script(val name: String) : CanonicalClassQuery()
+    data class Script(
+        val name: String,
+    ) : CanonicalClassQuery()
 
     /**
      * An arbitrary association between property and value, both of which
@@ -400,14 +416,18 @@ internal sealed class CanonicalClassQuery {
 }
 
 /** Wraps [Error] for `Result` propagation. */
-internal class UnicodeErrorException(val error: Error) : Throwable(error.name)
+internal class UnicodeErrorException(
+    val error: Error,
+) : Throwable(error.name)
 
 /**
  * A table of property values for a particular property.
  *
  * This is used as an internal representation to reflect the upstream type.
  */
-internal class PropertyValues(val entries: Array<Pair<String, String>>)
+internal class PropertyValues(
+    val entries: Array<Pair<String, String>>,
+)
 
 /**
  * Looks up a Unicode class given a query. If one doesn't exist, then
@@ -420,25 +440,26 @@ fun unicodeClass(query: ClassQuery): Result<ClassUnicode> {
         is CanonicalClassQuery.Binary -> boolProperty(canon.name)
         is CanonicalClassQuery.GeneralCategory -> gencat(canon.name)
         is CanonicalClassQuery.Script -> script(canon.name)
-        is CanonicalClassQuery.ByValue -> when (canon.propertyName) {
-            "Age" -> {
-                val cls = ClassUnicode.empty()
-                val agesRes = ages(canon.propertyValue)
-                if (agesRes.isFailure) return Result.failure(agesRes.exceptionOrNull()!!)
-                for (set in agesRes.getOrThrow()) {
-                    cls.union(hirClass(set))
+        is CanonicalClassQuery.ByValue ->
+            when (canon.propertyName) {
+                "Age" -> {
+                    val cls = ClassUnicode.empty()
+                    val agesRes = ages(canon.propertyValue)
+                    if (agesRes.isFailure) return Result.failure(agesRes.exceptionOrNull()!!)
+                    for (set in agesRes.getOrThrow()) {
+                        cls.union(hirClass(set))
+                    }
+                    Result.success(cls)
                 }
-                Result.success(cls)
+                "Script_Extensions" -> scriptExtension(canon.propertyValue)
+                "Grapheme_Cluster_Break" -> gcb(canon.propertyValue)
+                "Sentence_Break" -> sb(canon.propertyValue)
+                "Word_Break" -> wb(canon.propertyValue)
+                else -> {
+                    // What else should we support?
+                    Result.failure(UnicodeErrorException(Error.PropertyNotFound))
+                }
             }
-            "Script_Extensions" -> scriptExtension(canon.propertyValue)
-            "Grapheme_Cluster_Break" -> gcb(canon.propertyValue)
-            "Sentence_Break" -> sb(canon.propertyValue)
-            "Word_Break" -> wb(canon.propertyValue)
-            else -> {
-                // What else should we support?
-                Result.failure(UnicodeErrorException(Error.PropertyNotFound))
-            }
-        }
     }
 }
 
@@ -472,8 +493,9 @@ fun perlSpace(): Result<ClassUnicode> {
  */
 fun perlDigit(): Result<ClassUnicode> {
     fun imp(): Result<ClassUnicode> {
-        val decimal = propertySet(GENCAT_BY_NAME, "Decimal_Number")
-            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+        val decimal =
+            propertySet(GENCAT_BY_NAME, "Decimal_Number")
+                ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
         return Result.success(hirClass(decimal))
     }
     return imp()
@@ -491,11 +513,11 @@ fun hirClass(ranges: Range): ClassUnicode {
  * If the `unicode-perl` feature is not enabled, then this returns an error.
  */
 fun isWordCharacter(c: Int): Result<Boolean> {
-    fun imp(c: Int): Result<Boolean> {
-        if (c in 0..127 && isWordByte(c.toByte())) {
-            return Result.success(true)
-        }
-        val r = binarySearchBy(PERL_WORD.size) { i ->
+    if (c in 0..127 && isWordByte(c.toByte())) {
+        return Result.success(true)
+    }
+    val r =
+        binarySearchBy(PERL_WORD.size) { i ->
             val start = PERL_WORD[i][0]
             val end = PERL_WORD[i][1]
             when {
@@ -504,9 +526,7 @@ fun isWordCharacter(c: Int): Result<Boolean> {
                 else -> -1
             }
         }
-        return Result.success(r is BinarySearchResult.Ok)
-    }
-    return imp(c)
+    return Result.success(r is BinarySearchResult.Ok)
 }
 
 private fun isWordByte(b: Byte): Boolean {
@@ -549,13 +569,16 @@ private fun canonicalScript(normalizedValue: String): Result<String?> {
  * If the property names data is not available, then a failure is returned.
  */
 private fun canonicalProp(normalizedName: String): Result<String?> {
-    val r = binarySearchBy(PROPERTY_NAMES.size) { i ->
-        PROPERTY_NAMES[i].first.compareTo(normalizedName)
-    }
-    return Result.success(when (r) {
-        is BinarySearchResult.Ok -> PROPERTY_NAMES[r.index].second
-        is BinarySearchResult.Err -> null
-    })
+    val r =
+        binarySearchBy(PROPERTY_NAMES.size) { i ->
+            PROPERTY_NAMES[i].first.compareTo(normalizedName)
+        }
+    return Result.success(
+        when (r) {
+            is BinarySearchResult.Ok -> PROPERTY_NAMES[r.index].second
+            is BinarySearchResult.Err -> null
+        },
+    )
 }
 
 /**
@@ -588,13 +611,16 @@ private fun canonicalValue(
  * If the property values data is not available, then a failure is returned.
  */
 private fun propertyValues(canonicalPropertyName: String): Result<PropertyValues?> {
-    val r = binarySearchBy(PROPERTY_VALUES.size) { i ->
-        PROPERTY_VALUES[i].first.compareTo(canonicalPropertyName)
-    }
-    return Result.success(when (r) {
-        is BinarySearchResult.Ok -> PropertyValues(PROPERTY_VALUES[r.index].second)
-        is BinarySearchResult.Err -> null
-    })
+    val r =
+        binarySearchBy(PROPERTY_VALUES.size) { i ->
+            PROPERTY_VALUES[i].first.compareTo(canonicalPropertyName)
+        }
+    return Result.success(
+        when (r) {
+            is BinarySearchResult.Ok -> PropertyValues(PROPERTY_VALUES[r.index].second)
+            is BinarySearchResult.Err -> null
+        },
+    )
 }
 
 /** Look up a property by canonical name in a `BY_NAME` table. */
@@ -618,35 +644,36 @@ private fun propertySet(
  * failure is returned instead.
  */
 private fun ages(canonicalAge: String): Result<List<Range>> {
-    val ages: List<Pair<String, Range>> = listOf(
-        "V1_1" to AGE_V1_1,
-        "V2_0" to AGE_V2_0,
-        "V2_1" to AGE_V2_1,
-        "V3_0" to AGE_V3_0,
-        "V3_1" to AGE_V3_1,
-        "V3_2" to AGE_V3_2,
-        "V4_0" to AGE_V4_0,
-        "V4_1" to AGE_V4_1,
-        "V5_0" to AGE_V5_0,
-        "V5_1" to AGE_V5_1,
-        "V5_2" to AGE_V5_2,
-        "V6_0" to AGE_V6_0,
-        "V6_1" to AGE_V6_1,
-        "V6_2" to AGE_V6_2,
-        "V6_3" to AGE_V6_3,
-        "V7_0" to AGE_V7_0,
-        "V8_0" to AGE_V8_0,
-        "V9_0" to AGE_V9_0,
-        "V10_0" to AGE_V10_0,
-        "V11_0" to AGE_V11_0,
-        "V12_0" to AGE_V12_0,
-        "V12_1" to AGE_V12_1,
-        "V13_0" to AGE_V13_0,
-        "V14_0" to AGE_V14_0,
-        "V15_0" to AGE_V15_0,
-        "V15_1" to AGE_V15_1,
-        "V16_0" to AGE_V16_0,
-    )
+    val ages: List<Pair<String, Range>> =
+        listOf(
+            "V1_1" to AGE_V1_1,
+            "V2_0" to AGE_V2_0,
+            "V2_1" to AGE_V2_1,
+            "V3_0" to AGE_V3_0,
+            "V3_1" to AGE_V3_1,
+            "V3_2" to AGE_V3_2,
+            "V4_0" to AGE_V4_0,
+            "V4_1" to AGE_V4_1,
+            "V5_0" to AGE_V5_0,
+            "V5_1" to AGE_V5_1,
+            "V5_2" to AGE_V5_2,
+            "V6_0" to AGE_V6_0,
+            "V6_1" to AGE_V6_1,
+            "V6_2" to AGE_V6_2,
+            "V6_3" to AGE_V6_3,
+            "V7_0" to AGE_V7_0,
+            "V8_0" to AGE_V8_0,
+            "V9_0" to AGE_V9_0,
+            "V10_0" to AGE_V10_0,
+            "V11_0" to AGE_V11_0,
+            "V12_0" to AGE_V12_0,
+            "V12_1" to AGE_V12_1,
+            "V13_0" to AGE_V13_0,
+            "V14_0" to AGE_V14_0,
+            "V15_0" to AGE_V15_0,
+            "V15_1" to AGE_V15_1,
+            "V16_0" to AGE_V16_0,
+        )
     check(ages.size == AGE_BY_NAME.size) { "ages are out of sync" }
 
     val pos = ages.indexOfFirst { it.first == canonicalAge }
@@ -668,22 +695,24 @@ private fun ages(canonicalAge: String): Result<List<Range>> {
 private fun gencat(canonicalName: String): Result<ClassUnicode> {
     return when (canonicalName) {
         "Decimal_Number" -> perlDigit()
-        else -> when (canonicalName) {
-            "ASCII" -> Result.success(hirClass(arrayOf(intArrayOf(0, 0x7F))))
-            "Any" -> Result.success(hirClass(arrayOf(intArrayOf(0, 0x10FFFF))))
-            "Assigned" -> {
-                val r = gencat("Unassigned")
-                if (r.isFailure) return r
-                val cls = r.getOrThrow()
-                cls.negate()
-                Result.success(cls)
+        else ->
+            when (canonicalName) {
+                "ASCII" -> Result.success(hirClass(arrayOf(intArrayOf(0, 0x7F))))
+                "Any" -> Result.success(hirClass(arrayOf(intArrayOf(0, 0x10FFFF))))
+                "Assigned" -> {
+                    val r = gencat("Unassigned")
+                    if (r.isFailure) return r
+                    val cls = r.getOrThrow()
+                    cls.negate()
+                    Result.success(cls)
+                }
+                else -> {
+                    val set =
+                        propertySet(GENCAT_BY_NAME, canonicalName)
+                            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+                    Result.success(hirClass(set))
+                }
             }
-            else -> {
-                val set = propertySet(GENCAT_BY_NAME, canonicalName)
-                    ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
-                Result.success(hirClass(set))
-            }
-        }
     }
 }
 
@@ -696,8 +725,9 @@ private fun gencat(canonicalName: String): Result<ClassUnicode> {
  * available, then a failure is returned.
  */
 private fun script(canonicalName: String): Result<ClassUnicode> {
-    val set = propertySet(SCRIPT_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+    val set =
+        propertySet(SCRIPT_BY_NAME, canonicalName)
+            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
@@ -710,8 +740,9 @@ private fun script(canonicalName: String): Result<ClassUnicode> {
  * not available, then a failure is returned.
  */
 private fun scriptExtension(canonicalName: String): Result<ClassUnicode> {
-    val set = propertySet(SCRIPTEXT_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+    val set =
+        propertySet(SCRIPTEXT_BY_NAME, canonicalName)
+            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
@@ -729,8 +760,9 @@ private fun boolProperty(canonicalName: String): Result<ClassUnicode> {
         "Decimal_Number" -> perlDigit()
         "White_Space" -> perlSpace()
         else -> {
-            val set = propertySet(PROPBOOL_BY_NAME, canonicalName)
-                ?: return Result.failure(UnicodeErrorException(Error.PropertyNotFound))
+            val set =
+                propertySet(PROPBOOL_BY_NAME, canonicalName)
+                    ?: return Result.failure(UnicodeErrorException(Error.PropertyNotFound))
             Result.success(hirClass(set))
         }
     }
@@ -741,8 +773,9 @@ private fun boolProperty(canonicalName: String): Result<ClassUnicode> {
  * break property.
  */
 private fun gcb(canonicalName: String): Result<ClassUnicode> {
-    val set = propertySet(GCB_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+    val set =
+        propertySet(GCB_BY_NAME, canonicalName)
+            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
@@ -751,8 +784,9 @@ private fun gcb(canonicalName: String): Result<ClassUnicode> {
  * property.
  */
 private fun wb(canonicalName: String): Result<ClassUnicode> {
-    val set = propertySet(WB_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+    val set =
+        propertySet(WB_BY_NAME, canonicalName)
+            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
@@ -761,8 +795,9 @@ private fun wb(canonicalName: String): Result<ClassUnicode> {
  * break property.
  */
 private fun sb(canonicalName: String): Result<ClassUnicode> {
-    val set = propertySet(SB_BY_NAME, canonicalName)
-        ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
+    val set =
+        propertySet(SB_BY_NAME, canonicalName)
+            ?: return Result.failure(UnicodeErrorException(Error.PropertyValueNotFound))
     return Result.success(hirClass(set))
 }
 
@@ -793,7 +828,8 @@ internal fun symbolicNameNormalizeBytes(slice: ByteArray): Int {
     var startsWithIs = false
     if (slice.size >= 2) {
         // Ignore any "is" prefix.
-        val p0 = slice[0]; val p1 = slice[1]
+        val p0 = slice[0]
+        val p1 = slice[1]
         startsWithIs = (p0 == 'i'.code.toByte() && p1 == 's'.code.toByte()) ||
             (p0 == 'I'.code.toByte() && p1 == 'S'.code.toByte()) ||
             (p0 == 'i'.code.toByte() && p1 == 'S'.code.toByte()) ||
@@ -835,8 +871,13 @@ internal fun symbolicNameNormalizeBytes(slice: ByteArray): Int {
 // --- Binary search helpers ---
 
 internal sealed class BinarySearchResult {
-    data class Ok(val index: Int) : BinarySearchResult()
-    data class Err(val index: Int) : BinarySearchResult()
+    data class Ok(
+        val index: Int,
+    ) : BinarySearchResult()
+
+    data class Err(
+        val index: Int,
+    ) : BinarySearchResult()
 }
 
 /**
@@ -870,9 +911,7 @@ internal inline fun <K : Comparable<K>> binarySearchByKey(
     size: Int,
     key: K,
     extract: (Int) -> K,
-): BinarySearchResult {
-    return binarySearchBy(size) { i -> extract(i).compareTo(key) }
-}
+): BinarySearchResult = binarySearchBy(size) { i -> extract(i).compareTo(key) }
 
 private fun StringBuilder.appendCodePoint(cp: Int): StringBuilder {
     if (cp <= 0xFFFF) {

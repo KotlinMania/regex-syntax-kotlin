@@ -249,20 +249,21 @@ class IntervalSet<I : Interval<I, B>, B> internal constructor(
             while (b < other.ranges.size && !range.isIntersectionEmpty(other.ranges[b])) {
                 val oldRange = range
                 val (d1, d2) = range.difference(other.ranges[b])
-                range = when {
-                    d1 == null && d2 == null -> {
-                        // We lost the entire range, so move on to the next
-                        // without adding this one.
-                        a += 1
-                        continue@loopA
+                range =
+                    when {
+                        d1 == null && d2 == null -> {
+                            // We lost the entire range, so move on to the next
+                            // without adding this one.
+                            a += 1
+                            continue@loopA
+                        }
+                        d1 != null && d2 == null -> d1
+                        d1 == null && d2 != null -> d2
+                        else -> {
+                            ranges.add(d1!!)
+                            d2!!
+                        }
                     }
-                    d1 != null && d2 == null -> d1
-                    d1 == null && d2 != null -> d2
-                    else -> {
-                        ranges.add(d1!!)
-                        d2!!
-                    }
-                }
                 // It's possible that the `b` range has more to contribute
                 // here. In particular, if it is greater than the original
                 // range, then it might impact the next `a` range *and* it
@@ -410,7 +411,7 @@ class IntervalSet<I : Interval<I, B>, B> internal constructor(
 
     override fun hashCode(): Int = ranges.hashCode()
 
-    override fun toString(): String = "IntervalSet(${ranges})"
+    override fun toString(): String = "IntervalSet($ranges)"
 }
 
 /** An iterator over intervals. */
@@ -418,6 +419,7 @@ class IntervalSetIter<I> internal constructor(
     private val inner: Iterator<I>,
 ) : Iterator<I> {
     override fun hasNext(): Boolean = inner.hasNext()
+
     override fun next(): I = inner.next()
 }
 
@@ -440,9 +442,13 @@ interface IntervalFactory<I : Interval<I, B>, B> {
     fun create(lower: B, upper: B): I
 
     fun minBound(): B
+
     fun maxBound(): B
+
     fun boundAsInt(b: B): Int
+
     fun increment(b: B): B
+
     fun decrement(b: B): B
 
     /** Compare two bound values using their unsigned u32 representation. */
@@ -458,9 +464,13 @@ interface IntervalFactory<I : Interval<I, B>, B> {
  */
 interface Interval<I : Interval<I, B>, B> : Comparable<I> {
     fun lower(): B
+
     fun upper(): B
+
     fun setLower(bound: B)
+
     fun setUpper(bound: B)
+
     fun caseFoldSimple(intervals: MutableList<I>): Result<Unit>
 
     /** The factory carrying this interval's bound-type-static operations. */
@@ -585,15 +595,20 @@ internal fun <I : Interval<I, B>, B> I.isSubset(other: I): Boolean {
  */
 interface Bound<B> {
     fun minValue(): B
+
     fun maxValue(): B
+
     fun asInt(b: B): Int
+
     fun increment(b: B): B
+
     fun decrement(b: B): B
 }
 
 /** Bound implementation for an unsigned byte stored in a Kotlin signed [Byte]. */
 object ByteBound : Bound<Byte> {
     override fun minValue(): Byte = 0
+
     override fun maxValue(): Byte = -1 // 0xFF as signed Byte
 
     override fun asInt(b: Byte): Int = b.toInt() and 0xFF
@@ -621,25 +636,28 @@ object ByteBound : Bound<Byte> {
  */
 object CharBound : Bound<Int> {
     override fun minValue(): Int = 0x00
+
     override fun maxValue(): Int = 0x10FFFF
 
     override fun asInt(b: Int): Int = b
 
-    override fun increment(b: Int): Int = when (b) {
-        0xD7FF -> 0xE000
-        else -> {
-            check(b < 0x10FFFF) { "CharBound.increment overflow" }
-            b + 1
+    override fun increment(b: Int): Int =
+        when (b) {
+            0xD7FF -> 0xE000
+            else -> {
+                check(b < 0x10FFFF) { "CharBound.increment overflow" }
+                b + 1
+            }
         }
-    }
 
-    override fun decrement(b: Int): Int = when (b) {
-        0xE000 -> 0xD7FF
-        else -> {
-            check(b > 0) { "CharBound.decrement underflow" }
-            b - 1
+    override fun decrement(b: Int): Int =
+        when (b) {
+            0xE000 -> 0xD7FF
+            else -> {
+                check(b > 0) { "CharBound.decrement underflow" }
+                b - 1
+            }
         }
-    }
 }
 
 // Tests for interval sets are written in src/hir.rs against the public API.

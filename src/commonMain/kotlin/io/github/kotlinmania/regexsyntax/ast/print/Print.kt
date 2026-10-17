@@ -67,9 +67,7 @@ class Printer {
      * [Appendable]. Typical implementations of [Appendable] that can be used
      * here are a [StringBuilder] or any other text sink.
      */
-    fun print(ast: Ast, wtr: Appendable): Result<Unit> {
-        return visit(ast, Writer(wtr))
-    }
+    fun print(ast: Ast, wtr: Appendable): Result<Unit> = visit(ast, Writer(wtr))
 
     companion object {
         /** Create a new printer. */
@@ -77,19 +75,20 @@ class Printer {
     }
 }
 
-private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
+private class Writer(
+    val wtr: Appendable,
+) : Visitor<Unit, Throwable> {
     override fun finish(): Result<Unit> = Result.success(Unit)
 
-    override fun visitPre(ast: Ast): Result<Unit> {
-        return when (ast) {
+    override fun visitPre(ast: Ast): Result<Unit> =
+        when (ast) {
             is Ast.Group -> fmtGroupPre(ast.value)
             is Ast.ClassBracketed -> fmtClassBracketedPre(ast.value)
             else -> Result.success(Unit)
         }
-    }
 
-    override fun visitPost(ast: Ast): Result<Unit> {
-        return when (ast) {
+    override fun visitPost(ast: Ast): Result<Unit> =
+        when (ast) {
             is Ast.Empty -> Result.success(Unit)
             is Ast.Flags -> fmtSetFlags(ast.value)
             is Ast.Literal -> fmtLiteral(ast.value)
@@ -103,16 +102,14 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
             is Ast.Alternation -> Result.success(Unit)
             is Ast.Concat -> Result.success(Unit)
         }
-    }
 
     override fun visitAlternationIn(): Result<Unit> = writeStr("|")
 
-    override fun visitClassSetItemPre(ast: ClassSetItem): Result<Unit> {
-        return when (ast) {
+    override fun visitClassSetItemPre(ast: ClassSetItem): Result<Unit> =
+        when (ast) {
             is ClassSetItem.Bracketed -> fmtClassBracketedPre(ast.value)
             else -> Result.success(Unit)
         }
-    }
 
     override fun visitClassSetItemPost(ast: ClassSetItem): Result<Unit> {
         return when (ast) {
@@ -135,27 +132,24 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
         }
     }
 
-    override fun visitClassSetBinaryOpIn(ast: ClassSetBinaryOp): Result<Unit> {
-        return fmtClassSetBinaryOpKind(ast.kind)
-    }
+    override fun visitClassSetBinaryOpIn(ast: ClassSetBinaryOp): Result<Unit> = fmtClassSetBinaryOpKind(ast.kind)
 
     private fun writeStr(s: String): Result<Unit> = runCatching { wtr.append(s) }.map { }
 
-    private fun writeChar(c: Char): Result<Unit> = runCatching { wtr.append(c) }.map { }
-
-    private fun writeCodepoint(codepoint: Int): Result<Unit> = runCatching {
-        require(codepoint in 0..0x10FFFF) { "Invalid Unicode scalar value: $codepoint" }
-        require(codepoint !in 0xD800..0xDFFF) { "Invalid Unicode scalar value (surrogate): $codepoint" }
-        if (codepoint <= 0xFFFF) {
-            wtr.append(codepoint.toChar())
-        } else {
-            val u = codepoint - 0x10000
-            val high = 0xD800 + (u ushr 10)
-            val low = 0xDC00 + (u and 0x3FF)
-            wtr.append(high.toChar())
-            wtr.append(low.toChar())
-        }
-    }.map { }
+    private fun writeCodepoint(codepoint: Int): Result<Unit> =
+        runCatching {
+            require(codepoint in 0..0x10FFFF) { "Invalid Unicode scalar value: $codepoint" }
+            require(codepoint !in 0xD800..0xDFFF) { "Invalid Unicode scalar value (surrogate): $codepoint" }
+            if (codepoint <= 0xFFFF) {
+                wtr.append(codepoint.toChar())
+            } else {
+                val u = codepoint - 0x10000
+                val high = 0xD800 + (u ushr 10)
+                val low = 0xDC00 + (u and 0x3FF)
+                wtr.append(high.toChar())
+                wtr.append(low.toChar())
+            }
+        }.map { }
 
     private fun fmtGroupPre(ast: Group): Result<Unit> {
         return when (val k = ast.kind) {
@@ -201,13 +195,12 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
         }
     }
 
-    private fun fmtRepetitionRange(ast: RepetitionRange): Result<Unit> {
-        return when (ast) {
+    private fun fmtRepetitionRange(ast: RepetitionRange): Result<Unit> =
+        when (ast) {
             is RepetitionRange.Exactly -> writeStr("{${ast.value}}")
             is RepetitionRange.AtLeast -> writeStr("{${ast.value},}")
             is RepetitionRange.Bounded -> writeStr("{${ast.start},${ast.end}}")
         }
-    }
 
     private fun fmtLiteral(ast: Literal): Result<Unit> {
         val cu = ast.c
@@ -219,30 +212,33 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
                 writeCodepoint(ast.c)
             }
             is LiteralKind.Octal -> writeStr("\\${cu.toString(8)}")
-            is LiteralKind.HexFixed -> when (k.value) {
-                HexLiteralKind.X -> writeStr("\\x" + hexFixed(cu, 2))
-                HexLiteralKind.UnicodeShort -> writeStr("\\u" + hexFixed(cu, 4))
-                HexLiteralKind.UnicodeLong -> writeStr("\\U" + hexFixed(cu, 8))
-            }
-            is LiteralKind.HexBrace -> when (k.value) {
-                HexLiteralKind.X -> writeStr("\\x{" + cu.toString(16).uppercase() + "}")
-                HexLiteralKind.UnicodeShort -> writeStr("\\u{" + cu.toString(16).uppercase() + "}")
-                HexLiteralKind.UnicodeLong -> writeStr("\\U{" + cu.toString(16).uppercase() + "}")
-            }
-            is LiteralKind.Special -> when (k.value) {
-                SpecialLiteralKind.Bell -> writeStr("\\a")
-                SpecialLiteralKind.FormFeed -> writeStr("\\f")
-                SpecialLiteralKind.Tab -> writeStr("\\t")
-                SpecialLiteralKind.LineFeed -> writeStr("\\n")
-                SpecialLiteralKind.CarriageReturn -> writeStr("\\r")
-                SpecialLiteralKind.VerticalTab -> writeStr("\\v")
-                SpecialLiteralKind.Space -> writeStr("\\ ")
-            }
+            is LiteralKind.HexFixed ->
+                when (k.value) {
+                    HexLiteralKind.X -> writeStr("\\x" + hexFixed(cu, 2))
+                    HexLiteralKind.UnicodeShort -> writeStr("\\u" + hexFixed(cu, 4))
+                    HexLiteralKind.UnicodeLong -> writeStr("\\U" + hexFixed(cu, 8))
+                }
+            is LiteralKind.HexBrace ->
+                when (k.value) {
+                    HexLiteralKind.X -> writeStr("\\x{" + cu.toString(16).uppercase() + "}")
+                    HexLiteralKind.UnicodeShort -> writeStr("\\u{" + cu.toString(16).uppercase() + "}")
+                    HexLiteralKind.UnicodeLong -> writeStr("\\U{" + cu.toString(16).uppercase() + "}")
+                }
+            is LiteralKind.Special ->
+                when (k.value) {
+                    SpecialLiteralKind.Bell -> writeStr("\\a")
+                    SpecialLiteralKind.FormFeed -> writeStr("\\f")
+                    SpecialLiteralKind.Tab -> writeStr("\\t")
+                    SpecialLiteralKind.LineFeed -> writeStr("\\n")
+                    SpecialLiteralKind.CarriageReturn -> writeStr("\\r")
+                    SpecialLiteralKind.VerticalTab -> writeStr("\\v")
+                    SpecialLiteralKind.Space -> writeStr("\\ ")
+                }
         }
     }
 
-    private fun fmtAssertion(ast: Assertion): Result<Unit> {
-        return when (ast.kind) {
+    private fun fmtAssertion(ast: Assertion): Result<Unit> =
+        when (ast.kind) {
             AssertionKind.StartLine -> writeStr("^")
             AssertionKind.EndLine -> writeStr("$")
             AssertionKind.StartText -> writeStr("\\A")
@@ -256,7 +252,6 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
             AssertionKind.WordBoundaryStartHalf -> writeStr("\\b{start-half}")
             AssertionKind.WordBoundaryEndHalf -> writeStr("\\b{end-half}")
         }
-    }
 
     private fun fmtSetFlags(ast: SetFlags): Result<Unit> {
         val r1 = writeStr("(?")
@@ -270,47 +265,45 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
 
     private fun fmtFlags(ast: Flags): Result<Unit> {
         for (item in ast.items) {
-            val r = when (val kind = item.kind) {
-                is FlagsItemKind.Negation -> writeStr("-")
-                is FlagsItemKind.Flag -> when (kind.value) {
-                    Flag.CaseInsensitive -> writeStr("i")
-                    Flag.MultiLine -> writeStr("m")
-                    Flag.DotMatchesNewLine -> writeStr("s")
-                    Flag.SwapGreed -> writeStr("U")
-                    Flag.Unicode -> writeStr("u")
-                    Flag.CRLF -> writeStr("R")
-                    Flag.IgnoreWhitespace -> writeStr("x")
+            val r =
+                when (val kind = item.kind) {
+                    is FlagsItemKind.Negation -> writeStr("-")
+                    is FlagsItemKind.Flag ->
+                        when (kind.value) {
+                            Flag.CaseInsensitive -> writeStr("i")
+                            Flag.MultiLine -> writeStr("m")
+                            Flag.DotMatchesNewLine -> writeStr("s")
+                            Flag.SwapGreed -> writeStr("U")
+                            Flag.Unicode -> writeStr("u")
+                            Flag.CRLF -> writeStr("R")
+                            Flag.IgnoreWhitespace -> writeStr("x")
+                        }
                 }
-            }
             if (r.isFailure) return r
         }
         return Result.success(Unit)
     }
 
-    private fun fmtClassBracketedPre(ast: ClassBracketed): Result<Unit> {
-        return if (ast.negated) writeStr("[^") else writeStr("[")
-    }
+    private fun fmtClassBracketedPre(ast: ClassBracketed): Result<Unit> = if (ast.negated) writeStr("[^") else writeStr("[")
 
     private fun fmtClassBracketedPost(ast: ClassBracketed): Result<Unit> = writeStr("]")
 
-    private fun fmtClassSetBinaryOpKind(ast: ClassSetBinaryOpKind): Result<Unit> {
-        return when (ast) {
+    private fun fmtClassSetBinaryOpKind(ast: ClassSetBinaryOpKind): Result<Unit> =
+        when (ast) {
             ClassSetBinaryOpKind.Intersection -> writeStr("&&")
             ClassSetBinaryOpKind.Difference -> writeStr("--")
             ClassSetBinaryOpKind.SymmetricDifference -> writeStr("~~")
         }
-    }
 
-    private fun fmtClassPerl(ast: ClassPerl): Result<Unit> {
-        return when (ast.kind) {
+    private fun fmtClassPerl(ast: ClassPerl): Result<Unit> =
+        when (ast.kind) {
             ClassPerlKind.Digit -> if (ast.negated) writeStr("\\D") else writeStr("\\d")
             ClassPerlKind.Space -> if (ast.negated) writeStr("\\S") else writeStr("\\s")
             ClassPerlKind.Word -> if (ast.negated) writeStr("\\W") else writeStr("\\w")
         }
-    }
 
-    private fun fmtClassAscii(ast: ClassAscii): Result<Unit> {
-        return when (ast.kind) {
+    private fun fmtClassAscii(ast: ClassAscii): Result<Unit> =
+        when (ast.kind) {
             ClassAsciiKind.Alnum -> if (ast.negated) writeStr("[:^alnum:]") else writeStr("[:alnum:]")
             ClassAsciiKind.Alpha -> if (ast.negated) writeStr("[:^alpha:]") else writeStr("[:alpha:]")
             ClassAsciiKind.Ascii -> if (ast.negated) writeStr("[:^ascii:]") else writeStr("[:ascii:]")
@@ -326,7 +319,6 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
             ClassAsciiKind.Word -> if (ast.negated) writeStr("[:^word:]") else writeStr("[:word:]")
             ClassAsciiKind.Xdigit -> if (ast.negated) writeStr("[:^xdigit:]") else writeStr("[:xdigit:]")
         }
-    }
 
     private fun fmtClassUnicode(ast: ClassUnicode): Result<Unit> {
         val r0 = if (ast.negated) writeStr("\\P") else writeStr("\\p")
@@ -334,15 +326,14 @@ private class Writer(val wtr: Appendable) : Visitor<Unit, Throwable> {
         return when (val k = ast.kind) {
             is ClassUnicodeKind.OneLetter -> writeCodepoint(k.value)
             is ClassUnicodeKind.Named -> writeStr("{${k.value}}")
-            is ClassUnicodeKind.NamedValue -> when (k.op) {
-                ClassUnicodeOpKind.Equal -> writeStr("{${k.name}=${k.value}}")
-                ClassUnicodeOpKind.Colon -> writeStr("{${k.name}:${k.value}}")
-                ClassUnicodeOpKind.NotEqual -> writeStr("{${k.name}!=${k.value}}")
-            }
+            is ClassUnicodeKind.NamedValue ->
+                when (k.op) {
+                    ClassUnicodeOpKind.Equal -> writeStr("{${k.name}=${k.value}}")
+                    ClassUnicodeOpKind.Colon -> writeStr("{${k.name}:${k.value}}")
+                    ClassUnicodeOpKind.NotEqual -> writeStr("{${k.name}!=${k.value}}")
+                }
         }
     }
 }
 
-private fun hexFixed(value: Int, width: Int): String {
-    return value.toString(16).uppercase().padStart(width, '0')
-}
+private fun hexFixed(value: Int, width: Int): String = value.toString(16).uppercase().padStart(width, '0')

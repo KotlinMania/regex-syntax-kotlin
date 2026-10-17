@@ -6,10 +6,49 @@ package io.github.kotlinmania.regexsyntax.ast.parse
  * Licensed under either of Apache-2.0 OR MIT.
  */
 
-import io.github.kotlinmania.regexsyntax.ast.*
-import io.github.kotlinmania.regexsyntax.ast.Error as AstError
+import io.github.kotlinmania.regexsyntax.ast.Alternation
+import io.github.kotlinmania.regexsyntax.ast.Assertion
+import io.github.kotlinmania.regexsyntax.ast.AssertionKind
+import io.github.kotlinmania.regexsyntax.ast.Ast
+import io.github.kotlinmania.regexsyntax.ast.CaptureName
+import io.github.kotlinmania.regexsyntax.ast.ClassAscii
+import io.github.kotlinmania.regexsyntax.ast.ClassAsciiKind
+import io.github.kotlinmania.regexsyntax.ast.ClassBracketed
+import io.github.kotlinmania.regexsyntax.ast.ClassPerl
+import io.github.kotlinmania.regexsyntax.ast.ClassPerlKind
+import io.github.kotlinmania.regexsyntax.ast.ClassSet
+import io.github.kotlinmania.regexsyntax.ast.ClassSetBinaryOp
+import io.github.kotlinmania.regexsyntax.ast.ClassSetBinaryOpKind
+import io.github.kotlinmania.regexsyntax.ast.ClassSetItem
+import io.github.kotlinmania.regexsyntax.ast.ClassSetRange
+import io.github.kotlinmania.regexsyntax.ast.ClassSetUnion
+import io.github.kotlinmania.regexsyntax.ast.ClassUnicode
+import io.github.kotlinmania.regexsyntax.ast.ClassUnicodeKind
+import io.github.kotlinmania.regexsyntax.ast.ClassUnicodeOpKind
+import io.github.kotlinmania.regexsyntax.ast.Comment
+import io.github.kotlinmania.regexsyntax.ast.Concat
+import io.github.kotlinmania.regexsyntax.ast.ErrorKind
+import io.github.kotlinmania.regexsyntax.ast.Flag
+import io.github.kotlinmania.regexsyntax.ast.Flags
+import io.github.kotlinmania.regexsyntax.ast.FlagsItem
+import io.github.kotlinmania.regexsyntax.ast.FlagsItemKind
+import io.github.kotlinmania.regexsyntax.ast.Group
+import io.github.kotlinmania.regexsyntax.ast.GroupKind
+import io.github.kotlinmania.regexsyntax.ast.HexLiteralKind
+import io.github.kotlinmania.regexsyntax.ast.Literal
+import io.github.kotlinmania.regexsyntax.ast.LiteralKind
+import io.github.kotlinmania.regexsyntax.ast.Position
+import io.github.kotlinmania.regexsyntax.ast.Repetition
+import io.github.kotlinmania.regexsyntax.ast.RepetitionKind
+import io.github.kotlinmania.regexsyntax.ast.RepetitionOp
+import io.github.kotlinmania.regexsyntax.ast.RepetitionRange
+import io.github.kotlinmania.regexsyntax.ast.SetFlags
+import io.github.kotlinmania.regexsyntax.ast.Span
+import io.github.kotlinmania.regexsyntax.ast.SpecialLiteralKind
+import io.github.kotlinmania.regexsyntax.ast.WithComments
 import io.github.kotlinmania.regexsyntax.ast.visitor.Visitor
 import io.github.kotlinmania.regexsyntax.ast.visitor.visit
+import io.github.kotlinmania.regexsyntax.ast.Error as AstError
 
 /**
  * A builder for configuring an abstract syntax tree parser.
@@ -38,12 +77,13 @@ class ParserBuilder {
     /**
      * Build a new parser from the current configuration.
      */
-    fun build(): Parser = Parser(
-        nestLimit = nestLimit,
-        octal = octal,
-        emptyMinRange = emptyMinRange,
-        initialIgnoreWhitespace = ignoreWhitespace,
-    )
+    fun build(): Parser =
+        Parser(
+            nestLimit = nestLimit,
+            octal = octal,
+            emptyMinRange = emptyMinRange,
+            initialIgnoreWhitespace = ignoreWhitespace,
+        )
 
     /**
      * Set the nesting limit for this parser.
@@ -141,20 +181,28 @@ class Parser internal constructor(
         /** Create a new parser with a default configuration. */
         fun new(): Parser = ParserBuilder.new().build()
     }
+
     /** The current position of the parser. */
     internal var pos: Position = Position(0, 1, 1)
+
     /** The current capture index. */
     internal var captureIndex: UInt = 0u
+
     /** Whether the parser should ignore whitespace. */
     internal var ignoreWhitespace: Boolean = initialIgnoreWhitespace
+
     /** The comments found in the regular expression. */
     internal val comments: MutableList<Comment> = mutableListOf()
+
     /** A stack of group states. */
     internal val stackGroup: MutableList<GroupState> = mutableListOf()
+
     /** A stack of class states. */
     internal val stackClass: MutableList<ClassState> = mutableListOf()
+
     /** A list of capturing group names. */
     internal val captureNames: MutableList<io.github.kotlinmania.regexsyntax.ast.CaptureName> = mutableListOf()
+
     /** A scratch buffer for names and other things. */
     internal val scratch: StringBuilder = StringBuilder()
 
@@ -199,34 +247,20 @@ class Parser internal constructor(
     }
 }
 
-/** Returns true if the given codepoint is a hexadecimal digit. */
-private fun isHex(c: Int): Boolean {
-    if (c > 0xFFFF) return false
-    val ch = c.toChar()
-    return (ch in '0'..'9') || (ch in 'a'..'f') || (ch in 'A'..'F')
-}
-
-/**
- * A type that represents an AST and its comments.
- */
-data class WithComments(
-    /** The AST. */
-    val ast: Ast,
-    /** The comments found in the regular expression. */
-    val comments: List<Comment>,
-)
-
 /**
  * GroupState represents the state of a group while it is being parsed.
  */
 internal sealed class GroupState {
     /** An alternation. */
-    data class Alternation(val value: io.github.kotlinmania.regexsyntax.ast.Alternation) : GroupState()
+    data class Alternation(
+        val value: io.github.kotlinmania.regexsyntax.ast.Alternation,
+    ) : GroupState()
+
     /** A group. */
     data class Group(
         val concat: io.github.kotlinmania.regexsyntax.ast.Concat,
         val group: io.github.kotlinmania.regexsyntax.ast.Group,
-        val ignoreWhitespace: Boolean
+        val ignoreWhitespace: Boolean,
     ) : GroupState()
 }
 
@@ -238,12 +272,13 @@ internal sealed class ClassState {
     /** An opening bracket. */
     data class Open(
         val union: ClassSetUnion,
-        val set: ClassBracketed
+        val set: ClassBracketed,
     ) : ClassState()
+
     /** A binary operation. */
     data class Op(
         val kind: ClassSetBinaryOpKind,
-        val lhs: ClassSet
+        val lhs: ClassSet,
     ) : ClassState()
 }
 
@@ -252,33 +287,49 @@ internal sealed class ClassState {
  */
 internal sealed class Primitive {
     /** A literal character. */
-    data class Literal(val value: io.github.kotlinmania.regexsyntax.ast.Literal) : Primitive()
+    data class Literal(
+        val value: io.github.kotlinmania.regexsyntax.ast.Literal,
+    ) : Primitive()
+
     /** A zero-width assertion. */
-    data class Assertion(val value: io.github.kotlinmania.regexsyntax.ast.Assertion) : Primitive()
+    data class Assertion(
+        val value: io.github.kotlinmania.regexsyntax.ast.Assertion,
+    ) : Primitive()
+
     /** A dot assertion. */
-    data class Dot(val span: Span) : Primitive()
+    data class Dot(
+        val span: Span,
+    ) : Primitive()
+
     /** A Perl character class. */
-    data class Perl(val value: io.github.kotlinmania.regexsyntax.ast.ClassPerl) : Primitive()
+    data class Perl(
+        val value: io.github.kotlinmania.regexsyntax.ast.ClassPerl,
+    ) : Primitive()
+
     /** A Unicode character class. */
-    data class Unicode(val value: io.github.kotlinmania.regexsyntax.ast.ClassUnicode) : Primitive()
+    data class Unicode(
+        val value: io.github.kotlinmania.regexsyntax.ast.ClassUnicode,
+    ) : Primitive()
 
     /** Return the span of this primitive. */
-    fun span(): Span = when (this) {
-        is Literal -> value.span
-        is Assertion -> value.span
-        is Dot -> span
-        is Perl -> value.span
-        is Unicode -> value.span
-    }
+    fun span(): Span =
+        when (this) {
+            is Literal -> value.span
+            is Assertion -> value.span
+            is Dot -> span
+            is Perl -> value.span
+            is Unicode -> value.span
+        }
 
     /** Convert this primitive into a proper AST. */
-    fun intoAst(): Ast = when (this) {
-        is Literal -> Ast.Literal(value)
-        is Assertion -> Ast.Assertion(value)
-        is Dot -> Ast.Dot(span)
-        is Perl -> Ast.ClassPerl(value)
-        is Unicode -> Ast.ClassUnicode(value)
-    }
+    fun intoAst(): Ast =
+        when (this) {
+            is Literal -> Ast.Literal(value)
+            is Assertion -> Ast.Assertion(value)
+            is Dot -> Ast.Dot(span)
+            is Perl -> Ast.ClassPerl(value)
+            is Unicode -> Ast.ClassUnicode(value)
+        }
 
     /**
      * Convert this primitive into an item in a character class.
@@ -286,12 +337,13 @@ internal sealed class Primitive {
      * If this primitive is not a legal item (i.e., an assertion or a dot),
      * then return an error.
      */
-    fun intoClassSetItem(p: ParserI): Result<ClassSetItem> = when (this) {
-        is Literal -> Result.success(ClassSetItem.Literal(value))
-        is Perl -> Result.success(ClassSetItem.Perl(value))
-        is Unicode -> Result.success(ClassSetItem.Unicode(value))
-        else -> Result.failure(AstException(p.error(span(), ErrorKind.ClassEscapeInvalid)))
-    }
+    fun intoClassSetItem(p: ParserI): Result<ClassSetItem> =
+        when (this) {
+            is Literal -> Result.success(ClassSetItem.Literal(value))
+            is Perl -> Result.success(ClassSetItem.Perl(value))
+            is Unicode -> Result.success(ClassSetItem.Unicode(value))
+            else -> Result.failure(AstException(p.error(span(), ErrorKind.ClassEscapeInvalid)))
+        }
 
     /**
      * Convert this primitive into a literal in a character class. In
@@ -301,10 +353,11 @@ internal sealed class Primitive {
      * If this primitive is not a legal item (i.e., a class, assertion or a
      * dot), then return an error.
      */
-    fun intoClassLiteral(p: ParserI): Result<io.github.kotlinmania.regexsyntax.ast.Literal> = when (this) {
-        is Literal -> Result.success(value)
-        else -> Result.failure(AstException(p.error(span(), ErrorKind.ClassRangeLiteral)))
-    }
+    fun intoClassLiteral(p: ParserI): Result<io.github.kotlinmania.regexsyntax.ast.Literal> =
+        when (this) {
+            is Literal -> Result.success(value)
+            else -> Result.failure(AstException(p.error(span(), ErrorKind.ClassRangeLiteral)))
+        }
 }
 
 /**
@@ -376,10 +429,14 @@ internal class ParserI(
             names.add(-(result + 1), cap)
             Result.success(Unit)
         } else {
-            Result.failure(AstException(error(
-                cap.span,
-                ErrorKind.GroupNameDuplicate(names[result].span)
-            )))
+            Result.failure(
+                AstException(
+                    error(
+                        cap.span,
+                        ErrorKind.GroupNameDuplicate(names[result].span),
+                    ),
+                ),
+            )
         }
     }
 
@@ -438,14 +495,13 @@ internal class ParserI(
      * following the prefix and return true. Otherwise, don't bump the parser
      * and return false.
      */
-    private fun bumpIf(prefix: String): Boolean {
-        return if (pattern().substring(offset()).startsWith(prefix)) {
+    private fun bumpIf(prefix: String): Boolean =
+        if (pattern().substring(offset()).startsWith(prefix)) {
             repeat(prefix.length) { bump() }
             true
         } else {
             false
         }
-    }
 
     /**
      * Returns true if and only if the parser is positioned at a look-around
@@ -456,9 +512,7 @@ internal class ParserI(
      * This should only be called immediately after parsing the opening of
      * a group or a set of flags.
      */
-    private fun isLookaroundPrefix(): Boolean {
-        return bumpIf("?=") || bumpIf("?!") || bumpIf("?<=") || bumpIf("?<!")
-    }
+    private fun isLookaroundPrefix(): Boolean = bumpIf("?=") || bumpIf("?!") || bumpIf("?<=") || bumpIf("?<!")
 
     /**
      * Bump the parser, and if the `x` flag is enabled, bump through any
@@ -504,10 +558,11 @@ internal class ParserI(
                     }
                     commentText.append(cc.toChar())
                 }
-                val comment = Comment(
-                    span = Span(start, pos()),
-                    comment = commentText.toString()
-                )
+                val comment =
+                    Comment(
+                        span = Span(start, pos()),
+                        comment = commentText.toString(),
+                    )
                 parser().comments.add(comment)
             } else {
                 break
@@ -530,6 +585,7 @@ internal class ParserI(
         }
         return charAt(nextOffset)
     }
+
     /**
      * Like peek, but will ignore spaces when the parser is in whitespace
      * insensitive mode.
@@ -541,7 +597,7 @@ internal class ParserI(
         if (isEof()) {
             return null
         }
-        var start = offset() + (if (char() > 0xFFFF) 2 else 1)
+        val start = offset() + (if (char() > 0xFFFF) 2 else 1)
         var inComment = false
         var i = 0
         while (start + i < pattern().length) {
@@ -565,7 +621,6 @@ internal class ParserI(
         return charAt(start + i)
     }
 
-
     /** Returns true if the next call to `bump` would return false. */
     private fun isEof(): Boolean = offset() == pattern().length
 
@@ -584,11 +639,12 @@ internal class ParserI(
     /** Create a span that covers the current character. */
     private fun spanChar(): Span {
         val c = char()
-        var next = Position(
-            offset = offset() + (if (c > 0xFFFF) 2 else 1),
-            line = line(),
-            column = column() + 1
-        )
+        var next =
+            Position(
+                offset = offset() + (if (c > 0xFFFF) 2 else 1),
+                line = line(),
+                column = column() + 1,
+            )
         if (c == '\n'.code) {
             next = next.copy(line = next.line + 1, column = 1)
         }
@@ -625,10 +681,14 @@ internal class ParserI(
             last.value.addAst(concat.intoAst())
             return
         }
-        stack.add(GroupState.Alternation(io.github.kotlinmania.regexsyntax.ast.Alternation(
-            span = Span(concat.span.start, pos()),
-            asts = mutableListOf(concat.intoAst())
-        )))
+        stack.add(
+            GroupState.Alternation(
+                io.github.kotlinmania.regexsyntax.ast.Alternation(
+                    span = Span(concat.span.start, pos()),
+                    asts = mutableListOf(concat.intoAst()),
+                ),
+            ),
+        )
     }
 
     /**
@@ -662,20 +722,24 @@ internal class ParserI(
                     is io.github.kotlinmania.regexsyntax.either.Either.Right -> {
                         val group = either.value
                         val oldIgnoreWhitespace = ignoreWhitespace()
-                        val newIgnoreWhitespace = group.flags()
-                            ?.flagState(Flag.IgnoreWhitespace)
-                            ?: oldIgnoreWhitespace
-                        parser().stackGroup.add(GroupState.Group(
-                            concat = concat,
-                            group = group,
-                            ignoreWhitespace = oldIgnoreWhitespace
-                        ))
+                        val newIgnoreWhitespace =
+                            group
+                                .flags()
+                                ?.flagState(Flag.IgnoreWhitespace)
+                                ?: oldIgnoreWhitespace
+                        parser().stackGroup.add(
+                            GroupState.Group(
+                                concat = concat,
+                                group = group,
+                                ignoreWhitespace = oldIgnoreWhitespace,
+                            ),
+                        )
                         parser().ignoreWhitespace = newIgnoreWhitespace
                         Result.success(Concat(span(), mutableListOf()))
                     }
                 }
             },
-            onFailure = { Result.failure(it) }
+            onFailure = { Result.failure(it) },
         )
     }
 
@@ -728,15 +792,16 @@ internal class ParserI(
         parser().ignoreWhitespace = oldIgnoreWhitespace
         val finalGroupConcat = groupConcat.copy(span = groupConcat.span.copy(end = pos()))
         bump()
-        
-        val finalAst = if (alt != null) {
-            val finalAlt = alt.copy(span = alt.span.copy(end = finalGroupConcat.span.end))
-            finalAlt.addAst(finalGroupConcat.intoAst())
-            Ast.Alternation(finalAlt)
-        } else {
-            finalGroupConcat.intoAst()
-        }
-        
+
+        val finalAst =
+            if (alt != null) {
+                val finalAlt = alt.copy(span = alt.span.copy(end = finalGroupConcat.span.end))
+                finalAlt.addAst(finalGroupConcat.intoAst())
+                Ast.Alternation(finalAlt)
+            } else {
+                finalGroupConcat.intoAst()
+            }
+
         val finalGroup = group.copy(span = group.span.copy(end = pos()), ast = finalAst)
         priorConcat.addAst(Ast.Group(finalGroup))
         return Result.success(priorConcat)
@@ -753,21 +818,22 @@ internal class ParserI(
     private fun popGroupEnd(concat: Concat): Result<Ast> {
         val finalConcat = concat.copy(span = concat.span.copy(end = pos()))
         val stack = parser().stackGroup
-        val astResult = if (stack.isEmpty()) {
-            Result.success(finalConcat.intoAst())
-        } else {
-            when (val state = stack.removeAt(stack.size - 1)) {
-                is GroupState.Alternation -> {
-                    val alt = state.value
-                    val finalAlt = alt.copy(span = alt.span.copy(end = pos()))
-                    finalAlt.addAst(finalConcat.intoAst())
-                    Result.success(Ast.Alternation(finalAlt))
-                }
-                is GroupState.Group -> {
-                    Result.failure(AstException(error(state.group.span, ErrorKind.GroupUnclosed)))
+        val astResult =
+            if (stack.isEmpty()) {
+                Result.success(finalConcat.intoAst())
+            } else {
+                when (val state = stack.removeAt(stack.size - 1)) {
+                    is GroupState.Alternation -> {
+                        val alt = state.value
+                        val finalAlt = alt.copy(span = alt.span.copy(end = pos()))
+                        finalAlt.addAst(finalConcat.intoAst())
+                        Result.success(Ast.Alternation(finalAlt))
+                    }
+                    is GroupState.Group -> {
+                        Result.failure(AstException(error(state.group.span, ErrorKind.GroupUnclosed)))
+                    }
                 }
             }
-        }
 
         return astResult.fold(
             onSuccess = { ast ->
@@ -782,7 +848,7 @@ internal class ParserI(
                     }
                 }
             },
-            onFailure = { Result.failure(it) }
+            onFailure = { Result.failure(it) },
         )
     }
 
@@ -796,12 +862,11 @@ internal class ParserI(
      * is returned. Otherwise, a new union of set items for the class is
      * returned (which may be populated with either a `]` or a `-`).
      */
-    private fun pushClassOpen(parentUnion: ClassSetUnion): Result<ClassSetUnion> {
-        return parseSetClassOpen().map { (nestedSet, nestedUnion) ->
+    private fun pushClassOpen(parentUnion: ClassSetUnion): Result<ClassSetUnion> =
+        parseSetClassOpen().map { (nestedSet, nestedUnion) ->
             parser().stackClass.add(ClassState.Open(union = parentUnion, set = nestedSet))
             nestedUnion
         }
-    }
 
     /**
      * Parse the end of a character class set and pop the character class
@@ -828,15 +893,22 @@ internal class ParserI(
             is ClassState.Open -> {
                 val set = state.set
                 bump()
-                val finalSet = set.copy(
-                    span = set.span.copy(end = pos()),
-                    kind = prevSet
-                )
+                val finalSet =
+                    set.copy(
+                        span = set.span.copy(end = pos()),
+                        kind = prevSet,
+                    )
                 if (stack.isEmpty()) {
-                    Result.success(io.github.kotlinmania.regexsyntax.either.Either.Right(finalSet))
+                    Result.success(
+                        io.github.kotlinmania.regexsyntax.either.Either
+                            .Right(finalSet),
+                    )
                 } else {
                     state.union.push(ClassSetItem.Bracketed(finalSet))
-                    Result.success(io.github.kotlinmania.regexsyntax.either.Either.Left(state.union))
+                    Result.success(
+                        io.github.kotlinmania.regexsyntax.either.Either
+                            .Left(state.union),
+                    )
                 }
             }
         }
@@ -868,7 +940,7 @@ internal class ParserI(
      */
     private fun pushClassOp(
         nextKind: ClassSetBinaryOpKind,
-        nextUnion: ClassSetUnion
+        nextUnion: ClassSetUnion,
     ): ClassSetUnion {
         val item = ClassSet.Item(nextUnion.intoItem())
         val newLhs = popClassOp(item)
@@ -888,12 +960,14 @@ internal class ParserI(
         val state = stack.lastOrNull()
         return if (state is ClassState.Op) {
             stack.removeAt(stack.size - 1)
-            ClassSet.BinaryOp(ClassSetBinaryOp(
-                span = Span(state.lhs.span().start, rhs.span().end),
-                kind = state.kind,
-                lhs = state.lhs,
-                rhs = rhs
-            ))
+            ClassSet.BinaryOp(
+                ClassSetBinaryOp(
+                    span = Span(state.lhs.span().start, rhs.span().end),
+                    kind = state.kind,
+                    lhs = state.lhs,
+                    rhs = rhs,
+                ),
+            )
         } else {
             rhs
         }
@@ -916,41 +990,47 @@ internal class ParserI(
             if (isEof()) {
                 break
             }
-            val res: Result<Concat> = when (char().toChar()) {
-                '(' -> pushGroup(concat)
-                ')' -> popGroup(concat)
-                '|' -> pushAlternate(concat)
-                '[' -> parseSetClass().map { cls ->
-                    concat.addAst(Ast.ClassBracketed(cls))
-                    concat
+            val res: Result<Concat> =
+                when (char().toChar()) {
+                    '(' -> pushGroup(concat)
+                    ')' -> popGroup(concat)
+                    '|' -> pushAlternate(concat)
+                    '[' ->
+                        parseSetClass().map { cls ->
+                            concat.addAst(Ast.ClassBracketed(cls))
+                            concat
+                        }
+                    '?' -> parseUncountedRepetition(concat, RepetitionKind.ZeroOrOne)
+                    '*' -> parseUncountedRepetition(concat, RepetitionKind.ZeroOrMore)
+                    '+' -> parseUncountedRepetition(concat, RepetitionKind.OneOrMore)
+                    '{' -> parseCountedRepetition(concat)
+                    else ->
+                        parsePrimitive().map { prim ->
+                            concat.addAst(prim.intoAst())
+                            concat
+                        }
                 }
-                '?' -> parseUncountedRepetition(concat, RepetitionKind.ZeroOrOne)
-                '*' -> parseUncountedRepetition(concat, RepetitionKind.ZeroOrMore)
-                '+' -> parseUncountedRepetition(concat, RepetitionKind.OneOrMore)
-                '{' -> parseCountedRepetition(concat)
-                else -> parsePrimitive().map { prim ->
-                    concat.addAst(prim.intoAst())
-                    concat
-                }
-            }
-            concat = res.fold(
-                onSuccess = { it },
-                onFailure = { return Result.failure(it) }
-            )
+            concat =
+                res.fold(
+                    onSuccess = { it },
+                    onFailure = { return Result.failure(it) },
+                )
         }
         return popGroupEnd(concat).fold(
             onSuccess = { ast ->
                 NestLimiter(this).check(ast).fold(
                     onSuccess = {
-                        Result.success(WithComments(
-                            ast = ast,
-                            comments = parser().comments.toList()
-                        ))
+                        Result.success(
+                            WithComments(
+                                ast = ast,
+                                comments = parser().comments.toList(),
+                            ),
+                        )
                     },
-                    onFailure = { Result.failure(it) }
+                    onFailure = { Result.failure(it) },
                 )
             },
-            onFailure = { Result.failure(it) }
+            onFailure = { Result.failure(it) },
         )
     }
 
@@ -959,14 +1039,15 @@ internal class ParserI(
      */
     private fun parseUncountedRepetition(
         concat: Concat,
-        kind: RepetitionKind
+        kind: RepetitionKind,
     ): Result<Concat> {
         val start = pos()
-        val ast = if (concat.asts.isNotEmpty()) {
-            concat.removeLastAst()
-        } else {
-            return Result.failure(AstException(error(Span.splat(start), ErrorKind.RepetitionMissing)))
-        }
+        val ast =
+            if (concat.asts.isNotEmpty()) {
+                concat.removeLastAst()
+            } else {
+                return Result.failure(AstException(error(Span.splat(start), ErrorKind.RepetitionMissing)))
+            }
         when (ast) {
             is Ast.Empty, is Ast.Flags -> {
                 return Result.failure(AstException(error(span(), ErrorKind.RepetitionMissing)))
@@ -979,12 +1060,16 @@ internal class ParserI(
         val greedy = !bumpIf("?")
         val opSpan = Span(opStart, pos())
         val span = Span(ast.span().start, pos())
-        concat.addAst(Ast.Repetition(Repetition(
-            span = span,
-            op = RepetitionOp(opSpan, kind),
-            greedy = greedy,
-            ast = ast
-        )))
+        concat.addAst(
+            Ast.Repetition(
+                Repetition(
+                    span = span,
+                    op = RepetitionOp(opSpan, kind),
+                    greedy = greedy,
+                    ast = ast,
+                ),
+            ),
+        )
         return Result.success(concat)
     }
 
@@ -993,11 +1078,12 @@ internal class ParserI(
      */
     private fun parseCountedRepetition(concat: Concat): Result<Concat> {
         val start = pos()
-        val ast = if (concat.asts.isNotEmpty()) {
-            concat.removeLastAst()
-        } else {
-            return Result.failure(AstException(error(Span.splat(start), ErrorKind.RepetitionMissing)))
-        }
+        val ast =
+            if (concat.asts.isNotEmpty()) {
+                concat.removeLastAst()
+            } else {
+                return Result.failure(AstException(error(Span.splat(start), ErrorKind.RepetitionMissing)))
+            }
 
         when (ast) {
             is Ast.Empty, is Ast.Flags -> {
@@ -1014,34 +1100,37 @@ internal class ParserI(
             return Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
         }
 
-        val range: RepetitionRange = if (char() == ','.code) {
-            if (!bumpAndBumpSpace()) {
-                return Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
-            }
-            if (char() != '}'.code) {
-                val countStart = countStartResult.fold(
-                    onSuccess = { it },
-                    onFailure = { e ->
-                        if (e is AstException && e.err.kind() == ErrorKind.RepetitionCountDecimalEmpty) {
-                            if (parser().emptyMinRange) {
-                                0u
-                            } else {
-                                return Result.failure(e)
-                            }
-                        } else {
-                            return Result.failure(e)
-                        }
-                    }
-                )
-                val countEnd = specializeErr(parseDecimal(), ErrorKind.DecimalEmpty, ErrorKind.RepetitionCountDecimalEmpty)
-                    .getOrElse { return Result.failure(it) }
-                RepetitionRange.Bounded(countStart, countEnd)
+        val range: RepetitionRange =
+            if (char() == ','.code) {
+                if (!bumpAndBumpSpace()) {
+                    return Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
+                }
+                if (char() != '}'.code) {
+                    val countStart =
+                        countStartResult.fold(
+                            onSuccess = { it },
+                            onFailure = { e ->
+                                if (e is AstException && e.err.kind() == ErrorKind.RepetitionCountDecimalEmpty) {
+                                    if (parser().emptyMinRange) {
+                                        0u
+                                    } else {
+                                        return Result.failure(e)
+                                    }
+                                } else {
+                                    return Result.failure(e)
+                                }
+                            },
+                        )
+                    val countEnd =
+                        specializeErr(parseDecimal(), ErrorKind.DecimalEmpty, ErrorKind.RepetitionCountDecimalEmpty)
+                            .getOrElse { return Result.failure(it) }
+                    RepetitionRange.Bounded(countStart, countEnd)
+                } else {
+                    RepetitionRange.AtLeast(countStartResult.getOrElse { return Result.failure(it) })
+                }
             } else {
-                RepetitionRange.AtLeast(countStartResult.getOrElse { return Result.failure(it) })
+                RepetitionRange.Exactly(countStartResult.getOrElse { return Result.failure(it) })
             }
-        } else {
-            RepetitionRange.Exactly(countStartResult.getOrElse { return Result.failure(it) })
-        }
 
         if (isEof() || char() != '}'.code) {
             return Result.failure(AstException(error(Span(start, pos()), ErrorKind.RepetitionCountUnclosed)))
@@ -1058,12 +1147,16 @@ internal class ParserI(
             return Result.failure(AstException(error(opSpan, ErrorKind.RepetitionCountInvalid)))
         }
 
-        concat.addAst(Ast.Repetition(Repetition(
-            span = ast.span().withEnd(pos()),
-            op = RepetitionOp(opSpan, RepetitionKind.Range(range)),
-            greedy = greedy,
-            ast = ast
-        )))
+        concat.addAst(
+            Ast.Repetition(
+                Repetition(
+                    span = ast.span().withEnd(pos()),
+                    op = RepetitionOp(opSpan, RepetitionKind.Range(range)),
+                    greedy = greedy,
+                    ast = ast,
+                ),
+            ),
+        )
         return Result.success(concat)
     }
 
@@ -1080,25 +1173,30 @@ internal class ParserI(
                 AstException(
                     error(
                         Span(openSpan.start, span().end),
-                        ErrorKind.UnsupportedLookAround
-                    )
-                )
+                        ErrorKind.UnsupportedLookAround,
+                    ),
+                ),
             )
         }
         val innerSpan = span()
         var startsWithP = true
-        return if (bumpIf("?P<") || run {
+        return if (bumpIf("?P<") ||
+            run {
                 startsWithP = false
                 bumpIf("?<")
             }
         ) {
             val captureIndex = nextCaptureIndex(openSpan).getOrElse { return Result.failure(it) }
             val name = parseCaptureName(captureIndex).getOrElse { return Result.failure(it) }
-            Result.success(io.github.kotlinmania.regexsyntax.either.Either.Right(Group(
-                span = openSpan,
-                kind = GroupKind.CaptureName(startsWithP = startsWithP, name = name),
-                ast = Ast.Empty(span())
-            )))
+            Result.success(
+                io.github.kotlinmania.regexsyntax.either.Either.Right(
+                    Group(
+                        span = openSpan,
+                        kind = GroupKind.CaptureName(startsWithP = startsWithP, name = name),
+                        ast = Ast.Empty(span()),
+                    ),
+                ),
+            )
         } else if (bumpIf("?")) {
             if (isEof()) {
                 return Result.failure(AstException(error(openSpan, ErrorKind.GroupUnclosed)))
@@ -1110,25 +1208,37 @@ internal class ParserI(
                 if (flags.items.isEmpty()) {
                     return Result.failure(AstException(error(innerSpan, ErrorKind.RepetitionMissing)))
                 }
-                Result.success(io.github.kotlinmania.regexsyntax.either.Either.Left(SetFlags(
-                    span = Span(openSpan.start, pos()),
-                    flags = flags
-                )))
+                Result.success(
+                    io.github.kotlinmania.regexsyntax.either.Either.Left(
+                        SetFlags(
+                            span = Span(openSpan.start, pos()),
+                            flags = flags,
+                        ),
+                    ),
+                )
             } else {
                 if (charEnd != ':'.code) throw IllegalStateException("expected :")
-                Result.success(io.github.kotlinmania.regexsyntax.either.Either.Right(Group(
-                    span = openSpan,
-                    kind = GroupKind.NonCapturing(flags),
-                    ast = Ast.Empty(span())
-                )))
+                Result.success(
+                    io.github.kotlinmania.regexsyntax.either.Either.Right(
+                        Group(
+                            span = openSpan,
+                            kind = GroupKind.NonCapturing(flags),
+                            ast = Ast.Empty(span()),
+                        ),
+                    ),
+                )
             }
         } else {
             val captureIndex = nextCaptureIndex(openSpan).getOrElse { return Result.failure(it) }
-            Result.success(io.github.kotlinmania.regexsyntax.either.Either.Right(Group(
-                span = openSpan,
-                kind = GroupKind.CaptureIndex(captureIndex),
-                ast = Ast.Empty(span())
-            )))
+            Result.success(
+                io.github.kotlinmania.regexsyntax.either.Either.Right(
+                    Group(
+                        span = openSpan,
+                        kind = GroupKind.CaptureIndex(captureIndex),
+                        ast = Ast.Empty(span()),
+                    ),
+                ),
+            )
         }
     }
 
@@ -1161,14 +1271,15 @@ internal class ParserI(
         if (name.isEmpty()) {
             return Result.failure(AstException(error(Span(start, start), ErrorKind.GroupNameEmpty)))
         }
-        val capName = io.github.kotlinmania.regexsyntax.ast.CaptureName(
-            span = Span(start, end),
-            name = name,
-            index = captureIndex
-        )
+        val capName =
+            io.github.kotlinmania.regexsyntax.ast.CaptureName(
+                span = Span(start, end),
+                name = name,
+                index = captureIndex,
+            )
         return addCaptureName(capName).fold(
             onSuccess = { Result.success(capName) },
-            onFailure = { Result.failure(it) }
+            onFailure = { Result.failure(it) },
         )
     }
 
@@ -1217,8 +1328,8 @@ internal class ParserI(
     /**
      * Parses a single flag.
      */
-    internal fun parseFlag(): Result<Flag> {
-        return when (char().toChar()) {
+    internal fun parseFlag(): Result<Flag> =
+        when (char().toChar()) {
             'i' -> Result.success(Flag.CaseInsensitive)
             'm' -> Result.success(Flag.MultiLine)
             's' -> Result.success(Flag.DotMatchesNewLine)
@@ -1228,7 +1339,6 @@ internal class ParserI(
             'x' -> Result.success(Flag.IgnoreWhitespace)
             else -> Result.failure(AstException(error(spanChar(), ErrorKind.FlagUnrecognized)))
         }
-    }
 
     /**
      * Parses a single primitive expression.
@@ -1255,11 +1365,15 @@ internal class ParserI(
             else -> {
                 val span = spanChar()
                 bump()
-                Result.success(Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(
-                    span = span,
-                    kind = LiteralKind.Verbatim,
-                    c = c
-                )))
+                Result.success(
+                    Primitive.Literal(
+                        io.github.kotlinmania.regexsyntax.ast.Literal(
+                            span = span,
+                            kind = LiteralKind.Verbatim,
+                            c = c,
+                        ),
+                    ),
+                )
             }
         }
     }
@@ -1277,10 +1391,14 @@ internal class ParserI(
         when (cChar) {
             in '0'..'7' -> {
                 if (!parser().octal) {
-                    return Result.failure(AstException(error(
-                        Span(start, spanChar().end),
-                        ErrorKind.UnsupportedBackreference
-                    )))
+                    return Result.failure(
+                        AstException(
+                            error(
+                                Span(start, spanChar().end),
+                                ErrorKind.UnsupportedBackreference,
+                            ),
+                        ),
+                    )
                 }
                 val lit = parseOctal()
                 val finalLit = lit.copy(span = lit.span.copy(start = start))
@@ -1288,10 +1406,14 @@ internal class ParserI(
             }
             '8', '9' -> {
                 if (!parser().octal) {
-                    return Result.failure(AstException(error(
-                        Span(start, spanChar().end),
-                        ErrorKind.UnsupportedBackreference
-                    )))
+                    return Result.failure(
+                        AstException(
+                            error(
+                                Span(start, spanChar().end),
+                                ErrorKind.UnsupportedBackreference,
+                            ),
+                        ),
+                    )
                 }
             }
             'x', 'u', 'U' -> {
@@ -1300,7 +1422,7 @@ internal class ParserI(
                         val finalLit = lit.copy(span = lit.span.copy(start = start))
                         Result.success(Primitive.Literal(finalLit))
                     },
-                    onFailure = { Result.failure(it) }
+                    onFailure = { Result.failure(it) },
                 )
             }
             'p', 'P' -> {
@@ -1309,7 +1431,7 @@ internal class ParserI(
                         val finalCls = cls.copy(span = cls.span.copy(start = start))
                         Result.success(Primitive.Unicode(finalCls))
                     },
-                    onFailure = { Result.failure(it) }
+                    onFailure = { Result.failure(it) },
                 )
             }
             'd', 's', 'w', 'D', 'S', 'W' -> {
@@ -1322,36 +1444,84 @@ internal class ParserI(
         // Handle one-letter sequences
         bump()
         val span = Span(start, pos())
-        if (io.github.kotlinmania.regexsyntax.isMetaCharacter(cChar)) {
-            return Result.success(Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(
-                span = span,
-                kind = LiteralKind.Meta,
-                c = c
-            )))
+        if (io.github.kotlinmania.regexsyntax
+                .isMetaCharacter(cChar)
+        ) {
+            return Result.success(
+                Primitive.Literal(
+                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                        span = span,
+                        kind = LiteralKind.Meta,
+                        c = c,
+                    ),
+                ),
+            )
         }
-        if (io.github.kotlinmania.regexsyntax.isEscapeableCharacter(cChar)) {
-            return Result.success(Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(
-                span = span,
-                kind = LiteralKind.Superfluous,
-                c = c
-            )))
+        if (io.github.kotlinmania.regexsyntax
+                .isEscapeableCharacter(cChar)
+        ) {
+            return Result.success(
+                Primitive.Literal(
+                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                        span = span,
+                        kind = LiteralKind.Superfluous,
+                        c = c,
+                    ),
+                ),
+            )
         }
 
         return when (cChar) {
-            'a' -> Result.success(Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(span, LiteralKind.Special(SpecialLiteralKind.Bell), 0x07)))
-            'f' -> Result.success(Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(span, LiteralKind.Special(SpecialLiteralKind.FormFeed), 0x0C)))
-            't' -> Result.success(Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(span, LiteralKind.Special(SpecialLiteralKind.Tab), 0x09)))
-            'n' -> Result.success(Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(span, LiteralKind.Special(SpecialLiteralKind.LineFeed), 0x0A)))
-            'r' -> Result.success(Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(span, LiteralKind.Special(SpecialLiteralKind.CarriageReturn), 0x0D)))
-            'v' -> Result.success(Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(span, LiteralKind.Special(SpecialLiteralKind.VerticalTab), 0x0B)))
+            'a' ->
+                Result.success(
+                    Primitive.Literal(
+                        io.github.kotlinmania.regexsyntax.ast
+                            .Literal(span, LiteralKind.Special(SpecialLiteralKind.Bell), 0x07),
+                    ),
+                )
+            'f' ->
+                Result.success(
+                    Primitive.Literal(
+                        io.github.kotlinmania.regexsyntax.ast
+                            .Literal(span, LiteralKind.Special(SpecialLiteralKind.FormFeed), 0x0C),
+                    ),
+                )
+            't' ->
+                Result.success(
+                    Primitive.Literal(
+                        io.github.kotlinmania.regexsyntax.ast
+                            .Literal(span, LiteralKind.Special(SpecialLiteralKind.Tab), 0x09),
+                    ),
+                )
+            'n' ->
+                Result.success(
+                    Primitive.Literal(
+                        io.github.kotlinmania.regexsyntax.ast
+                            .Literal(span, LiteralKind.Special(SpecialLiteralKind.LineFeed), 0x0A),
+                    ),
+                )
+            'r' ->
+                Result.success(
+                    Primitive.Literal(
+                        io.github.kotlinmania.regexsyntax.ast
+                            .Literal(span, LiteralKind.Special(SpecialLiteralKind.CarriageReturn), 0x0D),
+                    ),
+                )
+            'v' ->
+                Result.success(
+                    Primitive.Literal(
+                        io.github.kotlinmania.regexsyntax.ast
+                            .Literal(span, LiteralKind.Special(SpecialLiteralKind.VerticalTab), 0x0B),
+                    ),
+                )
             'A' -> Result.success(Primitive.Assertion(Assertion(span, AssertionKind.StartText)))
             'z' -> Result.success(Primitive.Assertion(Assertion(span, AssertionKind.EndText)))
             'b' -> {
                 var kind: AssertionKind = AssertionKind.WordBoundary
                 if (!isEof() && char() == '{'.code) {
                     maybeParseSpecialWordBoundary(start).fold(
-                        onSuccess = { it?.let { kind = it } },
-                        onFailure = { return Result.failure(it) }
+                        onSuccess = { parsedKind -> if (parsedKind != null) kind = parsedKind },
+                        onFailure = { return Result.failure(it) },
                     )
                 }
                 Result.success(Primitive.Assertion(Assertion(Span(start, pos()), kind)))
@@ -1368,46 +1538,59 @@ internal class ParserI(
             val cc = c.toChar()
             cc in 'A'..'Z' || cc in 'a'..'z' || cc == '-'
         }
-        
+
         val start = pos()
         if (!bumpAndBumpSpace()) {
-            return Result.failure(AstException(error(
-                Span(wbStart, pos()),
-                ErrorKind.SpecialWordOrRepetitionUnexpectedEof
-            )))
+            return Result.failure(
+                AstException(
+                    error(
+                        Span(wbStart, pos()),
+                        ErrorKind.SpecialWordOrRepetitionUnexpectedEof,
+                    ),
+                ),
+            )
         }
-        
+
         val startContents = pos()
         if (!isValidChar(char())) {
             parser().pos = start
             return Result.success(null)
         }
-        
+
         parser().scratch.setLength(0)
         while (!isEof() && isValidChar(char())) {
             parser().scratch.append(char().toChar())
             if (!bumpAndBumpSpace()) break
         }
-        
+
         if (isEof() || char() != '}'.code) {
-            return Result.failure(AstException(error(
-                Span(start, pos()),
-                ErrorKind.SpecialWordBoundaryUnclosed
-            )))
+            return Result.failure(
+                AstException(
+                    error(
+                        Span(start, pos()),
+                        ErrorKind.SpecialWordBoundaryUnclosed,
+                    ),
+                ),
+            )
         }
-        
+
         val end = pos()
         bump()
-        val kind = when (parser().scratch.toString()) {
-            "start" -> AssertionKind.WordBoundaryStart
-            "end" -> AssertionKind.WordBoundaryEnd
-            "start-half" -> AssertionKind.WordBoundaryStartHalf
-            "end-half" -> AssertionKind.WordBoundaryEndHalf
-            else -> return Result.failure(AstException(error(
-                Span(startContents, end),
-                ErrorKind.SpecialWordBoundaryUnrecognized
-            )))
-        }
+        val kind =
+            when (parser().scratch.toString()) {
+                "start" -> AssertionKind.WordBoundaryStart
+                "end" -> AssertionKind.WordBoundaryEnd
+                "start-half" -> AssertionKind.WordBoundaryStartHalf
+                "end-half" -> AssertionKind.WordBoundaryEndHalf
+                else -> return Result.failure(
+                    AstException(
+                        error(
+                            Span(startContents, end),
+                            ErrorKind.SpecialWordBoundaryUnrecognized,
+                        ),
+                    ),
+                )
+            }
         return Result.success(kind)
     }
 
@@ -1428,7 +1611,7 @@ internal class ParserI(
         return io.github.kotlinmania.regexsyntax.ast.Literal(
             span = Span(start, pos()),
             kind = LiteralKind.Octal,
-            c = n
+            c = n,
         )
     }
 
@@ -1454,8 +1637,9 @@ internal class ParserI(
             if (i > 0 && !bumpAndBumpSpace()) {
                 return Result.failure(AstException(error(Span.splat(pos()), ErrorKind.EscapeUnexpectedEof)))
             }
-            val d = char().toChar().digitToIntOrNull(16)
-                ?: return Result.failure(AstException(error(spanChar(), ErrorKind.EscapeHexInvalidDigit)))
+            val d =
+                char().toChar().digitToIntOrNull(16)
+                    ?: return Result.failure(AstException(error(spanChar(), ErrorKind.EscapeHexInvalidDigit)))
             hex = (hex shl 4) or d
             i++
         }
@@ -1465,11 +1649,13 @@ internal class ParserI(
                 return Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeHexInvalid)))
             }
         }
-        return Result.success(io.github.kotlinmania.regexsyntax.ast.Literal(
-            span = Span(start, pos()),
-            kind = LiteralKind.HexFixed(kind),
-            c = hex
-        ))
+        return Result.success(
+            io.github.kotlinmania.regexsyntax.ast.Literal(
+                span = Span(start, pos()),
+                kind = LiteralKind.HexFixed(kind),
+                c = hex,
+            ),
+        )
     }
 
     internal fun parseHexBrace(start: Position, kind: HexLiteralKind): Result<io.github.kotlinmania.regexsyntax.ast.Literal> {
@@ -1480,8 +1666,9 @@ internal class ParserI(
         var digits = 0
         bumpAndBumpSpace()
         while (!isEof() && char() != '}'.code) {
-            val d = char().toChar().digitToIntOrNull(16)
-                ?: return Result.failure(AstException(error(spanChar(), ErrorKind.EscapeHexInvalidDigit)))
+            val d =
+                char().toChar().digitToIntOrNull(16)
+                    ?: return Result.failure(AstException(error(spanChar(), ErrorKind.EscapeHexInvalidDigit)))
             hex = (hex shl 4) or d
             if (hex > 0x10FFFF) {
                 while (!isEof() && char() != '}'.code) bump()
@@ -1501,11 +1688,13 @@ internal class ParserI(
             return Result.failure(AstException(error(Span(startDigits, pos()), ErrorKind.EscapeHexInvalid)))
         }
         bumpAndBumpSpace() // '}'
-        return Result.success(io.github.kotlinmania.regexsyntax.ast.Literal(
-            span = Span(start, pos()),
-            kind = LiteralKind.HexBrace(kind),
-            c = hex
-        ))
+        return Result.success(
+            io.github.kotlinmania.regexsyntax.ast.Literal(
+                span = Span(start, pos()),
+                kind = LiteralKind.HexBrace(kind),
+                c = hex,
+            ),
+        )
     }
 
     internal fun parseDecimal(): Result<UInt> {
@@ -1558,11 +1747,12 @@ internal class ParserI(
             return Result.failure(AstException(unclosedClassError()))
         }
         val prim2 = parseSetClassItem().getOrElse { return Result.failure(it) }
-        val range = ClassSetRange(
-            span = Span(prim1.span().start, prim2.span().end),
-            start = prim1.intoClassLiteral(this).getOrElse { return Result.failure(it) },
-            end = prim2.intoClassLiteral(this).getOrElse { return Result.failure(it) }
-        )
+        val range =
+            ClassSetRange(
+                span = Span(prim1.span().start, prim2.span().end),
+                start = prim1.intoClassLiteral(this).getOrElse { return Result.failure(it) },
+                end = prim2.intoClassLiteral(this).getOrElse { return Result.failure(it) },
+            )
         if (!range.isValid()) {
             return Result.failure(AstException(error(range.span, ErrorKind.ClassRangeInvalid)))
         }
@@ -1575,12 +1765,14 @@ internal class ParserI(
         val openResult = parseSetClassOpen()
         if (openResult.isFailure) return Result.failure(openResult.exceptionOrNull()!!)
         val (set, union) = openResult.getOrThrow()
-        
-        parser().stackClass.add(ClassState.Open(
-            union = union,
-            set = set.copy()
-        ))
-        
+
+        parser().stackClass.add(
+            ClassState.Open(
+                union = union,
+                set = set.copy(),
+            ),
+        )
+
         var currentUnion = union
 
         while (true) {
@@ -1588,67 +1780,79 @@ internal class ParserI(
             if (isEof()) {
                 return Result.failure(AstException(unclosedClassError()))
             }
-            val charResult: Result<ClassSetUnion> = when (char().toChar()) {
-                '[' -> {
-                    // If we've already parsed the opening bracket, then
-                    // attempt to treat this as the beginning of an ASCII
-                    // class. If ASCII class parsing fails, then the parser
-                    // backs up to `[`.
-                    if (parser().stackClass.isNotEmpty()) {
-                        val cls = maybeParseAsciiClass()
-                        if (cls != null) {
-                            currentUnion.push(ClassSetItem.Ascii(cls))
-                            Result.success(currentUnion)
+            val charResult: Result<ClassSetUnion> =
+                when (char().toChar()) {
+                    '[' -> {
+                        // If we've already parsed the opening bracket, then
+                        // attempt to treat this as the beginning of an ASCII
+                        // class. If ASCII class parsing fails, then the parser
+                        // backs up to `[`.
+                        if (parser().stackClass.isNotEmpty()) {
+                            val cls = maybeParseAsciiClass()
+                            if (cls != null) {
+                                currentUnion.push(ClassSetItem.Ascii(cls))
+                                Result.success(currentUnion)
+                            } else {
+                                pushClassOpen(currentUnion)
+                            }
                         } else {
                             pushClassOpen(currentUnion)
                         }
-                    } else {
-                        pushClassOpen(currentUnion)
+                    }
+                    ']' -> {
+                        val popRes = popClass(currentUnion)
+                        if (popRes.isFailure) return Result.failure(popRes.exceptionOrNull()!!)
+                        when (val either = popRes.getOrThrow()) {
+                            is io.github.kotlinmania.regexsyntax.either.Either.Left -> Result.success(either.value)
+                            is io.github.kotlinmania.regexsyntax.either.Either.Right -> return Result.success(either.value)
+                        }
+                    }
+                    '&' -> {
+                        if (peek() == '&'.code) {
+                            bump()
+                            bump()
+                            Result.success(pushClassOp(ClassSetBinaryOpKind.Intersection, currentUnion))
+                        } else {
+                            parseSetClassRange().map {
+                                currentUnion.push(it)
+                                currentUnion
+                            }
+                        }
+                    }
+                    '-' -> {
+                        if (peek() == '-'.code) {
+                            bump()
+                            bump()
+                            Result.success(pushClassOp(ClassSetBinaryOpKind.Difference, currentUnion))
+                        } else {
+                            parseSetClassRange().map {
+                                currentUnion.push(it)
+                                currentUnion
+                            }
+                        }
+                    }
+                    '~' -> {
+                        if (peek() == '~'.code) {
+                            bump()
+                            bump()
+                            Result.success(pushClassOp(ClassSetBinaryOpKind.SymmetricDifference, currentUnion))
+                        } else {
+                            parseSetClassRange().map {
+                                currentUnion.push(it)
+                                currentUnion
+                            }
+                        }
+                    }
+                    else -> {
+                        parseSetClassRange().map {
+                            currentUnion.push(it)
+                            currentUnion
+                        }
                     }
                 }
-                ']' -> {
-                    val popRes = popClass(currentUnion)
-                    if (popRes.isFailure) return Result.failure(popRes.exceptionOrNull()!!)
-                    when (val either = popRes.getOrThrow()) {
-                        is io.github.kotlinmania.regexsyntax.either.Either.Left -> Result.success(either.value)
-                        is io.github.kotlinmania.regexsyntax.either.Either.Right -> return Result.success(either.value)
-                    }
-                }
-                '&' -> {
-                    if (peek() == '&'.code) {
-                        bump()
-                        bump()
-                        Result.success(pushClassOp(ClassSetBinaryOpKind.Intersection, currentUnion))
-                    } else {
-                        parseSetClassRange().map { currentUnion.push(it); currentUnion }
-                    }
-                }
-                '-' -> {
-                    if (peek() == '-'.code) {
-                        bump()
-                        bump()
-                        Result.success(pushClassOp(ClassSetBinaryOpKind.Difference, currentUnion))
-                    } else {
-                        parseSetClassRange().map { currentUnion.push(it); currentUnion }
-                    }
-                }
-                '~' -> {
-                    if (peek() == '~'.code) {
-                        bump()
-                        bump()
-                        Result.success(pushClassOp(ClassSetBinaryOpKind.SymmetricDifference, currentUnion))
-                    } else {
-                        parseSetClassRange().map { currentUnion.push(it); currentUnion }
-                    }
-                }
-                else -> {
-                    parseSetClassRange().map { currentUnion.push(it); currentUnion }
-                }
-            }
             if (charResult.isFailure) return Result.failure(charResult.exceptionOrNull()!!)
             currentUnion = charResult.getOrThrow()
         }
-        throw IllegalStateException("unreachable")
     }
 
     internal fun parseSetClassOpen(): Result<Pair<ClassBracketed, ClassSetUnion>> {
@@ -1658,43 +1862,53 @@ internal class ParserI(
             return Result.failure(AstException(error(Span(start, pos()), ErrorKind.ClassUnclosed)))
         }
 
-        val negated = if (char() != '^'.code) {
-            false
-        } else {
-            if (!bumpAndBumpSpace()) {
-                return Result.failure(AstException(error(Span(start, pos()), ErrorKind.ClassUnclosed)))
+        val negated =
+            if (char() != '^'.code) {
+                false
+            } else {
+                if (!bumpAndBumpSpace()) {
+                    return Result.failure(AstException(error(Span(start, pos()), ErrorKind.ClassUnclosed)))
+                }
+                true
             }
-            true
-        }
 
         val union = ClassSetUnion(span(), mutableListOf())
         while (char() == '-'.code) {
-            union.push(ClassSetItem.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(
-                span = spanChar(),
-                kind = LiteralKind.Verbatim,
-                c = '-'.code
-            )))
+            union.push(
+                ClassSetItem.Literal(
+                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                        span = spanChar(),
+                        kind = LiteralKind.Verbatim,
+                        c = '-'.code,
+                    ),
+                ),
+            )
             if (!bumpAndBumpSpace()) {
                 return Result.failure(AstException(error(Span.splat(start), ErrorKind.ClassUnclosed)))
             }
         }
 
         if (union.items.isEmpty() && char() == ']'.code) {
-            union.push(ClassSetItem.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(
-                span = spanChar(),
-                kind = LiteralKind.Verbatim,
-                c = ']'.code
-            )))
+            union.push(
+                ClassSetItem.Literal(
+                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                        span = spanChar(),
+                        kind = LiteralKind.Verbatim,
+                        c = ']'.code,
+                    ),
+                ),
+            )
             if (!bumpAndBumpSpace()) {
                 return Result.failure(AstException(error(Span(start, pos()), ErrorKind.ClassUnclosed)))
             }
         }
 
-        val set = ClassBracketed(
-            span = Span(start, pos()),
-            negated = negated,
-            kind = ClassSet.Item(ClassSetItem.Union(ClassSetUnion(Span(union.span.start, union.span.start), mutableListOf())))
-        )
+        val set =
+            ClassBracketed(
+                span = Span(start, pos()),
+                negated = negated,
+                kind = ClassSet.Item(ClassSetItem.Union(ClassSetUnion(Span(union.span.start, union.span.start), mutableListOf()))),
+            )
         return Result.success(set to union)
     }
 
@@ -1728,58 +1942,29 @@ internal class ParserI(
             parser().pos = start
             return null
         }
-        val kind = ClassAsciiKind.fromName(name) ?: run {
-            parser().pos = start
-            return null
-        }
+        val kind =
+            ClassAsciiKind.fromName(name) ?: run {
+                parser().pos = start
+                return null
+            }
         return ClassAscii(Span(start, pos()), kind, negated)
     }
 
-    private fun parseSetClassItem(): Result<Primitive> {
-        return if (char() == '\\'.code) {
+    private fun parseSetClassItem(): Result<Primitive> =
+        if (char() == '\\'.code) {
             parseEscape()
         } else {
-            val x = Primitive.Literal(io.github.kotlinmania.regexsyntax.ast.Literal(
-                span = spanChar(),
-                kind = LiteralKind.Verbatim,
-                c = char(),
-            ))
+            val x =
+                Primitive.Literal(
+                    io.github.kotlinmania.regexsyntax.ast.Literal(
+                        span = spanChar(),
+                        kind = LiteralKind.Verbatim,
+                        c = char(),
+                    ),
+                )
             bump()
             Result.success(x)
         }
-    }
-
-    private fun parseSetClassPrimitive(): Result<Primitive> {
-        return when (char().toChar()) {
-            '\\' -> {
-                val start = pos()
-                bump()
-                if (isEof()) {
-                    Result.failure(AstException(error(Span(start, pos()), ErrorKind.EscapeUnexpectedEof)))
-                } else {
-                    val c = char().toChar()
-                    when (c) {
-                        'p', 'P' -> {
-                            parseUnicodeClass().map { cls ->
-                                val finalCls = cls.copy(span = cls.span.copy(start = start))
-                                Primitive.Unicode(finalCls)
-                            }
-                        }
-                        'd', 's', 'w', 'D', 'S', 'W' -> {
-                            val cls = parsePerlClass()
-                            val finalCls = cls.copy(span = cls.span.copy(start = start))
-                            Result.success(Primitive.Perl(finalCls))
-                        }
-                        else -> {
-                            parser().pos = start
-                            parseEscape()
-                        }
-                    }
-                }
-            }
-            else -> parsePrimitive()
-        }
-    }
 
     internal fun parseUnicodeClass(): Result<ClassUnicode> {
         val start = pos()
@@ -1800,18 +1985,19 @@ internal class ParserI(
                 val content = parser().scratch.toString()
                 bumpAndBumpSpace() // '}'
 
-                val kind = if (content.contains("!=")) {
-                    val parts = content.split("!=", limit = 2)
-                    ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.NotEqual, parts[0], parts[1])
-                } else if (content.contains(":")) {
-                    val parts = content.split(":", limit = 2)
-                    ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Colon, parts[0], parts[1])
-                } else if (content.contains("=")) {
-                    val parts = content.split("=", limit = 2)
-                    ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Equal, parts[0], parts[1])
-                } else {
-                    ClassUnicodeKind.Named(content)
-                }
+                val kind =
+                    if (content.contains("!=")) {
+                        val parts = content.split("!=", limit = 2)
+                        ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.NotEqual, parts[0], parts[1])
+                    } else if (content.contains(":")) {
+                        val parts = content.split(":", limit = 2)
+                        ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Colon, parts[0], parts[1])
+                    } else if (content.contains("=")) {
+                        val parts = content.split("=", limit = 2)
+                        ClassUnicodeKind.NamedValue(ClassUnicodeOpKind.Equal, parts[0], parts[1])
+                    } else {
+                        ClassUnicodeKind.Named(content)
+                    }
                 Result.success(ClassUnicode(Span(start, pos()), negated, kind))
             }
         } else {
@@ -1829,12 +2015,13 @@ internal class ParserI(
         val start = pos()
         val c = char().toChar()
         val negated = c.isUpperCase()
-        val kind = when (c.lowercaseChar()) {
-            'd' -> ClassPerlKind.Digit
-            's' -> ClassPerlKind.Space
-            'w' -> ClassPerlKind.Word
-            else -> throw IllegalStateException("unreachable")
-        }
+        val kind =
+            when (c.lowercaseChar()) {
+                'd' -> ClassPerlKind.Digit
+                's' -> ClassPerlKind.Space
+                'w' -> ClassPerlKind.Word
+                else -> throw IllegalStateException("unreachable")
+            }
         bump()
         return ClassPerl(Span(start, pos()), kind, negated)
     }
@@ -1861,12 +2048,12 @@ internal class ParserI(
  * NestLimiter is a visitor that checks whether an AST exceeds the nesting
  * limit.
  */
-internal class NestLimiter(private val p: ParserI) : Visitor<Unit, AstException> {
+internal class NestLimiter(
+    private val p: ParserI,
+) : Visitor<Unit, AstException> {
     private var depth = 0u
 
-    fun check(ast: Ast): Result<Unit> {
-        return visit(ast, this)
-    }
+    fun check(ast: Ast): Result<Unit> = visit(ast, this)
 
     private fun incrementDepth(span: Span): Result<Unit> {
         val new = depth + 1u
@@ -1885,49 +2072,53 @@ internal class NestLimiter(private val p: ParserI) : Visitor<Unit, AstException>
     override fun finish(): Result<Unit> = Result.success(Unit)
 
     override fun visitPre(ast: Ast): Result<Unit> {
-        val span = when (ast) {
-            is Ast.Empty, is Ast.Flags, is Ast.Literal, is Ast.Dot,
-            is Ast.Assertion, is Ast.ClassUnicode, is Ast.ClassPerl -> return Result.success(Unit)
-            is Ast.ClassBracketed -> ast.value.span
-            is Ast.Repetition -> ast.value.span
-            is Ast.Group -> ast.value.span
-            is Ast.Alternation -> ast.value.span
-            is Ast.Concat -> ast.value.span
-        }
+        val span =
+            when (ast) {
+                is Ast.Empty, is Ast.Flags, is Ast.Literal, is Ast.Dot,
+                is Ast.Assertion, is Ast.ClassUnicode, is Ast.ClassPerl,
+                -> return Result.success(Unit)
+                is Ast.ClassBracketed -> ast.value.span
+                is Ast.Repetition -> ast.value.span
+                is Ast.Group -> ast.value.span
+                is Ast.Alternation -> ast.value.span
+                is Ast.Concat -> ast.value.span
+            }
         return incrementDepth(span)
     }
 
     override fun visitPost(ast: Ast): Result<Unit> {
         when (ast) {
             is Ast.Empty, is Ast.Flags, is Ast.Literal, is Ast.Dot,
-            is Ast.Assertion, is Ast.ClassUnicode, is Ast.ClassPerl -> { }
+            is Ast.Assertion, is Ast.ClassUnicode, is Ast.ClassPerl,
+            -> { }
             else -> decrementDepth()
         }
         return Result.success(Unit)
     }
 
     override fun visitClassSetItemPre(ast: ClassSetItem): Result<Unit> {
-        val span = when (ast) {
-            is ClassSetItem.Empty, is ClassSetItem.Literal, is ClassSetItem.Range,
-            is ClassSetItem.Ascii, is ClassSetItem.Unicode, is ClassSetItem.Perl -> return Result.success(Unit)
-            is ClassSetItem.Bracketed -> ast.value.span
-            is ClassSetItem.Union -> ast.value.span
-        }
+        val span =
+            when (ast) {
+                is ClassSetItem.Empty, is ClassSetItem.Literal, is ClassSetItem.Range,
+                is ClassSetItem.Ascii, is ClassSetItem.Unicode, is ClassSetItem.Perl,
+                -> return Result.success(Unit)
+                is ClassSetItem.Bracketed -> ast.value.span
+                is ClassSetItem.Union -> ast.value.span
+            }
         return incrementDepth(span)
     }
 
     override fun visitClassSetItemPost(ast: ClassSetItem): Result<Unit> {
         when (ast) {
             is ClassSetItem.Empty, is ClassSetItem.Literal, is ClassSetItem.Range,
-            is ClassSetItem.Ascii, is ClassSetItem.Unicode, is ClassSetItem.Perl -> { }
+            is ClassSetItem.Ascii, is ClassSetItem.Unicode, is ClassSetItem.Perl,
+            -> { }
             else -> decrementDepth()
         }
         return Result.success(Unit)
     }
 
-    override fun visitClassSetBinaryOpPre(ast: ClassSetBinaryOp): Result<Unit> {
-        return incrementDepth(ast.span)
-    }
+    override fun visitClassSetBinaryOpPre(ast: ClassSetBinaryOp): Result<Unit> = incrementDepth(ast.span)
 
     override fun visitClassSetBinaryOpPost(ast: ClassSetBinaryOp): Result<Unit> {
         decrementDepth()
@@ -1939,7 +2130,9 @@ internal class NestLimiter(private val p: ParserI) : Visitor<Unit, AstException>
  * A throwable wrapper for [AstError] values. The Kotlin [Result] machinery
  * requires a [Throwable] in the failure case.
  */
-class AstException(val err: AstError) : Throwable(err.toString())
+class AstException(
+    val err: AstError,
+) : Throwable(err.toString())
 
 /**
  * When the result is an error, transforms the ast::ErrorKind from the source
@@ -1949,9 +2142,9 @@ class AstException(val err: AstError) : Throwable(err.toString())
 private fun <T> specializeErr(
     result: Result<T>,
     from: ErrorKind,
-    to: ErrorKind
-): Result<T> {
-    return result.fold(
+    to: ErrorKind,
+): Result<T> =
+    result.fold(
         onSuccess = { Result.success(it) },
         onFailure = { e ->
             if (e is AstException && e.err.kind() == from) {
@@ -1959,6 +2152,5 @@ private fun <T> specializeErr(
             } else {
                 Result.failure(e)
             }
-        }
+        },
     )
-}

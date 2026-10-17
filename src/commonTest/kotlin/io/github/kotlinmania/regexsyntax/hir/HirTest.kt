@@ -1,4 +1,3 @@
-// port-lint: source hir/mod.rs
 package io.github.kotlinmania.regexsyntax.hir
 
 import kotlin.test.Test
@@ -660,7 +659,7 @@ class HirTest {
     @Test
     fun noStackOverflowOnDrop() {
         var expr = Hir.empty()
-        for (i in 0 until 100) {
+        repeat(100) {
             expr = Hir.capture(Capture(index = 1u, name = null, sub = expr))
             expr = Hir.repetition(Repetition(min = 0u, max = 1u, greedy = true, sub = expr))
 

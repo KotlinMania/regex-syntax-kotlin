@@ -6,12 +6,11 @@ package io.github.kotlinmania.regexsyntax.parser
  * Licensed under either of Apache-2.0 OR MIT.
  */
 
-import io.github.kotlinmania.regexsyntax.Error
-import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder as AstParserBuilder
-import io.github.kotlinmania.regexsyntax.ast.parse.Parser as AstParser
 import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.hir.translate.Translator
 import io.github.kotlinmania.regexsyntax.hir.translate.TranslatorBuilder
+import io.github.kotlinmania.regexsyntax.ast.parse.Parser as AstParser
+import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder as AstParserBuilder
 
 /**
  * A convenience routine for parsing a regex using default options.
@@ -25,9 +24,7 @@ import io.github.kotlinmania.regexsyntax.hir.translate.TranslatorBuilder
  * to convert the `Ast` into an [Hir]. If you need access to the `Ast`, then
  * you should use [AstParser].
  */
-fun parse(pattern: String): Result<Hir> {
-    return Parser.new().parse(pattern)
-}
+fun parse(pattern: String): Result<Hir> = Parser.new().parse(pattern)
 
 /**
  * A builder for a regular expression parser.

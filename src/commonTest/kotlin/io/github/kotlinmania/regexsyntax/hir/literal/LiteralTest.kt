@@ -10,7 +10,12 @@ import kotlin.test.assertTrue
 
 class LiteralTest {
     private fun parse(pattern: String): Hir =
-        ParserBuilder.new().utf8(false).build().parse(pattern).getOrThrow()
+        ParserBuilder
+            .new()
+            .utf8(false)
+            .build()
+            .parse(pattern)
+            .getOrThrow()
 
     private fun prefixes(pattern: String): Seq =
         Extractor.new().kind(ExtractKind.Prefix).extract(parse(pattern))
@@ -206,10 +211,11 @@ class LiteralTest {
 
         val expected = exact("aaa", "aab", "aba", "abb", "baa", "bab", "bba", "bbb")
         assertEquals(expected, e("""[ab]{3}"""))
-        val expectedInexact = inexact(
-            listOf(I("aaa"), I("aab"), I("aba"), I("abb"), I("baa"), I("bab"), I("bba"), I("bbb")),
-            listOf(I("aaa"), I("aab"), I("aba"), I("abb"), I("baa"), I("bab"), I("bba"), I("bbb")),
-        )
+        val expectedInexact =
+            inexact(
+                listOf(I("aaa"), I("aab"), I("aba"), I("abb"), I("baa"), I("bab"), I("bba"), I("bbb")),
+                listOf(I("aaa"), I("aab"), I("aba"), I("abb"), I("baa"), I("bab"), I("bba"), I("bbb")),
+            )
         assertEquals(expectedInexact, e("""[ab]{3,4}"""))
     }
 
@@ -338,13 +344,15 @@ class LiteralTest {
     @Test
     fun anythingSmallLimits() {
         fun prefixes(pattern: String): Seq =
-            Extractor.new()
+            Extractor
+                .new()
                 .kind(ExtractKind.Prefix)
                 .limitTotal(10)
                 .extract(parse(pattern))
 
         fun suffixes(pattern: String): Seq =
-            Extractor.new()
+            Extractor
+                .new()
                 .kind(ExtractKind.Suffix)
                 .limitTotal(10)
                 .extract(parse(pattern))
@@ -381,15 +389,36 @@ class LiteralTest {
         assertEquals(infinite(), e(""".|a"""))
 
         val pat = """M[ou]'?am+[ae]r .*([AEae]l[- ])?[GKQ]h?[aeu]+([dtz][dhz]?)+af[iy]"""
-        val expected = inexact(
-            listOf("Mo'am", "Moam", "Mu'am", "Muam").map { I(it) },
-            listOf(
-                "ddafi", "ddafy", "dhafi", "dhafy", "dzafi", "dzafy", "dafi",
-                "dafy", "tdafi", "tdafy", "thafi", "thafy", "tzafi", "tzafy",
-                "tafi", "tafy", "zdafi", "zdafy", "zhafi", "zhafy", "zzafi",
-                "zzafy", "zafi", "zafy",
-            ).map { I(it) },
-        )
+        val expected =
+            inexact(
+                listOf("Mo'am", "Moam", "Mu'am", "Muam").map { I(it) },
+                listOf(
+                    "ddafi",
+                    "ddafy",
+                    "dhafi",
+                    "dhafy",
+                    "dzafi",
+                    "dzafy",
+                    "dafi",
+                    "dafy",
+                    "tdafi",
+                    "tdafy",
+                    "thafi",
+                    "thafy",
+                    "tzafi",
+                    "tzafy",
+                    "tafi",
+                    "tafy",
+                    "zdafi",
+                    "zdafy",
+                    "zhafi",
+                    "zhafy",
+                    "zzafi",
+                    "zzafy",
+                    "zafi",
+                    "zafy",
+                ).map { I(it) },
+            )
         assertEquals(expected, e(pat))
 
         assertEquals(
@@ -411,10 +440,11 @@ class LiteralTest {
     // matches from short literals.")
     @Test
     fun holmes() {
-        val expected = inexact(
-            listOf("HOL", "HOl", "HoL", "Hol", "hOL", "hOl", "hoL", "hol").map { I(it) },
-            listOf("MES", "MEs", "Eſ", "MeS", "Mes", "eſ", "mES", "mEs", "meS", "mes").map { I(it) },
-        )
+        val expected =
+            inexact(
+                listOf("HOL", "HOl", "HoL", "Hol", "hOL", "hOl", "hoL", "hol").map { I(it) },
+                listOf("MES", "MEs", "Eſ", "MeS", "Mes", "eſ", "mES", "mEs", "meS", "mes").map { I(it) },
+            )
         val (prefixes, suffixes) = e("""(?i)Holmes""")
         prefixes.keepFirstBytes(3)
         suffixes.keepLastBytes(3)

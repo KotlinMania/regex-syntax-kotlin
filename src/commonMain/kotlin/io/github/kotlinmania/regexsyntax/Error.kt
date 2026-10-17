@@ -2,11 +2,11 @@
 package io.github.kotlinmania.regexsyntax
 
 import io.github.kotlinmania.regexsyntax.ast.Span
+import kotlin.math.max
 import io.github.kotlinmania.regexsyntax.ast.Error as AstError
 import io.github.kotlinmania.regexsyntax.ast.ErrorKind as AstErrorKind
 import io.github.kotlinmania.regexsyntax.hir.Error as HirError
 import io.github.kotlinmania.regexsyntax.hir.ErrorKind as HirErrorKind
-import kotlin.math.max
 
 /**
  * This error type encompasses any error that can be returned by this crate.
@@ -19,18 +19,23 @@ sealed class Error {
      * An error that occurred while translating concrete syntax into abstract
      * syntax (AST).
      */
-    data class Parse(val value: AstError) : Error()
+    data class Parse(
+        val value: AstError,
+    ) : Error()
 
     /**
      * An error that occurred while translating abstract syntax into a high
      * level intermediate representation (HIR).
      */
-    data class Translate(val value: HirError) : Error()
+    data class Translate(
+        val value: HirError,
+    ) : Error()
 
-    override fun toString(): String = when (this) {
-        is Parse -> value.toString()
-        is Translate -> value.toString()
-    }
+    override fun toString(): String =
+        when (this) {
+            is Parse -> value.toString()
+            is Translate -> value.toString()
+        }
 
     fun fmt(): String = toString()
 
@@ -85,7 +90,7 @@ class Formatter<E : Any>(
                 for (s in spans.multiLine) {
                     notes.add(
                         "on line ${s.start.line} (column ${s.start.column}) " +
-                            "through line ${s.end.line} (column ${s.end.column - 1})"
+                            "through line ${s.end.line} (column ${s.end.column - 1})",
                     )
                 }
                 out.append(notes.joinToString("\n")).append('\n')
@@ -101,19 +106,21 @@ class Formatter<E : Any>(
     }
 
     companion object {
-        fun fromAstError(err: AstError): Formatter<AstErrorKind> = Formatter(
-            pattern = err.pattern(),
-            err = err.kind(),
-            span = err.span(),
-            auxSpan = err.auxiliarySpan(),
-        )
+        fun fromAstError(err: AstError): Formatter<AstErrorKind> =
+            Formatter(
+                pattern = err.pattern(),
+                err = err.kind(),
+                span = err.span(),
+                auxSpan = err.auxiliarySpan(),
+            )
 
-        fun fromHirError(err: HirError): Formatter<HirErrorKind> = Formatter(
-            pattern = err.pattern(),
-            err = err.kind(),
-            span = err.span(),
-            auxSpan = null,
-        )
+        fun fromHirError(err: HirError): Formatter<HirErrorKind> =
+            Formatter(
+                pattern = err.pattern(),
+                err = err.kind(),
+                span = err.span(),
+                auxSpan = null,
+            )
     }
 }
 
@@ -209,7 +216,7 @@ private class Spans(
         }
         var pos = 0
         for (span in spans) {
-            for (j in pos until (span.start.column - 1)) {
+            while (pos < span.start.column - 1) {
                 notes.append(' ')
                 pos += 1
             }
@@ -256,12 +263,13 @@ private class Spans(
             }
             val lineNumberWidth = if (lineCount <= 1) 0 else lineCount.toString().length
             val byLine = MutableList(lineCount) { mutableListOf<Span>() }
-            val spans = Spans(
-                pattern = fmter.pattern,
-                lineNumberWidth = lineNumberWidth,
-                byLine = byLine,
-                multiLine = mutableListOf(),
-            )
+            val spans =
+                Spans(
+                    pattern = fmter.pattern,
+                    lineNumberWidth = lineNumberWidth,
+                    byLine = byLine,
+                    multiLine = mutableListOf(),
+                )
             spans.add(fmter.span)
             val aux = fmter.auxSpan
             if (aux != null) {

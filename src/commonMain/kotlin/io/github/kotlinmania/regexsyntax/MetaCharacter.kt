@@ -1,4 +1,3 @@
-// port-lint: source lib.rs
 package io.github.kotlinmania.regexsyntax
 
 import io.github.kotlinmania.regexsyntax.unicode.UnicodeWordError
@@ -52,11 +51,13 @@ fun escapeInto(text: String, buf: StringBuilder) {
  * Note that the set of characters for which this function returns `true`
  * or `false` is fixed and won't change in a semver compatible release.
  */
-fun isMetaCharacter(c: Char): Boolean = when (c) {
-    '\\', '.', '+', '*', '?', '(', ')', '|', '[', ']', '{',
-    '}', '^', '$', '#', '&', '-', '~' -> true
-    else -> false
-}
+fun isMetaCharacter(c: Char): Boolean =
+    when (c) {
+        '\\', '.', '+', '*', '?', '(', ')', '|', '[', ']', '{',
+        '}', '^', '$', '#', '&', '-', '~',
+        -> true
+        else -> false
+    }
 
 /**
  * Returns true if the given character can be escaped in a regex.
@@ -124,9 +125,10 @@ fun isEscapeableCharacter(c: Char): Boolean {
  * available. Callers that prefer a [Result]-typed signature should use
  * [tryIsWordCharacter] instead.
  */
-fun isWordCharacter(c: Int): Boolean = tryIsWordCharacter(c).getOrElse {
-    throw it
-}
+fun isWordCharacter(c: Int): Boolean =
+    tryIsWordCharacter(c).getOrElse {
+        throw it
+    }
 
 /**
  * Returns true if and only if the given character is a Unicode word
