@@ -1,4 +1,3 @@
-// port-lint: source ast/mod.rs
 package io.github.kotlinmania.regexsyntax.ast
 
 /*
@@ -73,12 +72,13 @@ data class Error(
      * main error position set to the duplicate occurrence while its
      * auxiliary span will be set to the initial occurrence.
      */
-    fun auxiliarySpan(): Span? = when (val k = kindValue) {
-        is ErrorKind.FlagDuplicate -> k.original
-        is ErrorKind.FlagRepeatedNegation -> k.original
-        is ErrorKind.GroupNameDuplicate -> k.original
-        else -> null
-    }
+    fun auxiliarySpan(): Span? =
+        when (val k = kindValue) {
+            is ErrorKind.FlagDuplicate -> k.original
+            is ErrorKind.FlagRepeatedNegation -> k.original
+            is ErrorKind.GroupNameDuplicate -> k.original
+            else -> null
+        }
 
     override fun toString(): String = ErrorFormatter.fromAstError(this).toString()
 }
@@ -208,7 +208,9 @@ sealed class ErrorKind {
      * The nest limit was exceeded. The limit stored here is the limit
      * configured in the parser.
      */
-    data class NestLimitExceeded(val limit: UInt) : ErrorKind()
+    data class NestLimitExceeded(
+        val limit: UInt,
+    ) : ErrorKind()
 
     /**
      * The range provided in a counted repetition operator is invalid. The
@@ -277,53 +279,63 @@ sealed class ErrorKind {
     object UnsupportedLookAround : ErrorKind()
 
     fun fmt(wtr: Appendable): Result<Unit> {
-        val message = when (this) {
-            CaptureLimitExceeded -> "exceeded the maximum number of " +
-                "capturing groups (${UInt.MAX_VALUE})"
-            ClassEscapeInvalid -> "invalid escape sequence found in character class"
-            ClassRangeInvalid -> "invalid character class range, " +
-                "the start must be <= the end"
-            ClassRangeLiteral -> "invalid range boundary, must be a literal"
-            ClassUnclosed -> "unclosed character class"
-            DecimalEmpty -> "decimal literal empty"
-            DecimalInvalid -> "decimal literal invalid"
-            EscapeHexEmpty -> "hexadecimal literal empty"
-            EscapeHexInvalid -> "hexadecimal literal is not a Unicode scalar value"
-            EscapeHexInvalidDigit -> "invalid hexadecimal digit"
-            EscapeUnexpectedEof -> "incomplete escape sequence, " +
-                "reached end of pattern prematurely"
-            EscapeUnrecognized -> "unrecognized escape sequence"
-            FlagDanglingNegation -> "dangling flag negation operator"
-            is FlagDuplicate -> "duplicate flag"
-            is FlagRepeatedNegation -> "flag negation operator repeated"
-            FlagUnexpectedEof -> "expected flag but got end of regex"
-            FlagUnrecognized -> "unrecognized flag"
-            is GroupNameDuplicate -> "duplicate capture group name"
-            GroupNameEmpty -> "empty capture group name"
-            GroupNameInvalid -> "invalid capture group character"
-            GroupNameUnexpectedEof -> "unclosed capture group name"
-            GroupUnclosed -> "unclosed group"
-            GroupUnopened -> "unopened group"
-            is NestLimitExceeded -> "exceed the maximum number of " +
-                "nested parentheses/brackets ($limit)"
-            RepetitionCountInvalid -> "invalid repetition count range, " +
-                "the start must be <= the end"
-            RepetitionCountDecimalEmpty -> "repetition quantifier expects a valid decimal"
-            RepetitionCountUnclosed -> "unclosed counted repetition"
-            RepetitionMissing -> "repetition operator missing expression"
-            SpecialWordBoundaryUnclosed -> "special word boundary assertion is either " +
-                "unclosed or contains an invalid character"
-            SpecialWordBoundaryUnrecognized -> "unrecognized special word boundary assertion, " +
-                "valid choices are: start, end, start-half " +
-                "or end-half"
-            SpecialWordOrRepetitionUnexpectedEof -> "found either the beginning of a special word " +
-                "boundary or a bounded repetition on a \\b with " +
-                "an opening brace, but no closing brace"
-            UnicodeClassInvalid -> "invalid Unicode character class"
-            UnsupportedBackreference -> "backreferences are not supported"
-            UnsupportedLookAround -> "look-around, including look-ahead and look-behind, " +
-                "is not supported"
-        }
+        val message =
+            when (this) {
+                CaptureLimitExceeded ->
+                    "exceeded the maximum number of " +
+                        "capturing groups (${UInt.MAX_VALUE})"
+                ClassEscapeInvalid -> "invalid escape sequence found in character class"
+                ClassRangeInvalid ->
+                    "invalid character class range, " +
+                        "the start must be <= the end"
+                ClassRangeLiteral -> "invalid range boundary, must be a literal"
+                ClassUnclosed -> "unclosed character class"
+                DecimalEmpty -> "decimal literal empty"
+                DecimalInvalid -> "decimal literal invalid"
+                EscapeHexEmpty -> "hexadecimal literal empty"
+                EscapeHexInvalid -> "hexadecimal literal is not a Unicode scalar value"
+                EscapeHexInvalidDigit -> "invalid hexadecimal digit"
+                EscapeUnexpectedEof ->
+                    "incomplete escape sequence, " +
+                        "reached end of pattern prematurely"
+                EscapeUnrecognized -> "unrecognized escape sequence"
+                FlagDanglingNegation -> "dangling flag negation operator"
+                is FlagDuplicate -> "duplicate flag"
+                is FlagRepeatedNegation -> "flag negation operator repeated"
+                FlagUnexpectedEof -> "expected flag but got end of regex"
+                FlagUnrecognized -> "unrecognized flag"
+                is GroupNameDuplicate -> "duplicate capture group name"
+                GroupNameEmpty -> "empty capture group name"
+                GroupNameInvalid -> "invalid capture group character"
+                GroupNameUnexpectedEof -> "unclosed capture group name"
+                GroupUnclosed -> "unclosed group"
+                GroupUnopened -> "unopened group"
+                is NestLimitExceeded ->
+                    "exceed the maximum number of " +
+                        "nested parentheses/brackets ($limit)"
+                RepetitionCountInvalid ->
+                    "invalid repetition count range, " +
+                        "the start must be <= the end"
+                RepetitionCountDecimalEmpty -> "repetition quantifier expects a valid decimal"
+                RepetitionCountUnclosed -> "unclosed counted repetition"
+                RepetitionMissing -> "repetition operator missing expression"
+                SpecialWordBoundaryUnclosed ->
+                    "special word boundary assertion is either " +
+                        "unclosed or contains an invalid character"
+                SpecialWordBoundaryUnrecognized ->
+                    "unrecognized special word boundary assertion, " +
+                        "valid choices are: start, end, start-half " +
+                        "or end-half"
+                SpecialWordOrRepetitionUnexpectedEof ->
+                    "found either the beginning of a special word " +
+                        "boundary or a bounded repetition on a \\b with " +
+                        "an opening brace, but no closing brace"
+                UnicodeClassInvalid -> "invalid Unicode character class"
+                UnsupportedBackreference -> "backreferences are not supported"
+                UnsupportedLookAround ->
+                    "look-around, including look-ahead and look-behind, " +
+                        "is not supported"
+            }
         wtr.append(message)
         return Result.success(Unit)
     }
@@ -471,60 +483,85 @@ data class Comment(
  */
 sealed class Ast {
     /** An empty regex that matches everything. */
-    data class Empty(val span: Span) : Ast()
+    data class Empty(
+        val span: Span,
+    ) : Ast()
 
     /** A set of flags, e.g., `(?is)`. */
-    data class Flags(val value: SetFlags) : Ast()
+    data class Flags(
+        val value: SetFlags,
+    ) : Ast()
 
     /** A single character literal, which includes escape sequences. */
-    data class Literal(val value: io.github.kotlinmania.regexsyntax.ast.Literal) : Ast()
+    data class Literal(
+        val value: io.github.kotlinmania.regexsyntax.ast.Literal,
+    ) : Ast()
 
     /** The "any character" class. */
-    data class Dot(val span: Span) : Ast()
+    data class Dot(
+        val span: Span,
+    ) : Ast()
 
     /** A single zero-width assertion. */
-    data class Assertion(val value: io.github.kotlinmania.regexsyntax.ast.Assertion) : Ast()
+    data class Assertion(
+        val value: io.github.kotlinmania.regexsyntax.ast.Assertion,
+    ) : Ast()
 
     /** A single Unicode character class, e.g., `\pL` or `\p{Greek}`. */
-    data class ClassUnicode(val value: io.github.kotlinmania.regexsyntax.ast.ClassUnicode) : Ast()
+    data class ClassUnicode(
+        val value: io.github.kotlinmania.regexsyntax.ast.ClassUnicode,
+    ) : Ast()
 
     /** A single perl character class, e.g., `\d` or `\W`. */
-    data class ClassPerl(val value: io.github.kotlinmania.regexsyntax.ast.ClassPerl) : Ast()
+    data class ClassPerl(
+        val value: io.github.kotlinmania.regexsyntax.ast.ClassPerl,
+    ) : Ast()
 
     /**
      * A single bracketed character class set, which may contain zero or more
      * character ranges and/or zero or more nested classes. e.g.,
      * `[a-zA-Z\pL]`.
      */
-    data class ClassBracketed(val value: io.github.kotlinmania.regexsyntax.ast.ClassBracketed) : Ast()
+    data class ClassBracketed(
+        val value: io.github.kotlinmania.regexsyntax.ast.ClassBracketed,
+    ) : Ast()
 
     /** A repetition operator applied to an arbitrary regular expression. */
-    data class Repetition(val value: io.github.kotlinmania.regexsyntax.ast.Repetition) : Ast()
+    data class Repetition(
+        val value: io.github.kotlinmania.regexsyntax.ast.Repetition,
+    ) : Ast()
 
     /** A grouped regular expression. */
-    data class Group(val value: io.github.kotlinmania.regexsyntax.ast.Group) : Ast()
+    data class Group(
+        val value: io.github.kotlinmania.regexsyntax.ast.Group,
+    ) : Ast()
 
     /** An alternation of regular expressions. */
-    data class Alternation(val value: io.github.kotlinmania.regexsyntax.ast.Alternation) : Ast()
+    data class Alternation(
+        val value: io.github.kotlinmania.regexsyntax.ast.Alternation,
+    ) : Ast()
 
     /** A concatenation of regular expressions. */
-    data class Concat(val value: io.github.kotlinmania.regexsyntax.ast.Concat) : Ast()
+    data class Concat(
+        val value: io.github.kotlinmania.regexsyntax.ast.Concat,
+    ) : Ast()
 
     /** Return the span of this abstract syntax tree. */
-    fun span(): Span = when (this) {
-        is Empty -> span
-        is Flags -> value.span
-        is Literal -> value.span
-        is Dot -> span
-        is Assertion -> value.span
-        is ClassUnicode -> value.span
-        is ClassPerl -> value.span
-        is ClassBracketed -> value.span
-        is Repetition -> value.span
-        is Group -> value.span
-        is Alternation -> value.span
-        is Concat -> value.span
-    }
+    fun span(): Span =
+        when (this) {
+            is Empty -> span
+            is Flags -> value.span
+            is Literal -> value.span
+            is Dot -> span
+            is Assertion -> value.span
+            is ClassUnicode -> value.span
+            is ClassPerl -> value.span
+            is ClassBracketed -> value.span
+            is Repetition -> value.span
+            is Group -> value.span
+            is Alternation -> value.span
+            is Concat -> value.span
+        }
 
     /** Return true if and only if this Ast is empty. */
     fun isEmpty(): Boolean = this is Empty
@@ -533,23 +570,28 @@ sealed class Ast {
      * Returns true if and only if this AST has any (including possibly empty)
      * subexpressions.
      */
-    internal fun hasSubexprs(): Boolean = when (this) {
-        is Empty,
-        is Flags,
-        is Literal,
-        is Dot,
-        is Assertion,
-        is ClassUnicode,
-        is ClassPerl -> false
-        is ClassBracketed,
-        is Repetition,
-        is Group,
-        is Alternation,
-        is Concat -> true
-    }
+    internal fun hasSubexprs(): Boolean =
+        when (this) {
+            is Empty,
+            is Flags,
+            is Literal,
+            is Dot,
+            is Assertion,
+            is ClassUnicode,
+            is ClassPerl,
+            -> false
+            is ClassBracketed,
+            is Repetition,
+            is Group,
+            is Alternation,
+            is Concat,
+            -> true
+        }
 
     fun fmt(wtr: Appendable): Result<Unit> =
-        io.github.kotlinmania.regexsyntax.ast.print.Printer.new().print(this, wtr)
+        io.github.kotlinmania.regexsyntax.ast.print.Printer
+            .new()
+            .print(this, wtr)
 
     final override fun toString(): String {
         val dst = StringBuilder()
@@ -610,11 +652,12 @@ data class Alternation(
      * If this alternation contains exactly 1 AST, then the corresponding AST
      * is returned. Otherwise, [Ast.alternation] is returned.
      */
-    fun intoAst(): Ast = when (asts.size) {
-        0 -> Ast.empty(span)
-        1 -> asts[0]
-        else -> Ast.alternation(this)
-    }
+    fun intoAst(): Ast =
+        when (asts.size) {
+            0 -> Ast.empty(span)
+            1 -> asts[0]
+            else -> Ast.alternation(this)
+        }
 
     internal fun addAst(ast: Ast) {
         (asts as? MutableList<Ast>)?.add(ast)
@@ -635,11 +678,12 @@ data class Concat(
      * If this alternation contains exactly 1 AST, then the corresponding AST
      * is returned. Otherwise, [Ast.concat] is returned.
      */
-    fun intoAst(): Ast = when (asts.size) {
-        0 -> Ast.empty(span)
-        1 -> asts[0]
-        else -> Ast.concat(this)
-    }
+    fun intoAst(): Ast =
+        when (asts.size) {
+            0 -> Ast.empty(span)
+            1 -> asts[0]
+            else -> Ast.concat(this)
+        }
 
     internal fun addAst(ast: Ast) {
         (asts as? MutableList<Ast>)?.add(ast)
@@ -672,12 +716,16 @@ data class Literal(
      * If this literal was written as a `\x` hex escape, then this returns
      * the corresponding byte value. Otherwise, this returns `null`.
      */
-    fun byte(): UByte? = when (kind) {
-        is LiteralKind.HexFixed -> if (kind.value == HexLiteralKind.X) {
-            if (c in 0..0xFF) c.toUByte() else null
-        } else null
-        else -> null
-    }
+    fun byte(): UByte? =
+        when (kind) {
+            is LiteralKind.HexFixed ->
+                if (kind.value == HexLiteralKind.X) {
+                    if (c in 0..0xFF) c.toUByte() else null
+                } else {
+                    null
+                }
+            else -> null
+        }
 }
 
 /** The kind of a single literal expression. */
@@ -705,20 +753,26 @@ sealed class LiteralKind {
      * depending on the type of the escape, e.g., `\x61` or `a` or
      * `\U00000061`.
      */
-    data class HexFixed(val value: HexLiteralKind) : LiteralKind()
+    data class HexFixed(
+        val value: HexLiteralKind,
+    ) : LiteralKind()
 
     /**
      * The literal is written as a hex code with a bracketed number of
      * digits. The only restriction is that the bracketed hex code must refer
      * to a valid Unicode scalar value.
      */
-    data class HexBrace(val value: HexLiteralKind) : LiteralKind()
+    data class HexBrace(
+        val value: HexLiteralKind,
+    ) : LiteralKind()
 
     /**
      * The literal is written as a specially recognized escape, e.g., `\f`
      * or `\n`.
      */
-    data class Special(val value: SpecialLiteralKind) : LiteralKind()
+    data class Special(
+        val value: SpecialLiteralKind,
+    ) : LiteralKind()
 }
 
 /**
@@ -777,18 +831,21 @@ enum class HexLiteralKind {
      * A `\U` prefix. When used without brackets, this form is limited to
      * eight digits.
      */
-    UnicodeLong;
+    UnicodeLong,
+
+    ;
 
     /**
      * The number of digits that must be used with this literal form when
      * used without brackets. When used with brackets, there is no
      * restriction on the number of digits.
      */
-    fun digits(): Int = when (this) {
-        X -> 2
-        UnicodeShort -> 4
-        UnicodeLong -> 8
-    }
+    fun digits(): Int =
+        when (this) {
+            X -> 2
+            UnicodeShort -> 4
+            UnicodeLong -> 8
+        }
 }
 
 /** A Perl character class. */
@@ -871,7 +928,9 @@ enum class ClassAsciiKind {
     Word,
 
     /** `[0-9A-Fa-f]` */
-    Xdigit;
+    Xdigit,
+
+    ;
 
     companion object {
         /**
@@ -883,23 +942,24 @@ enum class ClassAsciiKind {
          * If no variant with the corresponding name exists, then `null` is
          * returned.
          */
-        fun fromName(name: String): ClassAsciiKind? = when (name) {
-            "alnum" -> Alnum
-            "alpha" -> Alpha
-            "ascii" -> Ascii
-            "blank" -> Blank
-            "cntrl" -> Cntrl
-            "digit" -> Digit
-            "graph" -> Graph
-            "lower" -> Lower
-            "print" -> Print
-            "punct" -> Punct
-            "space" -> Space
-            "upper" -> Upper
-            "word" -> Word
-            "xdigit" -> Xdigit
-            else -> null
-        }
+        fun fromName(name: String): ClassAsciiKind? =
+            when (name) {
+                "alnum" -> Alnum
+                "alpha" -> Alpha
+                "ascii" -> Ascii
+                "blank" -> Blank
+                "cntrl" -> Cntrl
+                "digit" -> Digit
+                "graph" -> Graph
+                "lower" -> Lower
+                "print" -> Print
+                "punct" -> Punct
+                "space" -> Space
+                "upper" -> Upper
+                "word" -> Word
+                "xdigit" -> Xdigit
+                else -> null
+            }
     }
 }
 
@@ -928,10 +988,11 @@ data class ClassUnicode(
      * Note that this takes the Unicode op into account, if it's present.
      * e.g., [isNegated] for `\P{scx!=Katakana}` will return `false`.
      */
-    fun isNegated(): Boolean = when (val k = kind) {
-        is ClassUnicodeKind.NamedValue -> if (k.op == ClassUnicodeOpKind.NotEqual) !negated else negated
-        else -> negated
-    }
+    fun isNegated(): Boolean =
+        when (val k = kind) {
+            is ClassUnicodeKind.NamedValue -> if (k.op == ClassUnicodeOpKind.NotEqual) !negated else negated
+            else -> negated
+        }
 }
 
 /** The available forms of Unicode character classes. */
@@ -941,13 +1002,17 @@ sealed class ClassUnicodeKind {
      * scalar value stored as a codepoint (`Int`), since astral codepoints do
      * not fit in a Kotlin `Char`.
      */
-    data class OneLetter(val value: Int) : ClassUnicodeKind()
+    data class OneLetter(
+        val value: Int,
+    ) : ClassUnicodeKind()
 
     /**
      * A binary property, general category or script. The string may be
      * empty.
      */
-    data class Named(val value: String) : ClassUnicodeKind()
+    data class Named(
+        val value: String,
+    ) : ClassUnicodeKind()
 
     /** A property name and an associated value. */
     data class NamedValue(
@@ -972,13 +1037,16 @@ enum class ClassUnicodeOpKind {
     Colon,
 
     /** A property that isn't a particular value, e.g., `\p{scx!=Katakana}`. */
-    NotEqual;
+    NotEqual,
+
+    ;
 
     /** Whether the op is an equality op or not. */
-    fun isEqual(): Boolean = when (this) {
-        Equal, Colon -> true
-        else -> false
-    }
+    fun isEqual(): Boolean =
+        when (this) {
+            Equal, Colon -> true
+            else -> false
+        }
 }
 
 /** A bracketed character class, e.g., `[a-z0-9]`. */
@@ -1010,22 +1078,28 @@ sealed class ClassSet {
      * An item, which can be a single literal, range, nested character class
      * or a union of items.
      */
-    data class Item(val value: ClassSetItem) : ClassSet()
+    data class Item(
+        val value: ClassSetItem,
+    ) : ClassSet()
 
     /** A single binary operation (i.e., &&, -- or ~~). */
-    data class BinaryOp(val value: ClassSetBinaryOp) : ClassSet()
+    data class BinaryOp(
+        val value: ClassSetBinaryOp,
+    ) : ClassSet()
 
     /** Return the span of this character class set. */
-    fun span(): Span = when (this) {
-        is Item -> value.span()
-        is BinaryOp -> value.span
-    }
+    fun span(): Span =
+        when (this) {
+            is Item -> value.span()
+            is BinaryOp -> value.span
+        }
 
     /** Return true if and only if this class set is empty. */
-    internal fun isEmpty(): Boolean = when (this) {
-        is Item -> value is ClassSetItem.Empty
-        else -> false
-    }
+    internal fun isEmpty(): Boolean =
+        when (this) {
+            is Item -> value is ClassSetItem.Empty
+            else -> false
+        }
 
     companion object {
         /** Build a set from a union. */
@@ -1042,44 +1116,61 @@ sealed class ClassSetItem {
      * item. Empty items can appear when using one of the binary operators.
      * For example, `[&&]` is the intersection of two empty classes.
      */
-    data class Empty(val span: Span) : ClassSetItem()
+    data class Empty(
+        val span: Span,
+    ) : ClassSetItem()
 
     /** A single literal. */
-    data class Literal(val value: io.github.kotlinmania.regexsyntax.ast.Literal) : ClassSetItem()
+    data class Literal(
+        val value: io.github.kotlinmania.regexsyntax.ast.Literal,
+    ) : ClassSetItem()
 
     /** A range between two literals. */
-    data class Range(val value: ClassSetRange) : ClassSetItem()
+    data class Range(
+        val value: ClassSetRange,
+    ) : ClassSetItem()
 
     /** An ASCII character class, e.g., `[:alnum:]` or `[:punct:]`. */
-    data class Ascii(val value: ClassAscii) : ClassSetItem()
+    data class Ascii(
+        val value: ClassAscii,
+    ) : ClassSetItem()
 
     /** A Unicode character class, e.g., `\pL` or `\p{Greek}`. */
-    data class Unicode(val value: ClassUnicode) : ClassSetItem()
+    data class Unicode(
+        val value: ClassUnicode,
+    ) : ClassSetItem()
 
     /** A perl character class, e.g., `\d` or `\W`. */
-    data class Perl(val value: ClassPerl) : ClassSetItem()
+    data class Perl(
+        val value: ClassPerl,
+    ) : ClassSetItem()
 
     /**
      * A bracketed character class set, which may contain zero or more
      * character ranges and/or zero or more nested classes. e.g.,
      * `[a-zA-Z\pL]`.
      */
-    data class Bracketed(val value: ClassBracketed) : ClassSetItem()
+    data class Bracketed(
+        val value: ClassBracketed,
+    ) : ClassSetItem()
 
     /** A union of items. */
-    data class Union(val value: ClassSetUnion) : ClassSetItem()
+    data class Union(
+        val value: ClassSetUnion,
+    ) : ClassSetItem()
 
     /** Return the span of this character class set item. */
-    fun span(): Span = when (this) {
-        is Empty -> span
-        is Literal -> value.span
-        is Range -> value.span
-        is Ascii -> value.span
-        is Perl -> value.span
-        is Unicode -> value.span
-        is Bracketed -> value.span
-        is Union -> value.span
-    }
+    fun span(): Span =
+        when (this) {
+            is Empty -> span
+            is Literal -> value.span
+            is Range -> value.span
+            is Ascii -> value.span
+            is Perl -> value.span
+            is Unicode -> value.span
+            is Bracketed -> value.span
+            is Union -> value.span
+        }
 }
 
 /** A single character class range in a set. */
@@ -1138,11 +1229,12 @@ data class ClassSetUnion(
      * corresponding item is returned. Otherwise, [ClassSetItem.Union] is
      * returned.
      */
-    fun intoItem(): ClassSetItem = when (items.size) {
-        0 -> ClassSetItem.Empty(span)
-        1 -> items[0]
-        else -> ClassSetItem.Union(this)
-    }
+    fun intoItem(): ClassSetItem =
+        when (items.size) {
+            0 -> ClassSetItem.Empty(span)
+            1 -> items[0]
+            else -> ClassSetItem.Union(this)
+        }
 }
 
 /** A Unicode character class set operation. */
@@ -1261,19 +1353,28 @@ sealed class RepetitionKind {
     object OneOrMore : RepetitionKind()
 
     /** `{m,n}` */
-    data class Range(val value: RepetitionRange) : RepetitionKind()
+    data class Range(
+        val value: RepetitionRange,
+    ) : RepetitionKind()
 }
 
 /** A range repetition operator. */
 sealed class RepetitionRange {
     /** `{m}` */
-    data class Exactly(val value: UInt) : RepetitionRange()
+    data class Exactly(
+        val value: UInt,
+    ) : RepetitionRange()
 
     /** `{m,}` */
-    data class AtLeast(val value: UInt) : RepetitionRange()
+    data class AtLeast(
+        val value: UInt,
+    ) : RepetitionRange()
 
     /** `{m,n}` */
-    data class Bounded(val start: UInt, val end: UInt) : RepetitionRange()
+    data class Bounded(
+        val start: UInt,
+        val end: UInt,
+    ) : RepetitionRange()
 
     /**
      * Returns true if and only if this repetition range is valid.
@@ -1281,10 +1382,11 @@ sealed class RepetitionRange {
      * The only case where a repetition range is invalid is if it is bounded
      * and its start is greater than its end.
      */
-    fun isValid(): Boolean = when (this) {
-        is Bounded -> start <= end
-        else -> true
-    }
+    fun isValid(): Boolean =
+        when (this) {
+            is Bounded -> start <= end
+            else -> true
+        }
 }
 
 /**
@@ -1307,33 +1409,38 @@ data class Group(
      * If this group is non-capturing, then this returns the (possibly empty)
      * set of flags. Otherwise, `null` is returned.
      */
-    fun flags(): Flags? = when (kind) {
-        is GroupKind.NonCapturing -> kind.value
-        else -> null
-    }
+    fun flags(): Flags? =
+        when (kind) {
+            is GroupKind.NonCapturing -> kind.value
+            else -> null
+        }
 
     /** Returns true if and only if this group is capturing. */
-    fun isCapturing(): Boolean = when (kind) {
-        is GroupKind.CaptureIndex, is GroupKind.CaptureName -> true
-        is GroupKind.NonCapturing -> false
-    }
+    fun isCapturing(): Boolean =
+        when (kind) {
+            is GroupKind.CaptureIndex, is GroupKind.CaptureName -> true
+            is GroupKind.NonCapturing -> false
+        }
 
     /**
      * Returns the capture index of this group, if this is a capturing group.
      *
      * This returns a capture index precisely when [isCapturing] is `true`.
      */
-    fun captureIndex(): UInt? = when (kind) {
-        is GroupKind.CaptureIndex -> kind.value
-        is GroupKind.CaptureName -> kind.name.index
-        is GroupKind.NonCapturing -> null
-    }
+    fun captureIndex(): UInt? =
+        when (kind) {
+            is GroupKind.CaptureIndex -> kind.value
+            is GroupKind.CaptureName -> kind.name.index
+            is GroupKind.NonCapturing -> null
+        }
 }
 
 /** The kind of a group. */
 sealed class GroupKind {
     /** `(a)` */
-    data class CaptureIndex(val value: UInt) : GroupKind()
+    data class CaptureIndex(
+        val value: UInt,
+    ) : GroupKind()
 
     /** `(?<name>a)` or `(?P<name>a)` */
     data class CaptureName(
@@ -1344,7 +1451,9 @@ sealed class GroupKind {
     ) : GroupKind()
 
     /** `(?:a)` and `(?i:a)` */
-    data class NonCapturing(val value: Flags) : GroupKind()
+    data class NonCapturing(
+        val value: Flags,
+    ) : GroupKind()
 }
 
 /**
@@ -1419,9 +1528,10 @@ data class Flags(
                 is FlagsItemKind.Negation -> {
                     negated = true
                 }
-                is FlagsItemKind.Flag -> if (kind.value == flag) {
-                    return !negated
-                }
+                is FlagsItemKind.Flag ->
+                    if (kind.value == flag) {
+                        return !negated
+                    }
             }
         }
         return null
@@ -1445,7 +1555,9 @@ sealed class FlagsItemKind {
     object Negation : FlagsItemKind()
 
     /** A single flag in a group. */
-    data class Flag(val value: io.github.kotlinmania.regexsyntax.ast.Flag) : FlagsItemKind()
+    data class Flag(
+        val value: io.github.kotlinmania.regexsyntax.ast.Flag,
+    ) : FlagsItemKind()
 
     /** Returns true if and only if this item is a negation operator. */
     fun isNegation(): Boolean = this is Negation

@@ -4,8 +4,8 @@
  */
 package io.github.kotlinmania.regexsyntax.hir.translate
 
-import io.github.kotlinmania.regexsyntax.ast.Ast
 import io.github.kotlinmania.regexsyntax.ast.AssertionKind
+import io.github.kotlinmania.regexsyntax.ast.Ast
 import io.github.kotlinmania.regexsyntax.ast.ClassAsciiKind
 import io.github.kotlinmania.regexsyntax.ast.ClassPerlKind
 import io.github.kotlinmania.regexsyntax.ast.ClassSetBinaryOp
@@ -18,14 +18,6 @@ import io.github.kotlinmania.regexsyntax.ast.GroupKind
 import io.github.kotlinmania.regexsyntax.ast.RepetitionKind
 import io.github.kotlinmania.regexsyntax.ast.RepetitionRange
 import io.github.kotlinmania.regexsyntax.ast.Span
-import io.github.kotlinmania.regexsyntax.ast.Assertion as AstAssertion
-import io.github.kotlinmania.regexsyntax.ast.ClassAscii as AstClassAscii
-import io.github.kotlinmania.regexsyntax.ast.ClassPerl as AstClassPerl
-import io.github.kotlinmania.regexsyntax.ast.ClassUnicode as AstClassUnicode
-import io.github.kotlinmania.regexsyntax.ast.Flags as AstFlags
-import io.github.kotlinmania.regexsyntax.ast.Group as AstGroup
-import io.github.kotlinmania.regexsyntax.ast.Literal as AstLiteral
-import io.github.kotlinmania.regexsyntax.ast.Repetition as AstRepetition
 import io.github.kotlinmania.regexsyntax.ast.visitor.Visitor
 import io.github.kotlinmania.regexsyntax.ast.visitor.visit
 import io.github.kotlinmania.regexsyntax.either.Either
@@ -49,6 +41,14 @@ import io.github.kotlinmania.regexsyntax.unicode.perlDigit
 import io.github.kotlinmania.regexsyntax.unicode.perlSpace
 import io.github.kotlinmania.regexsyntax.unicode.perlWord
 import io.github.kotlinmania.regexsyntax.unicode.unicodeClass
+import io.github.kotlinmania.regexsyntax.ast.Assertion as AstAssertion
+import io.github.kotlinmania.regexsyntax.ast.ClassAscii as AstClassAscii
+import io.github.kotlinmania.regexsyntax.ast.ClassPerl as AstClassPerl
+import io.github.kotlinmania.regexsyntax.ast.ClassUnicode as AstClassUnicode
+import io.github.kotlinmania.regexsyntax.ast.Flags as AstFlags
+import io.github.kotlinmania.regexsyntax.ast.Group as AstGroup
+import io.github.kotlinmania.regexsyntax.ast.Literal as AstLiteral
+import io.github.kotlinmania.regexsyntax.ast.Repetition as AstRepetition
 
 /** A builder for constructing an AST->HIR translator. */
 class TranslatorBuilder {
@@ -209,9 +209,14 @@ class Translator internal constructor(
  * A small mutable single-slot holder. The translator uses this to mutate
  * its active flag set in place as it walks the AST.
  */
-internal class StateCell<T>(var value: T) {
+internal class StateCell<T>(
+    var value: T,
+) {
     fun get(): T = value
-    fun set(v: T) { value = v }
+
+    fun set(v: T) {
+        value = v
+    }
 }
 
 /**
@@ -228,7 +233,9 @@ internal sealed class HirFrame {
      * case in the [Ast]. They get popped after an inductive (i.e., recursive)
      * step is complete.
      */
-    data class Expr(val expr: Hir) : HirFrame()
+    data class Expr(
+        val expr: Hir,
+    ) : HirFrame()
 
     /**
      * A literal that is being constructed, character by character, from the
@@ -238,14 +245,18 @@ internal sealed class HirFrame {
      * new literal. When it comes time to pop it, we convert it to an [Hir]
      * via [Hir.literal].
      */
-    class Literal(val bytes: MutableList<Byte>) : HirFrame()
+    class Literal(
+        val bytes: MutableList<Byte>,
+    ) : HirFrame()
 
     /**
      * A Unicode character class. This frame is mutated as we descend into
      * the [Ast] of a character class (which is itself its own mini recursive
      * structure).
      */
-    data class ClassUnicodeFrame(val cls: ClassUnicode) : HirFrame()
+    data class ClassUnicodeFrame(
+        val cls: ClassUnicode,
+    ) : HirFrame()
 
     /**
      * A byte-oriented character class. This frame is mutated as we descend
@@ -256,7 +267,9 @@ internal sealed class HirFrame {
      * If `utf8` is enabled (the default), then a byte character is only
      * permitted to match ASCII text.
      */
-    data class ClassBytesFrame(val cls: ClassBytes) : HirFrame()
+    data class ClassBytesFrame(
+        val cls: ClassBytes,
+    ) : HirFrame()
 
     /**
      * This is pushed whenever a repetition is observed. After visiting every
@@ -317,29 +330,32 @@ internal sealed class HirFrame {
     object AlternationBranch : HirFrame()
 
     /** Assert that the current stack frame is an [Hir] expression and return it. */
-    fun unwrapExpr(): Hir = when (this) {
-        is Expr -> expr
-        is Literal -> Hir.literal(bytes.toByteArray())
-        else -> error("tried to unwrap expr from HirFrame, got: $this")
-    }
+    fun unwrapExpr(): Hir =
+        when (this) {
+            is Expr -> expr
+            is Literal -> Hir.literal(bytes.toByteArray())
+            else -> error("tried to unwrap expr from HirFrame, got: $this")
+        }
 
     /**
      * Assert that the current stack frame is a Unicode class expression and
      * return it.
      */
-    fun unwrapClassUnicode(): ClassUnicode = when (this) {
-        is ClassUnicodeFrame -> cls
-        else -> error("tried to unwrap Unicode class from HirFrame, got: $this")
-    }
+    fun unwrapClassUnicode(): ClassUnicode =
+        when (this) {
+            is ClassUnicodeFrame -> cls
+            else -> error("tried to unwrap Unicode class from HirFrame, got: $this")
+        }
 
     /**
      * Assert that the current stack frame is a byte class expression and
      * return it.
      */
-    fun unwrapClassBytes(): ClassBytes = when (this) {
-        is ClassBytesFrame -> cls
-        else -> error("tried to unwrap byte class from HirFrame, got: $this")
-    }
+    fun unwrapClassBytes(): ClassBytes =
+        when (this) {
+            is ClassBytesFrame -> cls
+            else -> error("tried to unwrap byte class from HirFrame, got: $this")
+        }
 
     /**
      * Assert that the current stack frame is a repetition sentinel. If it
@@ -356,10 +372,11 @@ internal sealed class HirFrame {
      * its corresponding flags (the flags that were active at the time the
      * group was entered).
      */
-    fun unwrapGroup(): Flags = when (this) {
-        is Group -> oldFlags
-        else -> error("tried to unwrap group from HirFrame, got: $this")
-    }
+    fun unwrapGroup(): Flags =
+        when (this) {
+            is Group -> oldFlags
+            else -> error("tried to unwrap group from HirFrame, got: $this")
+        }
 
     /**
      * Assert that the current stack frame is an alternation pipe sentinel.
@@ -384,7 +401,6 @@ internal class TranslatorI(
     private val transRef: Translator,
     private val pattern: String,
 ) : Visitor<Hir, Error> {
-
     override fun finish(): Result<Hir> {
         // ... otherwise, we should have exactly one HIR on the stack.
         check(trans().stack.size == 1)
@@ -901,12 +917,17 @@ internal class TranslatorI(
             if (!isCased) {
                 return Result.success(null)
             }
-            val cls = ClassBytes.new(listOf(ClassBytesRange.new(
-                // OK because the codepoint is `<= 0x7F`, which in turn
-                // implies that it fits in a single byte (i.e., is ASCII).
-                c.toByte(),
-                c.toByte(),
-            )))
+            val cls =
+                ClassBytes.new(
+                    listOf(
+                        ClassBytesRange.new(
+                            // OK because the codepoint is `<= 0x7F`, which in turn
+                            // implies that it fits in a single byte (i.e., is ASCII).
+                            c.toByte(),
+                            c.toByte(),
+                        ),
+                    ),
+                )
             cls.caseFoldSimple()
             return Result.success(Hir.classOfHir(Class.Bytes(cls)))
         }
@@ -919,26 +940,27 @@ internal class TranslatorI(
         if (utf8 && (!flagsLocal.unicode() || !lineterm.isAscii())) {
             return Result.failure(error(span, ErrorKind.InvalidUtf8))
         }
-        val dot: Dot = if (flagsLocal.dotMatchesNewLine()) {
-            if (flagsLocal.unicode()) Dot.AnyChar else Dot.AnyByte
-        } else {
-            if (flagsLocal.unicode()) {
-                if (flagsLocal.crlf()) {
-                    Dot.AnyCharExceptCRLF
-                } else {
-                    if (!lineterm.isAscii()) {
-                        return Result.failure(error(span, ErrorKind.InvalidLineTerminator))
-                    }
-                    Dot.AnyCharExcept(lineterm.toInt() and 0xFF)
-                }
+        val dot: Dot =
+            if (flagsLocal.dotMatchesNewLine()) {
+                if (flagsLocal.unicode()) Dot.AnyChar else Dot.AnyByte
             } else {
-                if (flagsLocal.crlf()) {
-                    Dot.AnyByteExceptCRLF
+                if (flagsLocal.unicode()) {
+                    if (flagsLocal.crlf()) {
+                        Dot.AnyCharExceptCRLF
+                    } else {
+                        if (!lineterm.isAscii()) {
+                            return Result.failure(error(span, ErrorKind.InvalidLineTerminator))
+                        }
+                        Dot.AnyCharExcept(lineterm.toInt() and 0xFF)
+                    }
                 } else {
-                    Dot.AnyByteExcept(lineterm)
+                    if (flagsLocal.crlf()) {
+                        Dot.AnyByteExceptCRLF
+                    } else {
+                        Dot.AnyByteExcept(lineterm)
+                    }
                 }
             }
-        }
         return Result.success(Hir.dot(dot))
     }
 
@@ -946,72 +968,90 @@ internal class TranslatorI(
         val unicode = flags().unicode()
         val multiLine = flags().multiLine()
         val crlf = flags().crlf()
-        val hir = when (asst.kind) {
-            AssertionKind.StartLine -> Hir.look(if (multiLine) {
-                if (crlf) Look.StartCRLF else Look.StartLF
-            } else Look.Start)
-            AssertionKind.EndLine -> Hir.look(if (multiLine) {
-                if (crlf) Look.EndCRLF else Look.EndLF
-            } else Look.End)
-            AssertionKind.StartText -> Hir.look(Look.Start)
-            AssertionKind.EndText -> Hir.look(Look.End)
-            AssertionKind.WordBoundary -> Hir.look(if (unicode) Look.WordUnicode else Look.WordAscii)
-            AssertionKind.NotWordBoundary -> Hir.look(if (unicode) Look.WordUnicodeNegate else Look.WordAsciiNegate)
-            AssertionKind.WordBoundaryStart, AssertionKind.WordBoundaryStartAngle ->
-                Hir.look(if (unicode) Look.WordStartUnicode else Look.WordStartAscii)
-            AssertionKind.WordBoundaryEnd, AssertionKind.WordBoundaryEndAngle ->
-                Hir.look(if (unicode) Look.WordEndUnicode else Look.WordEndAscii)
-            AssertionKind.WordBoundaryStartHalf ->
-                Hir.look(if (unicode) Look.WordStartHalfUnicode else Look.WordStartHalfAscii)
-            AssertionKind.WordBoundaryEndHalf ->
-                Hir.look(if (unicode) Look.WordEndHalfUnicode else Look.WordEndHalfAscii)
-        }
+        val hir =
+            when (asst.kind) {
+                AssertionKind.StartLine ->
+                    Hir.look(
+                        if (multiLine) {
+                            if (crlf) Look.StartCRLF else Look.StartLF
+                        } else {
+                            Look.Start
+                        },
+                    )
+                AssertionKind.EndLine ->
+                    Hir.look(
+                        if (multiLine) {
+                            if (crlf) Look.EndCRLF else Look.EndLF
+                        } else {
+                            Look.End
+                        },
+                    )
+                AssertionKind.StartText -> Hir.look(Look.Start)
+                AssertionKind.EndText -> Hir.look(Look.End)
+                AssertionKind.WordBoundary -> Hir.look(if (unicode) Look.WordUnicode else Look.WordAscii)
+                AssertionKind.NotWordBoundary -> Hir.look(if (unicode) Look.WordUnicodeNegate else Look.WordAsciiNegate)
+                AssertionKind.WordBoundaryStart, AssertionKind.WordBoundaryStartAngle ->
+                    Hir.look(if (unicode) Look.WordStartUnicode else Look.WordStartAscii)
+                AssertionKind.WordBoundaryEnd, AssertionKind.WordBoundaryEndAngle ->
+                    Hir.look(if (unicode) Look.WordEndUnicode else Look.WordEndAscii)
+                AssertionKind.WordBoundaryStartHalf ->
+                    Hir.look(if (unicode) Look.WordStartHalfUnicode else Look.WordStartHalfAscii)
+                AssertionKind.WordBoundaryEndHalf ->
+                    Hir.look(if (unicode) Look.WordEndHalfUnicode else Look.WordEndHalfAscii)
+            }
         return Result.success(hir)
     }
 
     private fun hirCapture(group: AstGroup, expr: Hir): Hir {
-        val (index, name) = when (val k = group.kind) {
-            is GroupKind.CaptureIndex -> Pair(k.value, null)
-            is GroupKind.CaptureName -> Pair(k.name.index, k.name.name)
-            // The HIR doesn't need to use non-capturing groups, since the way
-            // in which the data type is defined handles this automatically.
-            is GroupKind.NonCapturing -> return expr
-        }
+        val (index, name) =
+            when (val k = group.kind) {
+                is GroupKind.CaptureIndex -> Pair(k.value, null)
+                is GroupKind.CaptureName -> Pair(k.name.index, k.name.name)
+                // The HIR doesn't need to use non-capturing groups, since the way
+                // in which the data type is defined handles this automatically.
+                is GroupKind.NonCapturing -> return expr
+            }
         return Hir.capture(Capture(index = index, name = name, sub = expr))
     }
 
     private fun hirRepetition(rep: AstRepetition, expr: Hir): Hir {
-        val (min, max) = when (val k = rep.op.kind) {
-            is RepetitionKind.ZeroOrOne -> Pair(0u, 1u as UInt?)
-            is RepetitionKind.ZeroOrMore -> Pair(0u, null as UInt?)
-            is RepetitionKind.OneOrMore -> Pair(1u, null as UInt?)
-            is RepetitionKind.Range -> when (val r = k.value) {
-                is RepetitionRange.Exactly -> Pair(r.value, r.value as UInt?)
-                is RepetitionRange.AtLeast -> Pair(r.value, null as UInt?)
-                is RepetitionRange.Bounded -> Pair(r.start, r.end as UInt?)
+        val (min, max) =
+            when (val k = rep.op.kind) {
+                is RepetitionKind.ZeroOrOne -> Pair(0u, 1u as UInt?)
+                is RepetitionKind.ZeroOrMore -> Pair(0u, null as UInt?)
+                is RepetitionKind.OneOrMore -> Pair(1u, null as UInt?)
+                is RepetitionKind.Range ->
+                    when (val r = k.value) {
+                        is RepetitionRange.Exactly -> Pair(r.value, r.value as UInt?)
+                        is RepetitionRange.AtLeast -> Pair(r.value, null as UInt?)
+                        is RepetitionRange.Bounded -> Pair(r.start, r.end as UInt?)
+                    }
             }
-        }
         val greedy = if (flags().swapGreed()) !rep.greedy else rep.greedy
-        return Hir.repetition(Repetition(
-            min = min,
-            max = max,
-            greedy = greedy,
-            sub = expr,
-        ))
+        return Hir.repetition(
+            Repetition(
+                min = min,
+                max = max,
+                greedy = greedy,
+                sub = expr,
+            ),
+        )
     }
 
     private fun hirUnicodeClass(astClass: AstClassUnicode): Result<ClassUnicode> {
         if (!flags().unicode()) {
             return Result.failure(error(astClass.span, ErrorKind.UnicodeNotAllowed))
         }
-        val query: ClassQuery = when (val k = astClass.kind) {
-            is ClassUnicodeKind.OneLetter -> ClassQuery.OneLetter(k.value)
-            is ClassUnicodeKind.Named -> ClassQuery.Binary(k.value)
-            is ClassUnicodeKind.NamedValue -> ClassQuery.ByValue(
-                propertyName = k.name,
-                propertyValue = k.value,
-            )
-        }
+        val query: ClassQuery =
+            when (val k = astClass.kind) {
+                is ClassUnicodeKind.OneLetter -> ClassQuery.OneLetter(k.value)
+                is ClassUnicodeKind.Named -> ClassQuery.Binary(k.value)
+                is ClassUnicodeKind.NamedValue ->
+                    ClassQuery.ByValue(
+                        propertyName = k.name,
+                        propertyValue = k.value,
+                    )
+            }
         val result = convertUnicodeClassError(astClass.span, unicodeClass(query))
         if (result.isSuccess) {
             val cls = result.getOrNull()!!
@@ -1022,18 +1062,20 @@ internal class TranslatorI(
     }
 
     private fun hirAsciiUnicodeClass(ast: AstClassAscii): Result<ClassUnicode> {
-        val cls = ClassUnicode.new(
-            asciiClassAsChars(ast.kind).map { (s, e) -> ClassUnicodeRange.new(s, e) }.toList()
-        )
+        val cls =
+            ClassUnicode.new(
+                asciiClassAsChars(ast.kind).map { (s, e) -> ClassUnicodeRange.new(s, e) }.toList(),
+            )
         val r = unicodeFoldAndNegate(ast.span, ast.negated, cls)
         if (r.isFailure) return Result.failure(r.exceptionOrNull()!!)
         return Result.success(cls)
     }
 
     private fun hirAsciiByteClass(ast: AstClassAscii): Result<ClassBytes> {
-        val cls = ClassBytes.new(
-            asciiClass(ast.kind).map { (s, e) -> ClassBytesRange.new(s, e) }.toList()
-        )
+        val cls =
+            ClassBytes.new(
+                asciiClass(ast.kind).map { (s, e) -> ClassBytesRange.new(s, e) }.toList(),
+            )
         val r = bytesFoldAndNegate(ast.span, ast.negated, cls)
         if (r.isFailure) return Result.failure(r.exceptionOrNull()!!)
         return Result.success(cls)
@@ -1041,11 +1083,12 @@ internal class TranslatorI(
 
     private fun hirPerlUnicodeClass(astClass: AstClassPerl): Result<ClassUnicode> {
         check(flags().unicode())
-        val result = when (astClass.kind) {
-            ClassPerlKind.Digit -> perlDigit()
-            ClassPerlKind.Space -> perlSpace()
-            ClassPerlKind.Word -> perlWord()
-        }
+        val result =
+            when (astClass.kind) {
+                ClassPerlKind.Digit -> perlDigit()
+                ClassPerlKind.Space -> perlSpace()
+                ClassPerlKind.Word -> perlWord()
+            }
         val cvt = convertUnicodeClassError(astClass.span, result)
         if (cvt.isFailure) return cvt
         val cls = cvt.getOrNull()!!
@@ -1059,11 +1102,12 @@ internal class TranslatorI(
 
     private fun hirPerlByteClass(astClass: AstClassPerl): Result<ClassBytes> {
         check(!flags().unicode())
-        val cls = when (astClass.kind) {
-            ClassPerlKind.Digit -> hirAsciiClassBytes(ClassAsciiKind.Digit)
-            ClassPerlKind.Space -> hirAsciiClassBytes(ClassAsciiKind.Space)
-            ClassPerlKind.Word -> hirAsciiClassBytes(ClassAsciiKind.Word)
-        }
+        val cls =
+            when (astClass.kind) {
+                ClassPerlKind.Digit -> hirAsciiClassBytes(ClassAsciiKind.Digit)
+                ClassPerlKind.Space -> hirAsciiClassBytes(ClassAsciiKind.Space)
+                ClassPerlKind.Word -> hirAsciiClassBytes(ClassAsciiKind.Word)
+            }
         // We needn't apply case folding here because the Perl ASCII classes
         // are already closed (under ASCII case folding).
         if (astClass.negated) {
@@ -1091,15 +1135,16 @@ internal class TranslatorI(
         if (result.isSuccess) return result
         val err = result.exceptionOrNull()
         val sp = span
-        val kind = if (err is UnicodeErrorException) {
-            when (err.error) {
-                io.github.kotlinmania.regexsyntax.unicode.Error.PropertyNotFound -> ErrorKind.UnicodePropertyNotFound
-                io.github.kotlinmania.regexsyntax.unicode.Error.PropertyValueNotFound -> ErrorKind.UnicodePropertyValueNotFound
-                io.github.kotlinmania.regexsyntax.unicode.Error.PerlClassNotFound -> ErrorKind.UnicodePerlClassNotFound
+        val kind =
+            if (err is UnicodeErrorException) {
+                when (err.error) {
+                    io.github.kotlinmania.regexsyntax.unicode.Error.PropertyNotFound -> ErrorKind.UnicodePropertyNotFound
+                    io.github.kotlinmania.regexsyntax.unicode.Error.PropertyValueNotFound -> ErrorKind.UnicodePropertyValueNotFound
+                    io.github.kotlinmania.regexsyntax.unicode.Error.PerlClassNotFound -> ErrorKind.UnicodePerlClassNotFound
+                }
+            } else {
+                ErrorKind.UnicodePerlClassNotFound
             }
-        } else {
-            ErrorKind.UnicodePerlClassNotFound
-        }
         return Result.failure(error(sp, kind))
     }
 
@@ -1188,20 +1233,26 @@ internal data class Flags(
     // Note that `ignoreWhitespace` is omitted here because it is handled
     // entirely in the parser.
 ) {
-    fun merge(previous: Flags): Flags = Flags(
-        caseInsensitive = caseInsensitive ?: previous.caseInsensitive,
-        multiLine = multiLine ?: previous.multiLine,
-        dotMatchesNewLine = dotMatchesNewLine ?: previous.dotMatchesNewLine,
-        swapGreed = swapGreed ?: previous.swapGreed,
-        unicode = unicode ?: previous.unicode,
-        crlf = crlf ?: previous.crlf,
-    )
+    fun merge(previous: Flags): Flags =
+        Flags(
+            caseInsensitive = caseInsensitive ?: previous.caseInsensitive,
+            multiLine = multiLine ?: previous.multiLine,
+            dotMatchesNewLine = dotMatchesNewLine ?: previous.dotMatchesNewLine,
+            swapGreed = swapGreed ?: previous.swapGreed,
+            unicode = unicode ?: previous.unicode,
+            crlf = crlf ?: previous.crlf,
+        )
 
     fun caseInsensitive(): Boolean = caseInsensitive ?: false
+
     fun multiLine(): Boolean = multiLine ?: false
+
     fun dotMatchesNewLine(): Boolean = dotMatchesNewLine ?: false
+
     fun swapGreed(): Boolean = swapGreed ?: false
+
     fun unicode(): Boolean = unicode ?: true
+
     fun crlf(): Boolean = crlf ?: false
 
     companion object {
@@ -1213,15 +1264,16 @@ internal data class Flags(
                     is FlagsItemKind.Negation -> {
                         enable = false
                     }
-                    is FlagsItemKind.Flag -> when (k.value) {
-                        Flag.CaseInsensitive -> flags = flags.copy(caseInsensitive = enable)
-                        Flag.MultiLine -> flags = flags.copy(multiLine = enable)
-                        Flag.DotMatchesNewLine -> flags = flags.copy(dotMatchesNewLine = enable)
-                        Flag.SwapGreed -> flags = flags.copy(swapGreed = enable)
-                        Flag.Unicode -> flags = flags.copy(unicode = enable)
-                        Flag.CRLF -> flags = flags.copy(crlf = enable)
-                        Flag.IgnoreWhitespace -> {}
-                    }
+                    is FlagsItemKind.Flag ->
+                        when (k.value) {
+                            Flag.CaseInsensitive -> flags = flags.copy(caseInsensitive = enable)
+                            Flag.MultiLine -> flags = flags.copy(multiLine = enable)
+                            Flag.DotMatchesNewLine -> flags = flags.copy(dotMatchesNewLine = enable)
+                            Flag.SwapGreed -> flags = flags.copy(swapGreed = enable)
+                            Flag.Unicode -> flags = flags.copy(unicode = enable)
+                            Flag.CRLF -> flags = flags.copy(crlf = enable)
+                            Flag.IgnoreWhitespace -> {}
+                        }
                 }
             }
             return flags
@@ -1235,68 +1287,83 @@ private fun hirAsciiClassBytes(kind: ClassAsciiKind): ClassBytes {
 }
 
 private fun asciiClass(kind: ClassAsciiKind): Sequence<Pair<Byte, Byte>> {
-    val slice: Array<Pair<Byte, Byte>> = when (kind) {
-        ClassAsciiKind.Alnum -> arrayOf(
-            '0'.code.toByte() to '9'.code.toByte(),
-            'A'.code.toByte() to 'Z'.code.toByte(),
-            'a'.code.toByte() to 'z'.code.toByte(),
-        )
-        ClassAsciiKind.Alpha -> arrayOf(
-            'A'.code.toByte() to 'Z'.code.toByte(),
-            'a'.code.toByte() to 'z'.code.toByte(),
-        )
-        ClassAsciiKind.Ascii -> arrayOf(
-            0x00.toByte() to 0x7F.toByte(),
-        )
-        ClassAsciiKind.Blank -> arrayOf(
-            '\t'.code.toByte() to '\t'.code.toByte(),
-            ' '.code.toByte() to ' '.code.toByte(),
-        )
-        ClassAsciiKind.Cntrl -> arrayOf(
-            0x00.toByte() to 0x1F.toByte(),
-            0x7F.toByte() to 0x7F.toByte(),
-        )
-        ClassAsciiKind.Digit -> arrayOf(
-            '0'.code.toByte() to '9'.code.toByte(),
-        )
-        ClassAsciiKind.Graph -> arrayOf(
-            '!'.code.toByte() to '~'.code.toByte(),
-        )
-        ClassAsciiKind.Lower -> arrayOf(
-            'a'.code.toByte() to 'z'.code.toByte(),
-        )
-        ClassAsciiKind.Print -> arrayOf(
-            ' '.code.toByte() to '~'.code.toByte(),
-        )
-        ClassAsciiKind.Punct -> arrayOf(
-            '!'.code.toByte() to '/'.code.toByte(),
-            ':'.code.toByte() to '@'.code.toByte(),
-            '['.code.toByte() to '`'.code.toByte(),
-            '{'.code.toByte() to '~'.code.toByte(),
-        )
-        ClassAsciiKind.Space -> arrayOf(
-            '\t'.code.toByte() to '\t'.code.toByte(),
-            '\n'.code.toByte() to '\n'.code.toByte(),
-            0x0B.toByte() to 0x0B.toByte(),
-            0x0C.toByte() to 0x0C.toByte(),
-            '\r'.code.toByte() to '\r'.code.toByte(),
-            ' '.code.toByte() to ' '.code.toByte(),
-        )
-        ClassAsciiKind.Upper -> arrayOf(
-            'A'.code.toByte() to 'Z'.code.toByte(),
-        )
-        ClassAsciiKind.Word -> arrayOf(
-            '0'.code.toByte() to '9'.code.toByte(),
-            'A'.code.toByte() to 'Z'.code.toByte(),
-            '_'.code.toByte() to '_'.code.toByte(),
-            'a'.code.toByte() to 'z'.code.toByte(),
-        )
-        ClassAsciiKind.Xdigit -> arrayOf(
-            '0'.code.toByte() to '9'.code.toByte(),
-            'A'.code.toByte() to 'F'.code.toByte(),
-            'a'.code.toByte() to 'f'.code.toByte(),
-        )
-    }
+    val slice: Array<Pair<Byte, Byte>> =
+        when (kind) {
+            ClassAsciiKind.Alnum ->
+                arrayOf(
+                    '0'.code.toByte() to '9'.code.toByte(),
+                    'A'.code.toByte() to 'Z'.code.toByte(),
+                    'a'.code.toByte() to 'z'.code.toByte(),
+                )
+            ClassAsciiKind.Alpha ->
+                arrayOf(
+                    'A'.code.toByte() to 'Z'.code.toByte(),
+                    'a'.code.toByte() to 'z'.code.toByte(),
+                )
+            ClassAsciiKind.Ascii ->
+                arrayOf(
+                    0x00.toByte() to 0x7F.toByte(),
+                )
+            ClassAsciiKind.Blank ->
+                arrayOf(
+                    '\t'.code.toByte() to '\t'.code.toByte(),
+                    ' '.code.toByte() to ' '.code.toByte(),
+                )
+            ClassAsciiKind.Cntrl ->
+                arrayOf(
+                    0x00.toByte() to 0x1F.toByte(),
+                    0x7F.toByte() to 0x7F.toByte(),
+                )
+            ClassAsciiKind.Digit ->
+                arrayOf(
+                    '0'.code.toByte() to '9'.code.toByte(),
+                )
+            ClassAsciiKind.Graph ->
+                arrayOf(
+                    '!'.code.toByte() to '~'.code.toByte(),
+                )
+            ClassAsciiKind.Lower ->
+                arrayOf(
+                    'a'.code.toByte() to 'z'.code.toByte(),
+                )
+            ClassAsciiKind.Print ->
+                arrayOf(
+                    ' '.code.toByte() to '~'.code.toByte(),
+                )
+            ClassAsciiKind.Punct ->
+                arrayOf(
+                    '!'.code.toByte() to '/'.code.toByte(),
+                    ':'.code.toByte() to '@'.code.toByte(),
+                    '['.code.toByte() to '`'.code.toByte(),
+                    '{'.code.toByte() to '~'.code.toByte(),
+                )
+            ClassAsciiKind.Space ->
+                arrayOf(
+                    '\t'.code.toByte() to '\t'.code.toByte(),
+                    '\n'.code.toByte() to '\n'.code.toByte(),
+                    0x0B.toByte() to 0x0B.toByte(),
+                    0x0C.toByte() to 0x0C.toByte(),
+                    '\r'.code.toByte() to '\r'.code.toByte(),
+                    ' '.code.toByte() to ' '.code.toByte(),
+                )
+            ClassAsciiKind.Upper ->
+                arrayOf(
+                    'A'.code.toByte() to 'Z'.code.toByte(),
+                )
+            ClassAsciiKind.Word ->
+                arrayOf(
+                    '0'.code.toByte() to '9'.code.toByte(),
+                    'A'.code.toByte() to 'Z'.code.toByte(),
+                    '_'.code.toByte() to '_'.code.toByte(),
+                    'a'.code.toByte() to 'z'.code.toByte(),
+                )
+            ClassAsciiKind.Xdigit ->
+                arrayOf(
+                    '0'.code.toByte() to '9'.code.toByte(),
+                    'A'.code.toByte() to 'F'.code.toByte(),
+                    'a'.code.toByte() to 'f'.code.toByte(),
+                )
+        }
     return slice.asSequence()
 }
 
@@ -1316,29 +1383,33 @@ private fun Byte.isAscii(): Boolean = (this.toInt() and 0xFF) <= 0x7F
  * requires a [Throwable] in the failure case; this wrapper carries the
  * original [Error] so callers can recover it via [HirException.err].
  */
-class HirException(val err: Error) : Throwable(err.toString())
+class HirException(
+    val err: Error,
+) : Throwable(err.toString())
 
 /**
  * Encode a Unicode scalar value (stored as an [Int] codepoint) into its
  * UTF-8 byte sequence.
  */
-private fun encodeUtf8(c: Int): ByteArray {
-    return when {
+private fun encodeUtf8(c: Int): ByteArray =
+    when {
         c <= 0x7F -> byteArrayOf(c.toByte())
-        c <= 0x7FF -> byteArrayOf(
-            (0xC0 or (c ushr 6)).toByte(),
-            (0x80 or (c and 0x3F)).toByte(),
-        )
-        c <= 0xFFFF -> byteArrayOf(
-            (0xE0 or (c ushr 12)).toByte(),
-            (0x80 or ((c ushr 6) and 0x3F)).toByte(),
-            (0x80 or (c and 0x3F)).toByte(),
-        )
-        else -> byteArrayOf(
-            (0xF0 or (c ushr 18)).toByte(),
-            (0x80 or ((c ushr 12) and 0x3F)).toByte(),
-            (0x80 or ((c ushr 6) and 0x3F)).toByte(),
-            (0x80 or (c and 0x3F)).toByte(),
-        )
+        c <= 0x7FF ->
+            byteArrayOf(
+                (0xC0 or (c ushr 6)).toByte(),
+                (0x80 or (c and 0x3F)).toByte(),
+            )
+        c <= 0xFFFF ->
+            byteArrayOf(
+                (0xE0 or (c ushr 12)).toByte(),
+                (0x80 or ((c ushr 6) and 0x3F)).toByte(),
+                (0x80 or (c and 0x3F)).toByte(),
+            )
+        else ->
+            byteArrayOf(
+                (0xF0 or (c ushr 18)).toByte(),
+                (0x80 or ((c ushr 12) and 0x3F)).toByte(),
+                (0x80 or ((c ushr 6) and 0x3F)).toByte(),
+                (0x80 or (c and 0x3F)).toByte(),
+            )
     }
-}

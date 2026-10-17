@@ -1,4 +1,3 @@
-// port-lint: source ast/mod.rs
 package io.github.kotlinmania.regexsyntax.ast
 
 import kotlin.test.Test
@@ -15,11 +14,14 @@ class AstTest {
         // construction in common code.
         var ast = Ast.empty(span())
         for (i in 0 until 200) {
-            ast = Ast.group(Group(
-                span = span(),
-                kind = GroupKind.CaptureIndex(i.toUInt()),
-                ast = ast,
-            ))
+            ast =
+                Ast.group(
+                    Group(
+                        span = span(),
+                        kind = GroupKind.CaptureIndex(i.toUInt()),
+                        ast = ast,
+                    ),
+                )
         }
         assertFalse(ast.isEmpty())
     }
@@ -64,18 +66,19 @@ class AstTest {
         )
     }
 
-    private fun astPayloadWords(ast: Ast): Int = when (ast) {
-        is Ast.Empty -> 1
-        is Ast.Flags -> 1
-        is Ast.Literal -> 1
-        is Ast.Dot -> 1
-        is Ast.Assertion -> 1
-        is Ast.ClassUnicode -> 1
-        is Ast.ClassPerl -> 1
-        is Ast.ClassBracketed -> 1
-        is Ast.Repetition -> 1
-        is Ast.Group -> 1
-        is Ast.Alternation -> 1
-        is Ast.Concat -> 1
-    }
+    private fun astPayloadWords(ast: Ast): Int =
+        when (ast) {
+            is Ast.Empty -> 1
+            is Ast.Flags -> 1
+            is Ast.Literal -> 1
+            is Ast.Dot -> 1
+            is Ast.Assertion -> 1
+            is Ast.ClassUnicode -> 1
+            is Ast.ClassPerl -> 1
+            is Ast.ClassBracketed -> 1
+            is Ast.Repetition -> 1
+            is Ast.Group -> 1
+            is Ast.Alternation -> 1
+            is Ast.Concat -> 1
+        }
 }

@@ -12,14 +12,15 @@ package io.github.kotlinmania.regexsyntax.unicodetables.casefoldingsimple
 // 64-KB method-size limit, so the initializer is split across chunked helpers that each
 // add a small slice of the table to a shared MutableList. The final `.toTypedArray()` is
 // what the rest of the port consumes.
-internal val CASE_FOLDING_SIMPLE: Array<Pair<Int, IntArray>> = buildList {
-    chunk0()
-    chunk1()
-    chunk2()
-    chunk3()
-    chunk4()
-    chunk5()
-}.toTypedArray()
+internal val CASE_FOLDING_SIMPLE: Array<Pair<Int, IntArray>> =
+    buildList {
+        chunk0()
+        chunk1()
+        chunk2()
+        chunk3()
+        chunk4()
+        chunk5()
+    }.toTypedArray()
 
 private fun MutableList<Pair<Int, IntArray>>.chunk0() {
     add(65 to intArrayOf(97))
@@ -2976,4 +2977,3 @@ private fun MutableList<Pair<Int, IntArray>>.chunk5() {
     add(125250 to intArrayOf(125216))
     add(125251 to intArrayOf(125217))
 }
-

@@ -63,9 +63,7 @@ interface Visitor<Output, Err> {
  * If the visitor returns an error at any point, then visiting is stopped and
  * the error is returned.
  */
-fun <Output, Err> visit(hir: Hir, visitor: Visitor<Output, Err>): Result<Output> {
-    return HeapVisitor.new().visit(hir, visitor)
-}
+fun <Output, Err> visit(hir: Hir, visitor: Visitor<Output, Err>): Result<Output> = HeapVisitor.new().visit(hir, visitor)
 
 /**
  * [HeapVisitor] visits every item in an [Hir] recursively using constant stack
@@ -138,32 +136,46 @@ private class HeapVisitor {
      * Build a stack frame for the given HIR if one is needed (which occurs if
      * and only if there are child nodes in the HIR). Otherwise, return null.
      */
-    private fun induct(hir: Hir): Frame? {
-        return when (val k = hir.kind()) {
+    private fun induct(hir: Hir): Frame? =
+        when (val k = hir.kind()) {
             is HirKind.Repetition -> Frame.Repetition(k.value)
             is HirKind.Capture -> Frame.Capture(k.value)
-            is HirKind.Concat -> if (k.items.isEmpty()) null else
-                Frame.Concat(head = k.items[0], tail = k.items.subList(1, k.items.size))
-            is HirKind.Alternation -> if (k.items.isEmpty()) null else
-                Frame.Alternation(head = k.items[0], tail = k.items.subList(1, k.items.size))
+            is HirKind.Concat ->
+                if (k.items.isEmpty()) {
+                    null
+                } else {
+                    Frame.Concat(head = k.items[0], tail = k.items.subList(1, k.items.size))
+                }
+            is HirKind.Alternation ->
+                if (k.items.isEmpty()) {
+                    null
+                } else {
+                    Frame.Alternation(head = k.items[0], tail = k.items.subList(1, k.items.size))
+                }
             else -> null
         }
-    }
 
     /**
      * Pops the given frame. If the frame has an additional inductive step,
      * then return it, otherwise return null.
      */
-    private fun pop(frame: Frame): Frame? {
-        return when (frame) {
+    private fun pop(frame: Frame): Frame? =
+        when (frame) {
             is Frame.Repetition -> null
             is Frame.Capture -> null
-            is Frame.Concat -> if (frame.tail.isEmpty()) null else
-                Frame.Concat(head = frame.tail[0], tail = frame.tail.subList(1, frame.tail.size))
-            is Frame.Alternation -> if (frame.tail.isEmpty()) null else
-                Frame.Alternation(head = frame.tail[0], tail = frame.tail.subList(1, frame.tail.size))
+            is Frame.Concat ->
+                if (frame.tail.isEmpty()) {
+                    null
+                } else {
+                    Frame.Concat(head = frame.tail[0], tail = frame.tail.subList(1, frame.tail.size))
+                }
+            is Frame.Alternation ->
+                if (frame.tail.isEmpty()) {
+                    null
+                } else {
+                    Frame.Alternation(head = frame.tail[0], tail = frame.tail.subList(1, frame.tail.size))
+                }
         }
-    }
 }
 
 /**
@@ -175,13 +187,17 @@ private sealed class Frame {
      * A stack frame allocated just before descending into a repetition
      * operator's child node.
      */
-    class Repetition(val rep: io.github.kotlinmania.regexsyntax.hir.Repetition) : Frame()
+    class Repetition(
+        val rep: io.github.kotlinmania.regexsyntax.hir.Repetition,
+    ) : Frame()
 
     /**
      * A stack frame allocated just before descending into a capture's child
      * node.
      */
-    class Capture(val capture: io.github.kotlinmania.regexsyntax.hir.Capture) : Frame()
+    class Capture(
+        val capture: io.github.kotlinmania.regexsyntax.hir.Capture,
+    ) : Frame()
 
     /**
      * The stack frame used while visiting every child node of a concatenation
@@ -209,10 +225,11 @@ private sealed class Frame {
      * Perform the next inductive step on this frame and return the next
      * child HIR node to visit.
      */
-    fun child(): Hir = when (this) {
-        is Repetition -> rep.sub
-        is Capture -> capture.sub
-        is Concat -> head
-        is Alternation -> head
-    }
+    fun child(): Hir =
+        when (this) {
+            is Repetition -> rep.sub
+            is Capture -> capture.sub
+            is Concat -> head
+            is Alternation -> head
+        }
 }

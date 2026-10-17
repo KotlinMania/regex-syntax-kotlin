@@ -97,20 +97,39 @@ private const val MAX_UTF8_BYTES: Int = 4
  * For example, if there are two ranges, `[C2-DF][80-BF]`, then the byte
  * sequence `\xDD\x61` would not satisfy it because `0x61 < 0x80`.
  */
-sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
+sealed class Utf8Sequence :
+    Comparable<Utf8Sequence>,
+    Iterable<Utf8Range> {
     /** One byte range. */
-    data class One(val r: Utf8Range) : Utf8Sequence()
+    data class One(
+        val r: Utf8Range,
+    ) : Utf8Sequence()
+
     /** Two successive byte ranges. */
-    data class Two(val rs: List<Utf8Range>) : Utf8Sequence() {
-        init { check(rs.size == 2) }
+    data class Two(
+        val rs: List<Utf8Range>,
+    ) : Utf8Sequence() {
+        init {
+            check(rs.size == 2)
+        }
     }
+
     /** Three successive byte ranges. */
-    data class Three(val rs: List<Utf8Range>) : Utf8Sequence() {
-        init { check(rs.size == 3) }
+    data class Three(
+        val rs: List<Utf8Range>,
+    ) : Utf8Sequence() {
+        init {
+            check(rs.size == 3)
+        }
     }
+
     /** Four successive byte ranges. */
-    data class Four(val rs: List<Utf8Range>) : Utf8Sequence() {
-        init { check(rs.size == 4) }
+    data class Four(
+        val rs: List<Utf8Range>,
+    ) : Utf8Sequence() {
+        init {
+            check(rs.size == 4)
+        }
     }
 
     companion object {
@@ -123,33 +142,43 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
         internal fun fromEncodedRange(start: ByteArray, startLen: Int, end: ByteArray, endLen: Int): Utf8Sequence {
             check(startLen == endLen)
             return when (startLen) {
-                2 -> Two(listOf(
-                    Utf8Range.new(start[0], end[0]),
-                    Utf8Range.new(start[1], end[1]),
-                ))
-                3 -> Three(listOf(
-                    Utf8Range.new(start[0], end[0]),
-                    Utf8Range.new(start[1], end[1]),
-                    Utf8Range.new(start[2], end[2]),
-                ))
-                4 -> Four(listOf(
-                    Utf8Range.new(start[0], end[0]),
-                    Utf8Range.new(start[1], end[1]),
-                    Utf8Range.new(start[2], end[2]),
-                    Utf8Range.new(start[3], end[3]),
-                ))
+                2 ->
+                    Two(
+                        listOf(
+                            Utf8Range.new(start[0], end[0]),
+                            Utf8Range.new(start[1], end[1]),
+                        ),
+                    )
+                3 ->
+                    Three(
+                        listOf(
+                            Utf8Range.new(start[0], end[0]),
+                            Utf8Range.new(start[1], end[1]),
+                            Utf8Range.new(start[2], end[2]),
+                        ),
+                    )
+                4 ->
+                    Four(
+                        listOf(
+                            Utf8Range.new(start[0], end[0]),
+                            Utf8Range.new(start[1], end[1]),
+                            Utf8Range.new(start[2], end[2]),
+                            Utf8Range.new(start[3], end[3]),
+                        ),
+                    )
                 else -> error("invalid encoded length: $startLen")
             }
         }
     }
 
     /** Returns the underlying sequence of byte ranges as a list. */
-    fun asSlice(): List<Utf8Range> = when (this) {
-        is One -> listOf(r)
-        is Two -> rs
-        is Three -> rs
-        is Four -> rs
-    }
+    fun asSlice(): List<Utf8Range> =
+        when (this) {
+            is One -> listOf(r)
+            is Two -> rs
+            is Three -> rs
+            is Four -> rs
+        }
 
     /**
      * Returns an iterator over the underlying byte ranges.
@@ -181,12 +210,13 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
      * This is useful when one is constructing a UTF-8 automaton to accept
      * character classes in reverse.
      */
-    fun reverse(): Utf8Sequence = when (this) {
-        is One -> this
-        is Two -> Two(listOf(rs[1], rs[0]))
-        is Three -> Three(listOf(rs[2], rs[1], rs[0]))
-        is Four -> Four(listOf(rs[3], rs[2], rs[1], rs[0]))
-    }
+    fun reverse(): Utf8Sequence =
+        when (this) {
+            is One -> this
+            is Two -> Two(listOf(rs[1], rs[0]))
+            is Three -> Three(listOf(rs[2], rs[1], rs[0]))
+            is Four -> Four(listOf(rs[3], rs[2], rs[1], rs[0]))
+        }
 
     /**
      * Returns true if and only if a prefix of [bytes] satisfies this sequence
@@ -208,12 +238,13 @@ sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
      */
     fun fmt(): String = toString()
 
-    override fun toString(): String = when (this) {
-        is One -> r.toString()
-        is Two -> "${rs[0]}${rs[1]}"
-        is Three -> "${rs[0]}${rs[1]}${rs[2]}"
-        is Four -> "${rs[0]}${rs[1]}${rs[2]}${rs[3]}"
-    }
+    override fun toString(): String =
+        when (this) {
+            is One -> r.toString()
+            is Two -> "${rs[0]}${rs[1]}"
+            is Three -> "${rs[0]}${rs[1]}${rs[2]}"
+            is Four -> "${rs[0]}${rs[1]}${rs[2]}${rs[3]}"
+        }
 
     override fun compareTo(other: Utf8Sequence): Int {
         val a = asSlice()
@@ -316,7 +347,10 @@ data class Utf8Range(
  * and compare it with the scalar value range directly. However, this is not
  * always possible (for example, in a byte based automaton).
  */
-class Utf8Sequences(start: Int, end: Int) : Iterator<Utf8Sequence> {
+class Utf8Sequences(
+    start: Int,
+    end: Int,
+) : Iterator<Utf8Sequence> {
     private val rangeStack: MutableList<ScalarRange> = mutableListOf(ScalarRange(start, end))
     private var nextItem: Utf8Sequence? = null
     private var ready: Boolean = false
@@ -403,7 +437,10 @@ class Utf8Sequences(start: Int, end: Int) : Iterator<Utf8Sequence> {
 }
 
 /** A range over scalar (Unicode codepoint) values. */
-internal data class ScalarRange(var start: Int, var end: Int) {
+internal data class ScalarRange(
+    var start: Int,
+    var end: Int,
+) {
     override fun toString(): String =
         "ScalarRange(${start.toString(16).uppercase()}, ${end.toString(16).uppercase()})"
 
@@ -412,14 +449,15 @@ internal data class ScalarRange(var start: Int, var end: Int) {
      *
      * Either or both ranges may be invalid.
      */
-    fun split(): Pair<ScalarRange, ScalarRange>? {
-        return if (start < 0xE000 && end > 0xD7FF) {
+    fun split(): Pair<ScalarRange, ScalarRange>? =
+        if (start < 0xE000 && end > 0xD7FF) {
             Pair(
                 ScalarRange(start, 0xD7FF),
                 ScalarRange(0xE000, end),
             )
-        } else null
-    }
+        } else {
+            null
+        }
 
     /** isValid returns true if and only if start <= end. */
     fun isValid(): Boolean = start <= end
@@ -428,11 +466,12 @@ internal data class ScalarRange(var start: Int, var end: Int) {
      * `asAscii` returns this range as a [Utf8Range] if and only if all scalar
      * values in this range can be encoded as a single byte.
      */
-    fun asAscii(): Utf8Range? {
-        return if (isAscii()) {
+    fun asAscii(): Utf8Range? =
+        if (isAscii()) {
             Utf8Range.new(start.toByte(), end.toByte())
-        } else null
-    }
+        } else {
+            null
+        }
 
     /**
      * isAscii returns true if the range is ASCII only (i.e., takes a single
@@ -455,21 +494,20 @@ internal data class ScalarRange(var start: Int, var end: Int) {
     }
 }
 
-private fun maxScalarValue(nbytes: Int): Int {
-    return when (nbytes) {
+private fun maxScalarValue(nbytes: Int): Int =
+    when (nbytes) {
         1 -> 0x007F
         2 -> 0x07FF
         3 -> 0xFFFF
         4 -> 0x0010_FFFF
         else -> error("invalid UTF-8 byte sequence size")
     }
-}
 
 /**
  * Encode a Unicode codepoint as UTF-8 into [dest], returning the number of bytes written.
  */
-private fun encodeUtf8(codepoint: Int, dest: ByteArray): Int {
-    return when {
+private fun encodeUtf8(codepoint: Int, dest: ByteArray): Int =
+    when {
         codepoint < 0x80 -> {
             dest[0] = codepoint.toByte()
             1
@@ -493,4 +531,3 @@ private fun encodeUtf8(codepoint: Int, dest: ByteArray): Int {
             4
         }
     }
-}

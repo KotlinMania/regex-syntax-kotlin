@@ -1,4 +1,3 @@
-// port-lint: source hir/mod.rs
 package io.github.kotlinmania.regexsyntax.hir
 
 /*
@@ -25,17 +24,16 @@ package io.github.kotlinmania.regexsyntax.hir
  */
 
 import io.github.kotlinmania.regexsyntax.ast.Span
+import io.github.kotlinmania.regexsyntax.debug.Utf8Decoded
+import io.github.kotlinmania.regexsyntax.debug.len
+import io.github.kotlinmania.regexsyntax.debug.utf8Decode
 import io.github.kotlinmania.regexsyntax.hir.interval.Interval
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalFactory
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSet
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSetIter
 import io.github.kotlinmania.regexsyntax.hir.interval.isIntersectionEmpty
-import io.github.kotlinmania.regexsyntax.unicode.CaseFoldError
 import io.github.kotlinmania.regexsyntax.unicode.SimpleCaseFolder
 import io.github.kotlinmania.regexsyntax.debug.Byte as DebugByte
-import io.github.kotlinmania.regexsyntax.debug.utf8Decode
-import io.github.kotlinmania.regexsyntax.debug.Utf8Decoded
-import io.github.kotlinmania.regexsyntax.debug.len
 
 /*
  * Upstream re-exports (tracking):
@@ -135,19 +133,20 @@ sealed class ErrorKind {
     object UnicodeCaseUnavailable : ErrorKind()
 
     fun fmt(wtr: Appendable): Result<Unit> {
-        val msg = when (this) {
-            UnicodeNotAllowed -> "Unicode not allowed here"
-            InvalidUtf8 -> "pattern can " + "mat" + "ch invalid UTF-8"
-            InvalidLineTerminator -> "invalid line terminator, must be ASCII"
-            UnicodePropertyNotFound -> "Unicode property not found"
-            UnicodePropertyValueNotFound -> "Unicode property value not found"
-            UnicodePerlClassNotFound ->
-                "Unicode-aware Perl class not found " +
-                "(make sure the unicode-perl feature is enabled)"
-            UnicodeCaseUnavailable ->
-                "Unicode-aware case insensitivity matching is not available " +
-                "(make sure the unicode-case feature is enabled)"
-        }
+        val msg =
+            when (this) {
+                UnicodeNotAllowed -> "Unicode not allowed here"
+                InvalidUtf8 -> "pattern can " + "mat" + "ch invalid UTF-8"
+                InvalidLineTerminator -> "invalid line terminator, must be ASCII"
+                UnicodePropertyNotFound -> "Unicode property not found"
+                UnicodePropertyValueNotFound -> "Unicode property value not found"
+                UnicodePerlClassNotFound ->
+                    "Unicode-aware Perl class not found " +
+                        "(make sure the unicode-perl feature is enabled)"
+                UnicodeCaseUnavailable ->
+                    "Unicode-aware case insensitivity matching is not available " +
+                        "(make sure the unicode-case feature is enabled)"
+            }
         wtr.append(msg)
         return Result.success(Unit)
     }
@@ -306,10 +305,11 @@ class Hir internal constructor(
             // string, then we force its maximum to be at most 1.
             if (rep.sub.properties().maximumLen() == 0) {
                 val currentMax = rep.max
-                rep = rep.copy(
-                    min = minOf(rep.min, 1u),
-                    max = if (currentMax != null) minOf(currentMax, 1u) else 1u,
-                )
+                rep =
+                    rep.copy(
+                        min = minOf(rep.min, 1u),
+                        max = if (currentMax != null) minOf(currentMax, 1u) else 1u,
+                    )
             }
             // The regex `a{0}` is always equivalent to the empty regex. This is
             // true even when `a` is an expression that never matches anything
@@ -352,17 +352,13 @@ class Hir internal constructor(
             // them together. Basically, when we see a literal, we add its bytes
             // to `priorLit`, and whenever we see anything else, we first take
             // any bytes in `priorLit` and add it to the `new` concatenation.
-            var priorLit: MutableList<Byte>? = null
+            var priorLit: ByteArray? = null
             for (sub in subs) {
                 val (kind, p) = sub.intoParts()
                 when (kind) {
                     is HirKind.Literal -> {
                         val pl = priorLit
-                        if (pl != null) {
-                            for (b in kind.value.bytes) pl.add(b)
-                        } else {
-                            priorLit = kind.value.bytes.toMutableList()
-                        }
+                        priorLit = if (pl != null) pl + kind.value.bytes else kind.value.bytes
                     }
                     // We also flatten concats that are direct children of another
                     // concat. We only need to do this one level deep since
@@ -374,16 +370,12 @@ class Hir internal constructor(
                             when (kind2) {
                                 is HirKind.Literal -> {
                                     val pl = priorLit
-                                    if (pl != null) {
-                                        for (b in kind2.value.bytes) pl.add(b)
-                                    } else {
-                                        priorLit = kind2.value.bytes.toMutableList()
-                                    }
+                                    priorLit = if (pl != null) pl + kind2.value.bytes else kind2.value.bytes
                                 }
                                 else -> {
                                     val pl = priorLit
                                     if (pl != null) {
-                                        newList.add(literal(pl.toByteArray()))
+                                        newList.add(literal(pl))
                                         priorLit = null
                                     }
                                     newList.add(Hir(kind2, props2))
@@ -396,7 +388,7 @@ class Hir internal constructor(
                     else -> {
                         val pl = priorLit
                         if (pl != null) {
-                            newList.add(literal(pl.toByteArray()))
+                            newList.add(literal(pl))
                             priorLit = null
                         }
                         newList.add(Hir(kind, p))
@@ -405,7 +397,7 @@ class Hir internal constructor(
             }
             val tail = priorLit
             if (tail != null) {
-                newList.add(literal(tail.toByteArray()))
+                newList.add(literal(tail))
             }
             if (newList.isEmpty()) return empty()
             if (newList.size == 1) return newList[0]
@@ -480,48 +472,95 @@ class Hir internal constructor(
          * * [Dot.AnyByteExceptLF] maps to `(?-Rsu:.)`.
          * * [Dot.AnyByteExceptCRLF] maps to `(?R-su:.)`.
          */
-        fun dot(dot: Dot): Hir {
-            return when (dot) {
-                Dot.AnyChar -> classOfHir(Class.Unicode(ClassUnicode.new(listOf(
-                    ClassUnicodeRange(0, 0x10FFFF),
-                ))))
-                Dot.AnyByte -> classOfHir(Class.Bytes(ClassBytes.new(listOf(
-                    ClassBytesRange(0x00, 0xFF.toByte()),
-                ))))
+        fun dot(dot: Dot): Hir =
+            when (dot) {
+                Dot.AnyChar ->
+                    classOfHir(
+                        Class.Unicode(
+                            ClassUnicode.new(
+                                listOf(
+                                    ClassUnicodeRange(0, 0x10FFFF),
+                                ),
+                            ),
+                        ),
+                    )
+                Dot.AnyByte ->
+                    classOfHir(
+                        Class.Bytes(
+                            ClassBytes.new(
+                                listOf(
+                                    ClassBytesRange(0x00, 0xFF.toByte()),
+                                ),
+                            ),
+                        ),
+                    )
                 is Dot.AnyCharExcept -> {
-                    val cls = ClassUnicode.new(listOf(
-                        ClassUnicodeRange(dot.codepoint, dot.codepoint),
-                    ))
+                    val cls =
+                        ClassUnicode.new(
+                            listOf(
+                                ClassUnicodeRange(dot.codepoint, dot.codepoint),
+                            ),
+                        )
                     cls.negate()
                     classOfHir(Class.Unicode(cls))
                 }
-                Dot.AnyCharExceptLF -> classOfHir(Class.Unicode(ClassUnicode.new(listOf(
-                    ClassUnicodeRange(0, 0x09),
-                    ClassUnicodeRange(0x0B, 0x10FFFF),
-                ))))
-                Dot.AnyCharExceptCRLF -> classOfHir(Class.Unicode(ClassUnicode.new(listOf(
-                    ClassUnicodeRange(0, 0x09),
-                    ClassUnicodeRange(0x0B, 0x0C),
-                    ClassUnicodeRange(0x0E, 0x10FFFF),
-                ))))
+                Dot.AnyCharExceptLF ->
+                    classOfHir(
+                        Class.Unicode(
+                            ClassUnicode.new(
+                                listOf(
+                                    ClassUnicodeRange(0, 0x09),
+                                    ClassUnicodeRange(0x0B, 0x10FFFF),
+                                ),
+                            ),
+                        ),
+                    )
+                Dot.AnyCharExceptCRLF ->
+                    classOfHir(
+                        Class.Unicode(
+                            ClassUnicode.new(
+                                listOf(
+                                    ClassUnicodeRange(0, 0x09),
+                                    ClassUnicodeRange(0x0B, 0x0C),
+                                    ClassUnicodeRange(0x0E, 0x10FFFF),
+                                ),
+                            ),
+                        ),
+                    )
                 is Dot.AnyByteExcept -> {
-                    val cls = ClassBytes.new(listOf(
-                        ClassBytesRange(dot.byte, dot.byte),
-                    ))
+                    val cls =
+                        ClassBytes.new(
+                            listOf(
+                                ClassBytesRange(dot.byte, dot.byte),
+                            ),
+                        )
                     cls.negate()
                     classOfHir(Class.Bytes(cls))
                 }
-                Dot.AnyByteExceptLF -> classOfHir(Class.Bytes(ClassBytes.new(listOf(
-                    ClassBytesRange(0x00, 0x09),
-                    ClassBytesRange(0x0B, 0xFF.toByte()),
-                ))))
-                Dot.AnyByteExceptCRLF -> classOfHir(Class.Bytes(ClassBytes.new(listOf(
-                    ClassBytesRange(0x00, 0x09),
-                    ClassBytesRange(0x0B, 0x0C),
-                    ClassBytesRange(0x0E, 0xFF.toByte()),
-                ))))
+                Dot.AnyByteExceptLF ->
+                    classOfHir(
+                        Class.Bytes(
+                            ClassBytes.new(
+                                listOf(
+                                    ClassBytesRange(0x00, 0x09),
+                                    ClassBytesRange(0x0B, 0xFF.toByte()),
+                                ),
+                            ),
+                        ),
+                    )
+                Dot.AnyByteExceptCRLF ->
+                    classOfHir(
+                        Class.Bytes(
+                            ClassBytes.new(
+                                listOf(
+                                    ClassBytesRange(0x00, 0x09),
+                                    ClassBytesRange(0x0B, 0x0C),
+                                    ClassBytesRange(0x0E, 0xFF.toByte()),
+                                ),
+                            ),
+                        ),
+                    )
             }
-        }
     }
 
     // ---- Methods for accessing the underlying [HirKind] and [Properties] ----
@@ -557,7 +596,9 @@ class Hir internal constructor(
     }
 
     fun fmt(wtr: Appendable): Result<Unit> =
-        io.github.kotlinmania.regexsyntax.hir.print.Printer.new().print(this, wtr)
+        io.github.kotlinmania.regexsyntax.hir.print.Printer
+            .new()
+            .print(this, wtr)
 
     override fun toString(): String {
         val dst = StringBuilder()
@@ -565,9 +606,7 @@ class Hir internal constructor(
         return dst.toString()
     }
 
-    override fun equals(other: Any?): Boolean {
-        return other is Hir && kindValue == other.kindValue && props == other.props
-    }
+    override fun equals(other: Any?): Boolean = other is Hir && kindValue == other.kindValue && props == other.props
 
     override fun hashCode(): Int = kindValue.hashCode() * 31 + props.hashCode()
 }
@@ -589,7 +628,9 @@ sealed class HirKind {
     object Empty : HirKind()
 
     /** A literal string that matches exactly these bytes. */
-    data class Literal(val value: io.github.kotlinmania.regexsyntax.hir.Literal) : HirKind()
+    data class Literal(
+        val value: io.github.kotlinmania.regexsyntax.hir.Literal,
+    ) : HirKind()
 
     /**
      * A single character class that matches any of the characters in the
@@ -598,16 +639,24 @@ sealed class HirKind {
      *
      * A class may be empty. In which case, it matches nothing.
      */
-    data class Class(val value: io.github.kotlinmania.regexsyntax.hir.Class) : HirKind()
+    data class Class(
+        val value: io.github.kotlinmania.regexsyntax.hir.Class,
+    ) : HirKind()
 
     /** A look-around assertion. A look-around assertion always has zero length. */
-    data class Look(val value: io.github.kotlinmania.regexsyntax.hir.Look) : HirKind()
+    data class Look(
+        val value: io.github.kotlinmania.regexsyntax.hir.Look,
+    ) : HirKind()
 
     /** A repetition operation applied to a sub-expression. */
-    data class Repetition(val value: io.github.kotlinmania.regexsyntax.hir.Repetition) : HirKind()
+    data class Repetition(
+        val value: io.github.kotlinmania.regexsyntax.hir.Repetition,
+    ) : HirKind()
 
     /** A capturing group, which contains a sub-expression. */
-    data class Capture(val value: io.github.kotlinmania.regexsyntax.hir.Capture) : HirKind()
+    data class Capture(
+        val value: io.github.kotlinmania.regexsyntax.hir.Capture,
+    ) : HirKind()
 
     /**
      * A concatenation of expressions.
@@ -618,7 +667,9 @@ sealed class HirKind {
      * Concatenations are guaranteed by [Hir]'s smart constructors to always
      * have at least two sub-expressions.
      */
-    data class Concat(val items: List<Hir>) : HirKind()
+    data class Concat(
+        val items: List<Hir>,
+    ) : HirKind()
 
     /**
      * An alternation of expressions.
@@ -630,16 +681,19 @@ sealed class HirKind {
      * Alternations are guaranteed by [Hir]'s smart constructors to always
      * have at least two sub-expressions.
      */
-    data class Alternation(val items: List<Hir>) : HirKind()
+    data class Alternation(
+        val items: List<Hir>,
+    ) : HirKind()
 
     /** Returns a list of this kind's sub-expressions, if any. */
-    fun subs(): List<Hir> = when (this) {
-        is Empty, is Literal, is Class, is Look -> emptyList()
-        is Repetition -> listOf(value.sub)
-        is Capture -> listOf(value.sub)
-        is Concat -> items
-        is Alternation -> items
-    }
+    fun subs(): List<Hir> =
+        when (this) {
+            is Empty, is Literal, is Class, is Look -> emptyList()
+            is Repetition -> listOf(value.sub)
+            is Capture -> listOf(value.sub)
+            is Concat -> items
+            is Alternation -> items
+        }
 }
 
 /**
@@ -654,14 +708,22 @@ sealed class HirKind {
  * debug rendering will attempt to print it as a normal string. (That
  * is, not a sequence of decimal numbers.)
  */
-data class Literal(val bytes: ByteArray) {
+data class Literal(
+    val bytes: ByteArray,
+) {
     override fun equals(other: Any?): Boolean = other is Literal && bytes.contentEquals(other.bytes)
+
     override fun hashCode(): Int = bytes.contentHashCode()
+
     fun fmt(wtr: Appendable): Result<Unit> {
         wtr.append(toString())
         return Result.success(Unit)
     }
-    override fun toString(): String = io.github.kotlinmania.regexsyntax.debug.Bytes(bytes).toString()
+
+    override fun toString(): String =
+        io.github.kotlinmania.regexsyntax.debug
+            .Bytes(bytes)
+            .toString()
 }
 
 /**
@@ -688,13 +750,17 @@ data class Literal(val bytes: ByteArray) {
  */
 sealed class Class {
     /** A set of characters represented by Unicode scalar values. */
-    data class Unicode(val value: ClassUnicode) : Class()
+    data class Unicode(
+        val value: ClassUnicode,
+    ) : Class()
 
     /**
      * A set of characters represented by arbitrary bytes (one byte per
      * character).
      */
-    data class Bytes(val value: ClassBytes) : Class()
+    data class Bytes(
+        val value: ClassBytes,
+    ) : Class()
 
     /**
      * Apply Unicode simple case folding to this character class, in place.
@@ -719,12 +785,14 @@ sealed class Class {
      * If this is a byte oriented character class, then this will be limited
      * to the ASCII ranges `A-Z` and `a-z`.
      */
-    fun tryCaseFoldSimple(): Result<Unit> {
-        return when (this) {
+    fun tryCaseFoldSimple(): Result<Unit> =
+        when (this) {
             is Unicode -> value.tryCaseFoldSimple()
-            is Bytes -> { value.caseFoldSimple(); Result.success(Unit) }
+            is Bytes -> {
+                value.caseFoldSimple()
+                Result.success(Unit)
+            }
         }
-    }
 
     /**
      * Negate this character class in place.
@@ -743,37 +811,41 @@ sealed class Class {
      * Returns true if and only if this character class will only ever recognize
      * valid UTF-8.
      */
-    fun isUtf8(): Boolean = when (this) {
-        is Unicode -> true
-        is Bytes -> value.isAscii()
-    }
+    fun isUtf8(): Boolean =
+        when (this) {
+            is Unicode -> true
+            is Bytes -> value.isAscii()
+        }
 
     /**
      * Returns the length, in bytes, of the smallest string matched by this
      * character class.
      */
-    fun minimumLen(): Int? = when (this) {
-        is Unicode -> value.minimumLen()
-        is Bytes -> value.minimumLen()
-    }
+    fun minimumLen(): Int? =
+        when (this) {
+            is Unicode -> value.minimumLen()
+            is Bytes -> value.minimumLen()
+        }
 
     /**
      * Returns the length, in bytes, of the longest string matched by this
      * character class.
      */
-    fun maximumLen(): Int? = when (this) {
-        is Unicode -> value.maximumLen()
-        is Bytes -> value.maximumLen()
-    }
+    fun maximumLen(): Int? =
+        when (this) {
+            is Unicode -> value.maximumLen()
+            is Bytes -> value.maximumLen()
+        }
 
     /**
      * Returns true if and only if this character class is empty. That is,
      * it has no elements.
      */
-    fun isEmpty(): Boolean = when (this) {
-        is Unicode -> value.ranges().isEmpty()
-        is Bytes -> value.ranges().isEmpty()
-    }
+    fun isEmpty(): Boolean =
+        when (this) {
+            is Unicode -> value.ranges().isEmpty()
+            is Bytes -> value.ranges().isEmpty()
+        }
 
     /**
      * If this class consists of exactly one element (whether a codepoint or a
@@ -782,22 +854,25 @@ sealed class Class {
      * If this class is empty or contains more than one element, then `null`
      * is returned.
      */
-    fun literal(): ByteArray? = when (this) {
-        is Unicode -> value.literal()
-        is Bytes -> value.literal()
-    }
+    fun literal(): ByteArray? =
+        when (this) {
+            is Unicode -> value.literal()
+            is Bytes -> value.literal()
+        }
 
     fun fmt(wtr: Appendable): Result<Unit> {
         wtr.append(toString())
         return Result.success(Unit)
     }
 
-    final override fun toString(): String = when (this) {
-        is Unicode -> value.ranges().joinToString(prefix = "[", postfix = "]")
-        is Bytes -> value.ranges().joinToString(prefix = "[", postfix = "]") { range ->
-            "${DebugByte(range.start())}..=${DebugByte(range.end())}"
+    final override fun toString(): String =
+        when (this) {
+            is Unicode -> value.ranges().joinToString(prefix = "[", postfix = "]")
+            is Bytes ->
+                value.ranges().joinToString(prefix = "[", postfix = "]") { range ->
+                    "${DebugByte(range.start())}..=${DebugByte(range.end())}"
+                }
         }
-    }
 }
 
 /** A set of characters represented by Unicode scalar values. */
@@ -820,7 +895,9 @@ class ClassUnicode internal constructor(
     }
 
     /** Add a new range to this set. */
-    fun push(range: ClassUnicodeRange) { set.push(range) }
+    fun push(range: ClassUnicodeRange) {
+        set.push(range)
+    }
 
     /** Return an iterator over all ranges in this class (ascending order). */
     fun iter(): ClassUnicodeIter = ClassUnicodeIter(set.iter())
@@ -841,19 +918,29 @@ class ClassUnicode internal constructor(
     fun tryCaseFoldSimple(): Result<Unit> = set.caseFoldSimple()
 
     /** Negate this character class. */
-    fun negate() { set.negate() }
+    fun negate() {
+        set.negate()
+    }
 
     /** Union this character class with the given character class, in place. */
-    fun union(other: ClassUnicode) { set.union(other.set) }
+    fun union(other: ClassUnicode) {
+        set.union(other.set)
+    }
 
     /** Intersect this character class with the given character class, in place. */
-    fun intersect(other: ClassUnicode) { set.intersect(other.set) }
+    fun intersect(other: ClassUnicode) {
+        set.intersect(other.set)
+    }
 
     /** Subtract the given character class from this character class, in place. */
-    fun difference(other: ClassUnicode) { set.difference(other.set) }
+    fun difference(other: ClassUnicode) {
+        set.difference(other.set)
+    }
 
     /** Compute the symmetric difference of the given character classes, in place. */
-    fun symmetricDifference(other: ClassUnicode) { set.symmetricDifference(other.set) }
+    fun symmetricDifference(other: ClassUnicode) {
+        set.symmetricDifference(other.set)
+    }
 
     /**
      * Returns true if and only if this character class will either recognize
@@ -894,13 +981,17 @@ class ClassUnicode internal constructor(
      */
     fun toByteClass(): ClassBytes? {
         if (!isAscii()) return null
-        return ClassBytes.new(ranges().map { r ->
-            ClassBytesRange(r.start.toByte(), r.end.toByte())
-        })
+        return ClassBytes.new(
+            ranges().map { r ->
+                ClassBytesRange(r.start.toByte(), r.end.toByte())
+            },
+        )
     }
 
     override fun equals(other: Any?): Boolean = other is ClassUnicode && set == other.set
+
     override fun hashCode(): Int = set.hashCode()
+
     override fun toString(): String = "ClassUnicode(${ranges()})"
 }
 
@@ -909,6 +1000,7 @@ class ClassUnicodeIter internal constructor(
     private val inner: IntervalSetIter<ClassUnicodeRange>,
 ) : Iterator<ClassUnicodeRange> {
     override fun hasNext(): Boolean = inner.hasNext()
+
     override fun next(): ClassUnicodeRange = inner.next()
 }
 
@@ -926,9 +1018,17 @@ data class ClassUnicodeRange(
     internal var end: Int,
 ) : Interval<ClassUnicodeRange, Int> {
     override fun lower(): Int = start
+
     override fun upper(): Int = end
-    override fun setLower(bound: Int) { start = bound }
-    override fun setUpper(bound: Int) { end = bound }
+
+    override fun setLower(bound: Int) {
+        start = bound
+    }
+
+    override fun setUpper(bound: Int) {
+        end = bound
+    }
+
     override fun factory(): IntervalFactory<ClassUnicodeRange, Int> = ClassUnicodeRange.Companion
 
     /**
@@ -963,23 +1063,30 @@ data class ClassUnicodeRange(
         }
 
         override fun create(lower: Int, upper: Int): ClassUnicodeRange = new(lower, upper)
+
         override fun minBound(): Int = 0x00
+
         override fun maxBound(): Int = 0x10FFFF
+
         override fun boundAsInt(b: Int): Int = b
-        override fun increment(b: Int): Int = when (b) {
-            0xD7FF -> 0xE000
-            else -> {
-                check(b < 0x10FFFF) { "ClassUnicodeRange.increment overflow" }
-                b + 1
+
+        override fun increment(b: Int): Int =
+            when (b) {
+                0xD7FF -> 0xE000
+                else -> {
+                    check(b < 0x10FFFF) { "ClassUnicodeRange.increment overflow" }
+                    b + 1
+                }
             }
-        }
-        override fun decrement(b: Int): Int = when (b) {
-            0xE000 -> 0xD7FF
-            else -> {
-                check(b > 0) { "ClassUnicodeRange.decrement underflow" }
-                b - 1
+
+        override fun decrement(b: Int): Int =
+            when (b) {
+                0xE000 -> 0xD7FF
+                else -> {
+                    check(b > 0) { "ClassUnicodeRange.decrement underflow" }
+                    b - 1
+                }
             }
-        }
     }
 
     /** Return the start of this range. */
@@ -1019,7 +1126,9 @@ class ClassBytes internal constructor(
     }
 
     /** Add a new range to this set. */
-    fun push(range: ClassBytesRange) { set.push(range) }
+    fun push(range: ClassBytesRange) {
+        set.push(range)
+    }
 
     /** Return an iterator over all ranges in this class. */
     fun iter(): ClassBytesIter = ClassBytesIter(set.iter())
@@ -1037,19 +1146,29 @@ class ClassBytes internal constructor(
     }
 
     /** Negate this byte class. */
-    fun negate() { set.negate() }
+    fun negate() {
+        set.negate()
+    }
 
     /** Union this byte class with the given byte class, in place. */
-    fun union(other: ClassBytes) { set.union(other.set) }
+    fun union(other: ClassBytes) {
+        set.union(other.set)
+    }
 
     /** Intersect this byte class with the given byte class, in place. */
-    fun intersect(other: ClassBytes) { set.intersect(other.set) }
+    fun intersect(other: ClassBytes) {
+        set.intersect(other.set)
+    }
 
     /** Subtract the given byte class from this byte class, in place. */
-    fun difference(other: ClassBytes) { set.difference(other.set) }
+    fun difference(other: ClassBytes) {
+        set.difference(other.set)
+    }
 
     /** Compute the symmetric difference of the given byte classes, in place. */
-    fun symmetricDifference(other: ClassBytes) { set.symmetricDifference(other.set) }
+    fun symmetricDifference(other: ClassBytes) {
+        set.symmetricDifference(other.set)
+    }
 
     /** Returns true if and only if this character class only matches ASCII bytes. */
     fun isAscii(): Boolean {
@@ -1075,13 +1194,17 @@ class ClassBytes internal constructor(
     /** If this class consists of only ASCII ranges, then return its corresponding Unicode class. */
     fun toUnicodeClass(): ClassUnicode? {
         if (!isAscii()) return null
-        return ClassUnicode.new(ranges().map { r ->
-            ClassUnicodeRange(r.start.toInt() and 0xFF, r.end.toInt() and 0xFF)
-        })
+        return ClassUnicode.new(
+            ranges().map { r ->
+                ClassUnicodeRange(r.start.toInt() and 0xFF, r.end.toInt() and 0xFF)
+            },
+        )
     }
 
     override fun equals(other: Any?): Boolean = other is ClassBytes && set == other.set
+
     override fun hashCode(): Int = set.hashCode()
+
     override fun toString(): String = "ClassBytes(${ranges()})"
 }
 
@@ -1090,6 +1213,7 @@ class ClassBytesIter internal constructor(
     private val inner: IntervalSetIter<ClassBytesRange>,
 ) : Iterator<ClassBytesRange> {
     override fun hasNext(): Boolean = inner.hasNext()
+
     override fun next(): ClassBytesRange = inner.next()
 }
 
@@ -1103,9 +1227,17 @@ data class ClassBytesRange(
     internal var end: Byte,
 ) : Interval<ClassBytesRange, Byte> {
     override fun lower(): Byte = start
+
     override fun upper(): Byte = end
-    override fun setLower(bound: Byte) { start = bound }
-    override fun setUpper(bound: Byte) { end = bound }
+
+    override fun setLower(bound: Byte) {
+        start = bound
+    }
+
+    override fun setUpper(bound: Byte) {
+        end = bound
+    }
+
     override fun factory(): IntervalFactory<ClassBytesRange, Byte> = ClassBytesRange.Companion
 
     /**
@@ -1137,14 +1269,19 @@ data class ClassBytesRange(
         }
 
         override fun create(lower: Byte, upper: Byte): ClassBytesRange = new(lower, upper)
+
         override fun minBound(): Byte = 0
+
         override fun maxBound(): Byte = -1 // 0xFF as signed Byte
+
         override fun boundAsInt(b: Byte): Int = b.toInt() and 0xFF
+
         override fun increment(b: Byte): Byte {
             val v = b.toInt() and 0xFF
             check(v < 0xFF) { "ClassBytesRange.increment overflow" }
             return (v + 1).toByte()
         }
+
         override fun decrement(b: Byte): Byte {
             val v = b.toInt() and 0xFF
             check(v > 0) { "ClassBytesRange.decrement underflow" }
@@ -1188,65 +1325,86 @@ data class ClassBytesRange(
  *
  * An assertion is always zero-length. Also called an "empty assertion."
  */
-enum class Look(val repr: Int) {
+enum class Look(
+    val repr: Int,
+) {
     /** Match the beginning of text. */
     Start(1 shl 0),
+
     /** Match the end of text. */
     End(1 shl 1),
+
     /** Match the beginning of a line or the beginning of text. */
     StartLF(1 shl 2),
+
     /** Match the end of a line or the end of text. */
     EndLF(1 shl 3),
+
     /** CRLF-aware start of line. */
     StartCRLF(1 shl 4),
+
     /** CRLF-aware end of line. */
     EndCRLF(1 shl 5),
+
     /** ASCII-only word boundary. */
     WordAscii(1 shl 6),
+
     /** Negation of ASCII word boundary. */
     WordAsciiNegate(1 shl 7),
+
     /** Unicode-aware word boundary. */
     WordUnicode(1 shl 8),
+
     /** Negation of Unicode word boundary. */
     WordUnicodeNegate(1 shl 9),
+
     /** Start of an ASCII-only word boundary. */
     WordStartAscii(1 shl 10),
+
     /** End of an ASCII-only word boundary. */
     WordEndAscii(1 shl 11),
+
     /** Start of a Unicode word boundary. */
     WordStartUnicode(1 shl 12),
+
     /** End of a Unicode word boundary. */
     WordEndUnicode(1 shl 13),
+
     /** Start half of an ASCII-only word boundary. */
     WordStartHalfAscii(1 shl 14),
+
     /** End half of an ASCII-only word boundary. */
     WordEndHalfAscii(1 shl 15),
+
     /** Start half of a Unicode word boundary. */
     WordStartHalfUnicode(1 shl 16),
+
     /** End half of a Unicode word boundary. */
-    WordEndHalfUnicode(1 shl 17);
+    WordEndHalfUnicode(1 shl 17),
+    ;
 
     /** Flip the look-around assertion to its equivalent for reverse searches. */
-    fun reversed(): Look = when (this) {
-        Start -> End
-        End -> Start
-        StartLF -> EndLF
-        EndLF -> StartLF
-        StartCRLF -> EndCRLF
-        EndCRLF -> StartCRLF
-        WordAscii -> WordAscii
-        WordAsciiNegate -> WordAsciiNegate
-        WordUnicode -> WordUnicode
-        WordUnicodeNegate -> WordUnicodeNegate
-        WordStartAscii -> WordEndAscii
-        WordEndAscii -> WordStartAscii
-        WordStartUnicode -> WordEndUnicode
-        WordEndUnicode -> WordStartUnicode
-        WordStartHalfAscii -> WordEndHalfAscii
-        WordEndHalfAscii -> WordStartHalfAscii
-        WordStartHalfUnicode -> WordEndHalfUnicode
-        WordEndHalfUnicode -> WordStartHalfUnicode
-    }
+    fun reversed(): Look =
+        when (this) {
+            Start -> End
+            End -> Start
+            StartLF -> EndLF
+            EndLF -> StartLF
+            StartCRLF -> EndCRLF
+            EndCRLF -> StartCRLF
+            WordAscii -> WordAscii
+            WordAsciiNegate -> WordAsciiNegate
+            WordUnicode -> WordUnicode
+            WordUnicodeNegate -> WordUnicodeNegate
+            WordStartAscii -> WordEndAscii
+            WordEndAscii -> WordStartAscii
+            WordStartUnicode -> WordEndUnicode
+            WordEndUnicode -> WordStartUnicode
+            WordStartHalfAscii -> WordEndHalfAscii
+            WordEndHalfAscii -> WordStartHalfAscii
+            WordStartHalfUnicode -> WordEndHalfUnicode
+            WordEndHalfUnicode -> WordStartHalfUnicode
+        }
 
     /**
      * Return the underlying representation of this look-around enumeration
@@ -1261,26 +1419,27 @@ enum class Look(val repr: Int) {
      * look-around assertion. Each assertion is guaranteed to be represented
      * by a distinct character.
      */
-    fun asChar(): String = when (this) {
-        Start -> "A"
-        End -> "z"
-        StartLF -> "^"
-        EndLF -> "$"
-        StartCRLF -> "r"
-        EndCRLF -> "R"
-        WordAscii -> "b"
-        WordAsciiNegate -> "B"
-        WordUnicode -> "𝛃"
-        WordUnicodeNegate -> "𝚩"
-        WordStartAscii -> "<"
-        WordEndAscii -> ">"
-        WordStartUnicode -> "〈"
-        WordEndUnicode -> "〉"
-        WordStartHalfAscii -> "◁"
-        WordEndHalfAscii -> "▷"
-        WordStartHalfUnicode -> "◀"
-        WordEndHalfUnicode -> "▶"
-    }
+    fun asChar(): String =
+        when (this) {
+            Start -> "A"
+            End -> "z"
+            StartLF -> "^"
+            EndLF -> "$"
+            StartCRLF -> "r"
+            EndCRLF -> "R"
+            WordAscii -> "b"
+            WordAsciiNegate -> "B"
+            WordUnicode -> "𝛃"
+            WordUnicodeNegate -> "𝚩"
+            WordStartAscii -> "<"
+            WordEndAscii -> ">"
+            WordStartUnicode -> "〈"
+            WordEndUnicode -> "〉"
+            WordStartHalfAscii -> "◁"
+            WordEndHalfAscii -> "▷"
+            WordStartHalfUnicode -> "◀"
+            WordEndHalfUnicode -> "▶"
+        }
 
     companion object {
         /**
@@ -1361,7 +1520,9 @@ sealed class Dot {
     object AnyByte : Dot()
 
     /** Matches the UTF-8 encoding of any Unicode scalar value except for the codepoint given. */
-    data class AnyCharExcept(val codepoint: Int) : Dot()
+    data class AnyCharExcept(
+        val codepoint: Int,
+    ) : Dot()
 
     /** Matches the UTF-8 encoding of any Unicode scalar value except for `\n`. */
     object AnyCharExceptLF : Dot()
@@ -1370,7 +1531,9 @@ sealed class Dot {
     object AnyCharExceptCRLF : Dot()
 
     /** Matches any byte value except for the byte given. */
-    data class AnyByteExcept(val byte: Byte) : Dot()
+    data class AnyByteExcept(
+        val byte: Byte,
+    ) : Dot()
 
     /** Matches any byte value except for `\n`. */
     object AnyByteExceptLF : Dot()
@@ -1390,7 +1553,9 @@ sealed class Dot {
  * be cheap to call.
  */
 @ConsistentCopyVisibility
-data class Properties internal constructor(internal val inner: PropertiesI) {
+data class Properties internal constructor(
+    internal val inner: PropertiesI,
+) {
     /** Returns the length (in bytes) of the smallest string matched by this HIR. */
     fun minimumLen(): Int? = inner.minimumLen
 
@@ -1445,20 +1610,21 @@ data class Properties internal constructor(internal val inner: PropertiesI) {
             // Use a helper.
             val all = propsList.toList()
             val staticInit = all.firstOrNull()?.staticExplicitCapturesLen()
-            val out = PropertiesI(
-                minimumLen = null,
-                maximumLen = null,
-                lookSet = LookSet.empty(),
-                lookSetPrefix = fix,
-                lookSetSuffix = fix,
-                lookSetPrefixAny = LookSet.empty(),
-                lookSetSuffixAny = LookSet.empty(),
-                utf8 = true,
-                explicitCapturesLen = 0,
-                staticExplicitCapturesLen = staticInit,
-                literal = false,
-                alternationLiteral = true,
-            )
+            val out =
+                PropertiesI(
+                    minimumLen = null,
+                    maximumLen = null,
+                    lookSet = LookSet.empty(),
+                    lookSetPrefix = fix,
+                    lookSetSuffix = fix,
+                    lookSetPrefixAny = LookSet.empty(),
+                    lookSetSuffixAny = LookSet.empty(),
+                    utf8 = true,
+                    explicitCapturesLen = 0,
+                    staticExplicitCapturesLen = staticInit,
+                    literal = false,
+                    alternationLiteral = true,
+                )
             var minPoisoned = false
             var maxPoisoned = false
             for (p in all) {
@@ -1500,97 +1666,116 @@ data class Properties internal constructor(internal val inner: PropertiesI) {
         }
 
         /** Create a new set of HIR properties for an empty regex. */
-        internal fun empty(): Properties = Properties(PropertiesI(
-            minimumLen = 0,
-            maximumLen = 0,
-            lookSet = LookSet.empty(),
-            lookSetPrefix = LookSet.empty(),
-            lookSetSuffix = LookSet.empty(),
-            lookSetPrefixAny = LookSet.empty(),
-            lookSetSuffixAny = LookSet.empty(),
-            utf8 = true,
-            explicitCapturesLen = 0,
-            staticExplicitCapturesLen = 0,
-            literal = false,
-            alternationLiteral = false,
-        ))
+        internal fun empty(): Properties =
+            Properties(
+                PropertiesI(
+                    minimumLen = 0,
+                    maximumLen = 0,
+                    lookSet = LookSet.empty(),
+                    lookSetPrefix = LookSet.empty(),
+                    lookSetSuffix = LookSet.empty(),
+                    lookSetPrefixAny = LookSet.empty(),
+                    lookSetSuffixAny = LookSet.empty(),
+                    utf8 = true,
+                    explicitCapturesLen = 0,
+                    staticExplicitCapturesLen = 0,
+                    literal = false,
+                    alternationLiteral = false,
+                ),
+            )
 
         /** Create a new set of HIR properties for a literal regex. */
-        internal fun literal(lit: Literal): Properties = Properties(PropertiesI(
-            minimumLen = lit.bytes.size,
-            maximumLen = lit.bytes.size,
-            lookSet = LookSet.empty(),
-            lookSetPrefix = LookSet.empty(),
-            lookSetSuffix = LookSet.empty(),
-            lookSetPrefixAny = LookSet.empty(),
-            lookSetSuffixAny = LookSet.empty(),
-            utf8 = isValidUtf8(lit.bytes),
-            explicitCapturesLen = 0,
-            staticExplicitCapturesLen = 0,
-            literal = true,
-            alternationLiteral = true,
-        ))
+        internal fun literal(lit: Literal): Properties =
+            Properties(
+                PropertiesI(
+                    minimumLen = lit.bytes.size,
+                    maximumLen = lit.bytes.size,
+                    lookSet = LookSet.empty(),
+                    lookSetPrefix = LookSet.empty(),
+                    lookSetSuffix = LookSet.empty(),
+                    lookSetPrefixAny = LookSet.empty(),
+                    lookSetSuffixAny = LookSet.empty(),
+                    utf8 = isValidUtf8(lit.bytes),
+                    explicitCapturesLen = 0,
+                    staticExplicitCapturesLen = 0,
+                    literal = true,
+                    alternationLiteral = true,
+                ),
+            )
 
         /** Create a new set of HIR properties for a character class. */
-        internal fun classOf(cls: Class): Properties = Properties(PropertiesI(
-            minimumLen = cls.minimumLen(),
-            maximumLen = cls.maximumLen(),
-            lookSet = LookSet.empty(),
-            lookSetPrefix = LookSet.empty(),
-            lookSetSuffix = LookSet.empty(),
-            lookSetPrefixAny = LookSet.empty(),
-            lookSetSuffixAny = LookSet.empty(),
-            utf8 = cls.isUtf8(),
-            explicitCapturesLen = 0,
-            staticExplicitCapturesLen = 0,
-            literal = false,
-            alternationLiteral = false,
-        ))
+        internal fun classOf(cls: Class): Properties =
+            Properties(
+                PropertiesI(
+                    minimumLen = cls.minimumLen(),
+                    maximumLen = cls.maximumLen(),
+                    lookSet = LookSet.empty(),
+                    lookSetPrefix = LookSet.empty(),
+                    lookSetSuffix = LookSet.empty(),
+                    lookSetPrefixAny = LookSet.empty(),
+                    lookSetSuffixAny = LookSet.empty(),
+                    utf8 = cls.isUtf8(),
+                    explicitCapturesLen = 0,
+                    staticExplicitCapturesLen = 0,
+                    literal = false,
+                    alternationLiteral = false,
+                ),
+            )
 
         /** Create a new set of HIR properties for a look-around assertion. */
-        internal fun look(look: Look): Properties = Properties(PropertiesI(
-            minimumLen = 0,
-            maximumLen = 0,
-            lookSet = LookSet.singleton(look),
-            lookSetPrefix = LookSet.singleton(look),
-            lookSetSuffix = LookSet.singleton(look),
-            lookSetPrefixAny = LookSet.singleton(look),
-            lookSetSuffixAny = LookSet.singleton(look),
-            utf8 = true,
-            explicitCapturesLen = 0,
-            staticExplicitCapturesLen = 0,
-            literal = false,
-            alternationLiteral = false,
-        ))
+        internal fun look(look: Look): Properties =
+            Properties(
+                PropertiesI(
+                    minimumLen = 0,
+                    maximumLen = 0,
+                    lookSet = LookSet.singleton(look),
+                    lookSetPrefix = LookSet.singleton(look),
+                    lookSetSuffix = LookSet.singleton(look),
+                    lookSetPrefixAny = LookSet.singleton(look),
+                    lookSetSuffixAny = LookSet.singleton(look),
+                    utf8 = true,
+                    explicitCapturesLen = 0,
+                    staticExplicitCapturesLen = 0,
+                    literal = false,
+                    alternationLiteral = false,
+                ),
+            )
 
         /** Create a new set of HIR properties for a repetition. */
         internal fun repetition(rep: Repetition): Properties {
             val p = rep.sub.properties()
             val childMin = p.minimumLen()
-            val minimumLen = if (childMin != null) {
-                val repMin = rep.min.toInt()
-                saturatingMul(childMin, repMin)
-            } else null
+            val minimumLen =
+                if (childMin != null) {
+                    val repMin = rep.min.toInt()
+                    saturatingMul(childMin, repMin)
+                } else {
+                    null
+                }
             val repMax = rep.max
-            val maximumLen = if (repMax != null) {
-                val rmax = repMax.toInt()
-                val childMax = p.maximumLen()
-                if (childMax != null) checkedMul(childMax, rmax) else null
-            } else null
-            val out = PropertiesI(
-                minimumLen = minimumLen,
-                maximumLen = maximumLen,
-                lookSet = p.lookSet(),
-                lookSetPrefix = LookSet.empty(),
-                lookSetSuffix = LookSet.empty(),
-                lookSetPrefixAny = p.lookSetPrefixAny(),
-                lookSetSuffixAny = p.lookSetSuffixAny(),
-                utf8 = p.isUtf8(),
-                explicitCapturesLen = p.explicitCapturesLen(),
-                staticExplicitCapturesLen = p.staticExplicitCapturesLen(),
-                literal = false,
-                alternationLiteral = false,
-            )
+            val maximumLen =
+                if (repMax != null) {
+                    val rmax = repMax.toInt()
+                    val childMax = p.maximumLen()
+                    if (childMax != null) checkedMul(childMax, rmax) else null
+                } else {
+                    null
+                }
+            val out =
+                PropertiesI(
+                    minimumLen = minimumLen,
+                    maximumLen = maximumLen,
+                    lookSet = p.lookSet(),
+                    lookSetPrefix = LookSet.empty(),
+                    lookSetSuffix = LookSet.empty(),
+                    lookSetPrefixAny = p.lookSetPrefixAny(),
+                    lookSetSuffixAny = p.lookSetSuffixAny(),
+                    utf8 = p.isUtf8(),
+                    explicitCapturesLen = p.explicitCapturesLen(),
+                    staticExplicitCapturesLen = p.staticExplicitCapturesLen(),
+                    literal = false,
+                    alternationLiteral = false,
+                )
             // If the repetition operator can accept the empty string, then its
             // lookset prefix and suffixes themselves remain empty since they are
             // no longer required to match.
@@ -1616,30 +1801,33 @@ data class Properties internal constructor(internal val inner: PropertiesI) {
         /** Create a new set of HIR properties for a capture. */
         internal fun capture(capture: Capture): Properties {
             val p = capture.sub.properties()
-            return Properties(p.inner.copy(
-                explicitCapturesLen = saturatingAdd(p.explicitCapturesLen(), 1),
-                staticExplicitCapturesLen = p.staticExplicitCapturesLen()?.run { saturatingAdd(this, 1) },
-                literal = false,
-                alternationLiteral = false,
-            ))
+            return Properties(
+                p.inner.copy(
+                    explicitCapturesLen = saturatingAdd(p.explicitCapturesLen(), 1),
+                    staticExplicitCapturesLen = p.staticExplicitCapturesLen()?.run { saturatingAdd(this, 1) },
+                    literal = false,
+                    alternationLiteral = false,
+                ),
+            )
         }
 
         /** Create a new set of HIR properties for a concatenation. */
         internal fun concat(concat: List<Hir>): Properties {
-            val out = PropertiesI(
-                minimumLen = 0,
-                maximumLen = 0,
-                lookSet = LookSet.empty(),
-                lookSetPrefix = LookSet.empty(),
-                lookSetSuffix = LookSet.empty(),
-                lookSetPrefixAny = LookSet.empty(),
-                lookSetSuffixAny = LookSet.empty(),
-                utf8 = true,
-                explicitCapturesLen = 0,
-                staticExplicitCapturesLen = 0,
-                literal = true,
-                alternationLiteral = true,
-            )
+            val out =
+                PropertiesI(
+                    minimumLen = 0,
+                    maximumLen = 0,
+                    lookSet = LookSet.empty(),
+                    lookSetPrefix = LookSet.empty(),
+                    lookSetSuffix = LookSet.empty(),
+                    lookSetPrefixAny = LookSet.empty(),
+                    lookSetSuffixAny = LookSet.empty(),
+                    utf8 = true,
+                    explicitCapturesLen = 0,
+                    staticExplicitCapturesLen = 0,
+                    literal = true,
+                    alternationLiteral = true,
+                )
             for (x in concat) {
                 val p = x.properties()
                 out.lookSet = out.lookSet.union(p.lookSet())
@@ -1729,10 +1917,11 @@ data class LookSet(
         /** Return a [LookSet] from the slice given as a native endian 32-bit integer. */
         fun readRepr(slice: ByteArray): LookSet {
             check(slice.size >= 4)
-            val bits = (slice[0].toInt() and 0xFF) or
-                ((slice[1].toInt() and 0xFF) shl 8) or
-                ((slice[2].toInt() and 0xFF) shl 16) or
-                ((slice[3].toInt() and 0xFF) shl 24)
+            val bits =
+                (slice[0].toInt() and 0xFF) or
+                    ((slice[1].toInt() and 0xFF) shl 8) or
+                    ((slice[2].toInt() and 0xFF) shl 16) or
+                    ((slice[3].toInt() and 0xFF) shl 24)
             return LookSet(bits)
         }
     }
@@ -1741,7 +1930,10 @@ data class LookSet(
     fun len(): Int {
         var b = bits
         var c = 0
-        while (b != 0) { c += b and 1; b = b ushr 1 }
+        while (b != 0) {
+            c += b and 1
+            b = b ushr 1
+        }
         return c
     }
 
@@ -1759,8 +1951,10 @@ data class LookSet(
 
     /** Returns true if and only if this set contains any "start/end of line" anchors. */
     fun containsAnchorLine(): Boolean =
-        contains(Look.StartLF) || contains(Look.EndLF) ||
-        contains(Look.StartCRLF) || contains(Look.EndCRLF)
+        contains(Look.StartLF) ||
+            contains(Look.EndLF) ||
+            contains(Look.StartCRLF) ||
+            contains(Look.EndCRLF)
 
     /** Returns true if and only if this set contains any \n line anchors. */
     fun containsAnchorLf(): Boolean = contains(Look.StartLF) || contains(Look.EndLF)
@@ -1772,14 +1966,20 @@ data class LookSet(
     fun containsWord(): Boolean = containsWordUnicode() || containsWordAscii()
 
     fun containsWordUnicode(): Boolean =
-        contains(Look.WordUnicode) || contains(Look.WordUnicodeNegate) ||
-        contains(Look.WordStartUnicode) || contains(Look.WordEndUnicode) ||
-        contains(Look.WordStartHalfUnicode) || contains(Look.WordEndHalfUnicode)
+        contains(Look.WordUnicode) ||
+            contains(Look.WordUnicodeNegate) ||
+            contains(Look.WordStartUnicode) ||
+            contains(Look.WordEndUnicode) ||
+            contains(Look.WordStartHalfUnicode) ||
+            contains(Look.WordEndHalfUnicode)
 
     fun containsWordAscii(): Boolean =
-        contains(Look.WordAscii) || contains(Look.WordAsciiNegate) ||
-        contains(Look.WordStartAscii) || contains(Look.WordEndAscii) ||
-        contains(Look.WordStartHalfAscii) || contains(Look.WordEndHalfAscii)
+        contains(Look.WordAscii) ||
+            contains(Look.WordAsciiNegate) ||
+            contains(Look.WordStartAscii) ||
+            contains(Look.WordEndAscii) ||
+            contains(Look.WordStartHalfAscii) ||
+            contains(Look.WordEndHalfAscii)
 
     /** Returns an iterator over all of the look-around assertions in this set. */
     override fun iterator(): Iterator<Look> = LookSetIter(this)
@@ -1847,7 +2047,9 @@ data class LookSet(
 }
 
 /** An iterator over all look-around assertions in a [LookSet]. */
-class LookSetIter internal constructor(initial: LookSet) : Iterator<Look> {
+class LookSetIter internal constructor(
+    initial: LookSet,
+) : Iterator<Look> {
     private var set: LookSet = initial
 
     override fun hasNext(): Boolean = nextLook() != null
@@ -1883,13 +2085,14 @@ private fun classChars(hirs: List<Hir>): Class? {
     val cls = ClassUnicode.new(emptyList())
     for (hir in hirs) {
         when (val k = hir.kind()) {
-            is HirKind.Class -> when (val c = k.value) {
-                is Class.Unicode -> cls.union(c.value)
-                is Class.Bytes -> {
-                    val asUni = c.value.toUnicodeClass() ?: return null
-                    cls.union(asUni)
+            is HirKind.Class ->
+                when (val c = k.value) {
+                    is Class.Unicode -> cls.union(c.value)
+                    is Class.Bytes -> {
+                        val asUni = c.value.toUnicodeClass() ?: return null
+                        cls.union(asUni)
+                    }
                 }
-            }
             else -> return null
         }
     }
@@ -1905,13 +2108,14 @@ private fun classBytes(hirs: List<Hir>): Class? {
     val cls = ClassBytes.new(emptyList())
     for (hir in hirs) {
         when (val k = hir.kind()) {
-            is HirKind.Class -> when (val c = k.value) {
-                is Class.Unicode -> {
-                    val asBytes = c.value.toByteClass() ?: return null
-                    cls.union(asBytes)
+            is HirKind.Class ->
+                when (val c = k.value) {
+                    is Class.Unicode -> {
+                        val asBytes = c.value.toByteClass() ?: return null
+                        cls.union(asBytes)
+                    }
+                    is Class.Bytes -> cls.union(c.value)
                 }
-                is Class.Bytes -> cls.union(c.value)
-            }
             else -> return null
         }
     }
@@ -1926,14 +2130,16 @@ private fun classBytes(hirs: List<Hir>): Class? {
 private fun singletonChars(hirs: List<Hir>): List<Int>? {
     val singletons = ArrayList<Int>()
     for (hir in hirs) {
-        val literal = when (val k = hir.kind()) {
-            is HirKind.Literal -> k.value.bytes
-            else -> return null
-        }
-        val ch = when (val r = utf8Decode(literal)) {
-            null, is Utf8Decoded.Failed -> return null
-            is Utf8Decoded.Ok -> r.codepoint
-        }
+        val literal =
+            when (val k = hir.kind()) {
+                is HirKind.Literal -> k.value.bytes
+                else -> return null
+            }
+        val ch =
+            when (val r = utf8Decode(literal)) {
+                null, is Utf8Decoded.Failed -> return null
+                is Utf8Decoded.Ok -> r.codepoint
+            }
         if (literal.size != ch.len()) return null
         singletons.add(ch)
     }
@@ -1948,10 +2154,11 @@ private fun singletonChars(hirs: List<Hir>): List<Int>? {
 private fun singletonBytes(hirs: List<Hir>): List<Byte>? {
     val singletons = ArrayList<Byte>()
     for (hir in hirs) {
-        val literal = when (val k = hir.kind()) {
-            is HirKind.Literal -> k.value.bytes
-            else -> return null
-        }
+        val literal =
+            when (val k = hir.kind()) {
+                is HirKind.Literal -> k.value.bytes
+                else -> return null
+            }
         if (literal.size != 1) return null
         singletons.add(literal[0])
     }
@@ -1959,8 +2166,13 @@ private fun singletonBytes(hirs: List<Hir>): List<Byte>? {
 }
 
 private sealed class LiftResult {
-    class Success(val hir: Hir) : LiftResult()
-    class Unchanged(val items: List<Hir>) : LiftResult()
+    class Success(
+        val hir: Hir,
+    ) : LiftResult()
+
+    class Unchanged(
+        val items: List<Hir>,
+    ) : LiftResult()
 }
 
 /**
@@ -1970,16 +2182,18 @@ private sealed class LiftResult {
  */
 private fun liftCommonPrefix(hirs: List<Hir>): LiftResult {
     if (hirs.size <= 1) return LiftResult.Unchanged(hirs)
-    var prefix: List<Hir> = when (val k = hirs[0].kind()) {
-        is HirKind.Concat -> k.items
-        else -> return LiftResult.Unchanged(hirs)
-    }
-    if (prefix.isEmpty()) return LiftResult.Unchanged(hirs)
-    for (i in 1 until hirs.size) {
-        val concat = when (val k = hirs[i].kind()) {
+    var prefix: List<Hir> =
+        when (val k = hirs[0].kind()) {
             is HirKind.Concat -> k.items
             else -> return LiftResult.Unchanged(hirs)
         }
+    if (prefix.isEmpty()) return LiftResult.Unchanged(hirs)
+    for (i in 1 until hirs.size) {
+        val concat =
+            when (val k = hirs[i].kind()) {
+                is HirKind.Concat -> k.items
+                else -> return LiftResult.Unchanged(hirs)
+            }
         var commonLen = 0
         val maxLen = minOf(prefix.size, concat.size)
         while (commonLen < maxLen && prefix[commonLen] == concat[commonLen]) {
@@ -1993,10 +2207,11 @@ private fun liftCommonPrefix(hirs: List<Hir>): LiftResult {
     val prefixConcat = ArrayList<Hir>()
     val suffixAlts = ArrayList<Hir>()
     for ((i, h) in hirs.withIndex()) {
-        val concat = when (val k = h.kind()) {
-            is HirKind.Concat -> k.items
-            else -> error("unreachable: liftCommonPrefix concat case mismatch")
-        }
+        val concat =
+            when (val k = h.kind()) {
+                is HirKind.Concat -> k.items
+                else -> error("unreachable: liftCommonPrefix concat case mismatch")
+            }
         suffixAlts.add(Hir.concat(concat.subList(len, concat.size)))
         if (i == 0) {
             prefixConcat.addAll(concat.subList(0, len))
@@ -2038,8 +2253,8 @@ private fun checkedMul(a: Int, b: Int): Int? {
 }
 
 /** Encode a Unicode codepoint as UTF-8 into [dest], returning the number of bytes written. */
-internal fun encodeUtf8(codepoint: Int, dest: ByteArray): Int {
-    return when {
+internal fun encodeUtf8(codepoint: Int, dest: ByteArray): Int =
+    when {
         codepoint < 0x80 -> {
             dest[0] = codepoint.toByte()
             1
@@ -2063,22 +2278,21 @@ internal fun encodeUtf8(codepoint: Int, dest: ByteArray): Int {
             4
         }
     }
-}
 
 /** Number of bytes a codepoint takes to encode as UTF-8. */
-internal fun codepointUtf8Len(codepoint: Int): Int = when {
-    codepoint < 0x80 -> 1
-    codepoint < 0x800 -> 2
-    codepoint < 0x10000 -> 3
-    else -> 4
-}
+internal fun codepointUtf8Len(codepoint: Int): Int =
+    when {
+        codepoint < 0x80 -> 1
+        codepoint < 0x800 -> 2
+        codepoint < 0x10000 -> 3
+        else -> 4
+    }
 
 /** Validate UTF-8 encoding of a byte sequence. */
-internal fun isValidUtf8(bytes: ByteArray): Boolean {
-    return try {
+internal fun isValidUtf8(bytes: ByteArray): Boolean =
+    try {
         bytes.decodeToString(throwOnInvalidSequence = true)
         true
     } catch (_: Throwable) {
         false
     }
-}

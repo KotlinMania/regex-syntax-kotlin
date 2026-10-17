@@ -3,11 +3,9 @@ package io.github.kotlinmania.regexsyntax.hir.translate
 
 import io.github.kotlinmania.regexsyntax.ast.Ast
 import io.github.kotlinmania.regexsyntax.ast.ClassAsciiKind
-import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder
 import io.github.kotlinmania.regexsyntax.ast.Position
 import io.github.kotlinmania.regexsyntax.ast.Span
-import io.github.kotlinmania.regexsyntax.ast.Alternation as AstAlternation
-import io.github.kotlinmania.regexsyntax.ast.Concat as AstConcat
+import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder
 import io.github.kotlinmania.regexsyntax.hir.Capture
 import io.github.kotlinmania.regexsyntax.hir.Class
 import io.github.kotlinmania.regexsyntax.hir.ClassBytes
@@ -15,7 +13,6 @@ import io.github.kotlinmania.regexsyntax.hir.ClassBytesRange
 import io.github.kotlinmania.regexsyntax.hir.ClassUnicode
 import io.github.kotlinmania.regexsyntax.hir.ClassUnicodeRange
 import io.github.kotlinmania.regexsyntax.hir.Dot
-import io.github.kotlinmania.regexsyntax.hir.Error as HirError
 import io.github.kotlinmania.regexsyntax.hir.ErrorKind
 import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.hir.HirKind
@@ -30,12 +27,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import io.github.kotlinmania.regexsyntax.ast.Alternation as AstAlternation
+import io.github.kotlinmania.regexsyntax.ast.Concat as AstConcat
+import io.github.kotlinmania.regexsyntax.hir.Error as HirError
 
 class TranslateTest {
     private fun spanSplat(pos: Position): Span = Span.splat(pos)
 
     private fun parse(pattern: String): Ast =
-        ParserBuilder.new().octal(true).build().parse(pattern).getOrThrow()
+        ParserBuilder
+            .new()
+            .octal(true)
+            .build()
+            .parse(pattern)
+            .getOrThrow()
 
     private fun t(pattern: String): Hir {
         val ast = parse(pattern)
@@ -109,38 +114,44 @@ class TranslateTest {
         Hir.`class`(Class.Unicode(perlWord().getOrThrow()))
 
     private fun hirAsciiUclass(kind: ClassAsciiKind): Hir =
-        Hir.`class`(Class.Unicode(ClassUnicode.new(
-            asciiClassAsChars(kind).map { (start, end) -> ClassUnicodeRange.new(start, end) },
-        )))
+        Hir.`class`(
+            Class.Unicode(
+                ClassUnicode.new(
+                    asciiClassAsChars(kind).map { (start, end) -> ClassUnicodeRange.new(start, end) },
+                ),
+            ),
+        )
 
     private fun hirAsciiBclass(kind: ClassAsciiKind): Hir =
-        Hir.`class`(Class.Bytes(ClassBytes.new(
-            asciiClass(kind).map { (start, end) -> ClassBytesRange.new(start.toByte(), end.toByte()) },
-        )))
+        Hir.`class`(
+            Class.Bytes(
+                ClassBytes.new(
+                    asciiClass(kind).map { (start, end) -> ClassBytesRange.new(start.toByte(), end.toByte()) },
+                ),
+            ),
+        )
 
     private fun hirUclass(vararg ranges: Pair<Int, Int>): Hir = Hir.`class`(uclass(*ranges))
 
     private fun hirBclass(vararg ranges: Pair<Int, Int>): Hir = Hir.`class`(bclass(*ranges))
 
-    private fun hirCaseFold(expr: Hir): Hir {
-        return when (val kind = expr.intoKind()) {
+    private fun hirCaseFold(expr: Hir): Hir =
+        when (val kind = expr.intoKind()) {
             is HirKind.Class -> {
                 kind.value.caseFoldSimple()
                 Hir.`class`(kind.value)
             }
             else -> throw IllegalStateException("cannot case fold non-class Hir expr")
         }
-    }
 
-    private fun hirNegate(expr: Hir): Hir {
-        return when (val kind = expr.intoKind()) {
+    private fun hirNegate(expr: Hir): Hir =
+        when (val kind = expr.intoKind()) {
             is HirKind.Class -> {
                 kind.value.negate()
                 Hir.`class`(kind.value)
             }
             else -> throw IllegalStateException("cannot negate non-class Hir expr")
         }
-    }
 
     private fun uclass(vararg ranges: Pair<Int, Int>): Class =
         Class.Unicode(ClassUnicode.new(ranges.map { (start, end) -> ClassUnicodeRange.new(start, end) }))
@@ -158,64 +169,67 @@ class TranslateTest {
         return Hir.`class`(cls)
     }
 
-    private fun hirUnion(expr1: Hir, expr2: Hir): Hir {
-        return when (val kind1 = expr1.intoKind()) {
-            is HirKind.Class -> when (val kind2 = expr2.intoKind()) {
-                is HirKind.Class -> when (val cls1 = kind1.value) {
-                    is Class.Unicode -> {
-                        cls1.value.union((kind2.value as Class.Unicode).value)
-                        Hir.`class`(Class.Unicode(cls1.value))
-                    }
-                    is Class.Bytes -> {
-                        cls1.value.union((kind2.value as Class.Bytes).value)
-                        Hir.`class`(Class.Bytes(cls1.value))
-                    }
+    private fun hirUnion(expr1: Hir, expr2: Hir): Hir =
+        when (val kind1 = expr1.intoKind()) {
+            is HirKind.Class ->
+                when (val kind2 = expr2.intoKind()) {
+                    is HirKind.Class ->
+                        when (val cls1 = kind1.value) {
+                            is Class.Unicode -> {
+                                cls1.value.union((kind2.value as Class.Unicode).value)
+                                Hir.`class`(Class.Unicode(cls1.value))
+                            }
+                            is Class.Bytes -> {
+                                cls1.value.union((kind2.value as Class.Bytes).value)
+                                Hir.`class`(Class.Bytes(cls1.value))
+                            }
+                        }
+                    else -> throw IllegalStateException("cannot union non-class Hir exprs")
                 }
-                else -> throw IllegalStateException("cannot union non-class Hir exprs")
-            }
             else -> throw IllegalStateException("cannot union non-class Hir exprs")
         }
-    }
 
-    private fun hirDifference(expr1: Hir, expr2: Hir): Hir {
-        return when (val kind1 = expr1.intoKind()) {
-            is HirKind.Class -> when (val kind2 = expr2.intoKind()) {
-                is HirKind.Class -> when (val cls1 = kind1.value) {
-                    is Class.Unicode -> {
-                        cls1.value.difference((kind2.value as Class.Unicode).value)
-                        Hir.`class`(Class.Unicode(cls1.value))
-                    }
-                    is Class.Bytes -> {
-                        cls1.value.difference((kind2.value as Class.Bytes).value)
-                        Hir.`class`(Class.Bytes(cls1.value))
-                    }
+    private fun hirDifference(expr1: Hir, expr2: Hir): Hir =
+        when (val kind1 = expr1.intoKind()) {
+            is HirKind.Class ->
+                when (val kind2 = expr2.intoKind()) {
+                    is HirKind.Class ->
+                        when (val cls1 = kind1.value) {
+                            is Class.Unicode -> {
+                                cls1.value.difference((kind2.value as Class.Unicode).value)
+                                Hir.`class`(Class.Unicode(cls1.value))
+                            }
+                            is Class.Bytes -> {
+                                cls1.value.difference((kind2.value as Class.Bytes).value)
+                                Hir.`class`(Class.Bytes(cls1.value))
+                            }
+                        }
+                    else -> throw IllegalStateException("cannot difference non-class Hir exprs")
                 }
-                else -> throw IllegalStateException("cannot difference non-class Hir exprs")
-            }
             else -> throw IllegalStateException("cannot difference non-class Hir exprs")
         }
-    }
 
     private fun hirLook(look: Look): Hir = Hir.look(look)
 
     private fun c(ch: Char): Int = ch.code
 
-    private fun asciiClass(kind: ClassAsciiKind): List<Pair<Int, Int>> = when (kind) {
-        ClassAsciiKind.Alnum -> listOf(c('0') to c('9'), c('A') to c('Z'), c('a') to c('z'))
-        ClassAsciiKind.Alpha -> listOf(c('A') to c('Z'), c('a') to c('z'))
-        ClassAsciiKind.Ascii -> listOf(0x00 to 0x7F)
-        ClassAsciiKind.Blank -> listOf(c('\t') to c('\t'), c(' ') to c(' '))
-        ClassAsciiKind.Cntrl -> listOf(0x00 to 0x1F, 0x7F to 0x7F)
-        ClassAsciiKind.Digit -> listOf(c('0') to c('9'))
-        ClassAsciiKind.Graph -> listOf(c('!') to c('~'))
-        ClassAsciiKind.Lower -> listOf(c('a') to c('z'))
-        ClassAsciiKind.Print -> listOf(c(' ') to c('~'))
-        ClassAsciiKind.Punct -> listOf(c('!') to c('/'), c(':') to c('@'), c('[') to c('`'), c('{') to c('~'))
-        ClassAsciiKind.Space -> listOf(c('\t') to c('\t'), c('\n') to c('\n'), 0x0B to 0x0B, 0x0C to 0x0C, c('\r') to c('\r'), c(' ') to c(' '))
-        ClassAsciiKind.Upper -> listOf(c('A') to c('Z'))
-        ClassAsciiKind.Word -> listOf(c('0') to c('9'), c('A') to c('Z'), c('_') to c('_'), c('a') to c('z'))
-        ClassAsciiKind.Xdigit -> listOf(c('0') to c('9'), c('A') to c('F'), c('a') to c('f'))
-    }
+    private fun asciiClass(kind: ClassAsciiKind): List<Pair<Int, Int>> =
+        when (kind) {
+            ClassAsciiKind.Alnum -> listOf(c('0') to c('9'), c('A') to c('Z'), c('a') to c('z'))
+            ClassAsciiKind.Alpha -> listOf(c('A') to c('Z'), c('a') to c('z'))
+            ClassAsciiKind.Ascii -> listOf(0x00 to 0x7F)
+            ClassAsciiKind.Blank -> listOf(c('\t') to c('\t'), c(' ') to c(' '))
+            ClassAsciiKind.Cntrl -> listOf(0x00 to 0x1F, 0x7F to 0x7F)
+            ClassAsciiKind.Digit -> listOf(c('0') to c('9'))
+            ClassAsciiKind.Graph -> listOf(c('!') to c('~'))
+            ClassAsciiKind.Lower -> listOf(c('a') to c('z'))
+            ClassAsciiKind.Print -> listOf(c(' ') to c('~'))
+            ClassAsciiKind.Punct -> listOf(c('!') to c('/'), c(':') to c('@'), c('[') to c('`'), c('{') to c('~'))
+            ClassAsciiKind.Space -> listOf(c('\t') to c('\t'), c('\n') to c('\n'), 0x0B to 0x0B, 0x0C to 0x0C, c('\r') to c('\r'), c(' ') to c(' '))
+            ClassAsciiKind.Upper -> listOf(c('A') to c('Z'))
+            ClassAsciiKind.Word -> listOf(c('0') to c('9'), c('A') to c('Z'), c('_') to c('_'), c('a') to c('z'))
+            ClassAsciiKind.Xdigit -> listOf(c('0') to c('9'), c('A') to c('F'), c('a') to c('f'))
+        }
 
     private fun asciiClassAsChars(kind: ClassAsciiKind): List<Pair<Int, Int>> = asciiClass(kind)
 
@@ -325,20 +339,24 @@ class TranslateTest {
         assertEquals(t("(?i:a)"), hirUclass(c('A') to c('A'), c('a') to c('a')))
         assertEquals(
             t("a(?i)a(?-i)a"),
-            hirCat(listOf(
-                hirLit("a"),
-                hirUclass(c('A') to c('A'), c('a') to c('a')),
-                hirLit("a"),
-            )),
+            hirCat(
+                listOf(
+                    hirLit("a"),
+                    hirUclass(c('A') to c('A'), c('a') to c('a')),
+                    hirLit("a"),
+                ),
+            ),
         )
         assertEquals(
             t("(?i)ab@c"),
-            hirCat(listOf(
-                hirUclass(c('A') to c('A'), c('a') to c('a')),
-                hirUclass(c('B') to c('B'), c('b') to c('b')),
-                hirLit("@"),
-                hirUclass(c('C') to c('C'), c('c') to c('c')),
-            )),
+            hirCat(
+                listOf(
+                    hirUclass(c('A') to c('A'), c('a') to c('a')),
+                    hirUclass(c('B') to c('B'), c('b') to c('b')),
+                    hirLit("@"),
+                    hirUclass(c('C') to c('C'), c('c') to c('c')),
+                ),
+            ),
         )
         assertEquals(
             t("(?i)β"),
@@ -348,20 +366,24 @@ class TranslateTest {
         assertEquals(t("(?i-u)a"), hirBclass(c('A') to c('A'), c('a') to c('a')))
         assertEquals(
             t("(?-u)a(?i)a(?-i)a"),
-            hirCat(listOf(
-                hirLit("a"),
-                hirBclass(c('A') to c('A'), c('a') to c('a')),
-                hirLit("a"),
-            )),
+            hirCat(
+                listOf(
+                    hirLit("a"),
+                    hirBclass(c('A') to c('A'), c('a') to c('a')),
+                    hirLit("a"),
+                ),
+            ),
         )
         assertEquals(
             t("(?i-u)ab@c"),
-            hirCat(listOf(
-                hirBclass(c('A') to c('A'), c('a') to c('a')),
-                hirBclass(c('B') to c('B'), c('b') to c('b')),
-                hirLit("@"),
-                hirBclass(c('C') to c('C'), c('c') to c('c')),
-            )),
+            hirCat(
+                listOf(
+                    hirBclass(c('A') to c('A'), c('a') to c('a')),
+                    hirBclass(c('B') to c('B'), c('b') to c('b')),
+                    hirLit("@"),
+                    hirBclass(c('C') to c('C'), c('c') to c('c')),
+                ),
+            ),
         )
 
         assertEquals(
@@ -436,10 +458,12 @@ class TranslateTest {
         assertEquals(t("(?P<foo>a)"), hirCaptureName(1u, "foo", hirLit("a")))
         assertEquals(
             t("(?P<foo>a)(?P<bar>b)"),
-            hirCat(listOf(
-                hirCaptureName(1u, "foo", hirLit("a")),
-                hirCaptureName(2u, "bar", hirLit("b")),
-            )),
+            hirCat(
+                listOf(
+                    hirCaptureName(1u, "foo", hirLit("a")),
+                    hirCaptureName(2u, "bar", hirLit("b")),
+                ),
+            ),
         )
         assertEquals(t("(?:)"), Hir.empty())
         assertEquals(t("(?:a)"), hirLit("a"))
@@ -453,11 +477,13 @@ class TranslateTest {
         )
         assertEquals(
             t("(a)(?P<foo>b)(c)"),
-            hirCat(listOf(
-                hirCapture(1u, hirLit("a")),
-                hirCaptureName(2u, "foo", hirLit("b")),
-                hirCapture(3u, hirLit("c")),
-            )),
+            hirCat(
+                listOf(
+                    hirCapture(1u, hirLit("a")),
+                    hirCaptureName(2u, "foo", hirLit("b")),
+                    hirCapture(3u, hirLit("c")),
+                ),
+            ),
         )
         assertEquals(t("()"), hirCapture(1u, Hir.empty()))
         assertEquals(t("((?i))"), hirCapture(1u, Hir.empty()))
@@ -476,24 +502,30 @@ class TranslateTest {
         )
         assertEquals(
             t("(?i-u:a)β"),
-            hirCat(listOf(
-                hirBclass(c('A') to c('A'), c('a') to c('a')),
-                hirLit("β"),
-            )),
+            hirCat(
+                listOf(
+                    hirBclass(c('A') to c('A'), c('a') to c('a')),
+                    hirLit("β"),
+                ),
+            ),
         )
         assertEquals(
             t("(?:(?i-u)a)b"),
-            hirCat(listOf(
-                hirBclass(c('A') to c('A'), c('a') to c('a')),
-                hirLit("b"),
-            )),
+            hirCat(
+                listOf(
+                    hirBclass(c('A') to c('A'), c('a') to c('a')),
+                    hirLit("b"),
+                ),
+            ),
         )
         assertEquals(
             t("((?i-u)a)b"),
-            hirCat(listOf(
-                hirCapture(1u, hirBclass(c('A') to c('A'), c('a') to c('a'))),
-                hirLit("b"),
-            )),
+            hirCat(
+                listOf(
+                    hirCapture(1u, hirBclass(c('A') to c('A'), c('a') to c('a'))),
+                    hirLit("b"),
+                ),
+            ),
         )
         assertEquals(
             t("(?i)(?-i:a)a"),
@@ -501,48 +533,62 @@ class TranslateTest {
         )
         assertEquals(
             t("(?im)a^"),
-            hirCat(listOf(
-                hirUclass(c('A') to c('A'), c('a') to c('a')),
-                hirLook(Look.StartLF),
-            )),
+            hirCat(
+                listOf(
+                    hirUclass(c('A') to c('A'), c('a') to c('a')),
+                    hirLook(Look.StartLF),
+                ),
+            ),
         )
         assertEquals(
             t("(?im)a^(?i-m)a^"),
-            hirCat(listOf(
-                hirUclass(c('A') to c('A'), c('a') to c('a')),
-                hirLook(Look.StartLF),
-                hirUclass(c('A') to c('A'), c('a') to c('a')),
-                hirLook(Look.Start),
-            )),
+            hirCat(
+                listOf(
+                    hirUclass(c('A') to c('A'), c('a') to c('a')),
+                    hirLook(Look.StartLF),
+                    hirUclass(c('A') to c('A'), c('a') to c('a')),
+                    hirLook(Look.Start),
+                ),
+            ),
         )
         assertEquals(
             t("(?U)a*a*?(?-U)a*a*?"),
-            hirCat(listOf(
-                hirStar(false, hirLit("a")),
-                hirStar(true, hirLit("a")),
-                hirStar(true, hirLit("a")),
-                hirStar(false, hirLit("a")),
-            )),
+            hirCat(
+                listOf(
+                    hirStar(false, hirLit("a")),
+                    hirStar(true, hirLit("a")),
+                    hirStar(true, hirLit("a")),
+                    hirStar(false, hirLit("a")),
+                ),
+            ),
         )
         assertEquals(
             t("(?:a(?i)a)a"),
-            hirCat(listOf(
-                hirCat(listOf(
+            hirCat(
+                listOf(
+                    hirCat(
+                        listOf(
+                            hirLit("a"),
+                            hirUclass(c('A') to c('A'), c('a') to c('a')),
+                        ),
+                    ),
                     hirLit("a"),
-                    hirUclass(c('A') to c('A'), c('a') to c('a')),
-                )),
-                hirLit("a"),
-            )),
+                ),
+            ),
         )
         assertEquals(
             t("(?i)(?:a(?-i)a)a"),
-            hirCat(listOf(
-                hirCat(listOf(
+            hirCat(
+                listOf(
+                    hirCat(
+                        listOf(
+                            hirUclass(c('A') to c('A'), c('a') to c('a')),
+                            hirLit("a"),
+                        ),
+                    ),
                     hirUclass(c('A') to c('A'), c('a') to c('a')),
-                    hirLit("a"),
-                )),
-                hirUclass(c('A') to c('A'), c('a') to c('a')),
-            )),
+                ),
+            ),
         )
     }
 
@@ -622,11 +668,13 @@ class TranslateTest {
         assertEquals(t("^|$|\\b"), hirAlt(listOf(a(), b(), c())))
         assertEquals(
             t("^$|$\\b|\\b\\B"),
-            hirAlt(listOf(
-                hirCat(listOf(a(), b())),
-                hirCat(listOf(b(), c())),
-                hirCat(listOf(c(), d())),
-            )),
+            hirAlt(
+                listOf(
+                    hirCat(listOf(a(), b())),
+                    hirCat(listOf(b(), c())),
+                    hirCat(listOf(c(), d())),
+                ),
+            ),
         )
         assertEquals(t("(^|$)"), hirCapture(1u, hirAlt(listOf(a(), b()))))
         assertEquals(
@@ -637,27 +685,33 @@ class TranslateTest {
             t("(^$|$\\b|\\b\\B)"),
             hirCapture(
                 1u,
-                hirAlt(listOf(
-                    hirCat(listOf(a(), b())),
-                    hirCat(listOf(b(), c())),
-                    hirCat(listOf(c(), d())),
-                )),
+                hirAlt(
+                    listOf(
+                        hirCat(listOf(a(), b())),
+                        hirCat(listOf(b(), c())),
+                        hirCat(listOf(c(), d())),
+                    ),
+                ),
             ),
         )
         assertEquals(
             t("(^$|($\\b|(\\b\\B)))"),
             hirCapture(
                 1u,
-                hirAlt(listOf(
-                    hirCat(listOf(a(), b())),
-                    hirCapture(
-                        2u,
-                        hirAlt(listOf(
-                            hirCat(listOf(b(), c())),
-                            hirCapture(3u, hirCat(listOf(c(), d()))),
-                        )),
+                hirAlt(
+                    listOf(
+                        hirCat(listOf(a(), b())),
+                        hirCapture(
+                            2u,
+                            hirAlt(
+                                listOf(
+                                    hirCat(listOf(b(), c())),
+                                    hirCapture(3u, hirCat(listOf(c(), d()))),
+                                ),
+                            ),
+                        ),
                     ),
-                )),
+                ),
             ),
         )
     }
@@ -673,24 +727,28 @@ class TranslateTest {
         // Combining all of the letter properties should give us the one giant
         // letter property.
         assertEquals(
-            t("""(?x)
+            t(
+                """(?x)
                 \p{Lowercase_Letter}
                 |\p{Uppercase_Letter}
                 |\p{Titlecase_Letter}
                 |\p{Modifier_Letter}
                 |\p{Other_Letter}
-            """),
+            """,
+            ),
             hirUclassQuery(ClassQuery.Binary("letter")),
         )
         // Byte classes that can truly match invalid UTF-8 cannot be combined
         // with Unicode classes.
         assertEquals(
             tBytes("""[Δδ]|(?-u:[\x90-\xFF])|[Λλ]"""),
-            hirAlt(listOf(
-                hirUclass(c('Δ') to c('Δ'), c('δ') to c('δ')),
-                hirBclass(0x90 to 0xFF),
-                hirUclass(c('Λ') to c('Λ'), c('λ') to c('λ')),
-            )),
+            hirAlt(
+                listOf(
+                    hirUclass(c('Δ') to c('Δ'), c('δ') to c('δ')),
+                    hirBclass(0x90 to 0xFF),
+                    hirUclass(c('Λ') to c('Λ'), c('λ') to c('λ')),
+                ),
+            ),
         )
         // Byte classes on their own can be combined, even if some are ASCII
         // and others are invalid UTF-8.
@@ -1040,33 +1098,41 @@ class TranslateTest {
 
         assertEquals(
             t("""(?i)[\p{age:3.0}\pZ\p{Greek}]"""),
-            hirCaseFold(hirUnion(
-                hirUclassQuery(ClassQuery.ByValue("age", "3.0")),
+            hirCaseFold(
                 hirUnion(
-                    hirUclassQuery(ClassQuery.Binary("greek")),
-                    hirUclassQuery(ClassQuery.Binary("separator")),
+                    hirUclassQuery(ClassQuery.ByValue("age", "3.0")),
+                    hirUnion(
+                        hirUclassQuery(ClassQuery.Binary("greek")),
+                        hirUclassQuery(ClassQuery.Binary("separator")),
+                    ),
                 ),
-            )),
+            ),
         )
         assertEquals(
             t("""[^\p{age:3.0}\pZ\p{Greek}]"""),
-            hirNegate(hirUnion(
-                hirUclassQuery(ClassQuery.ByValue("age", "3.0")),
+            hirNegate(
                 hirUnion(
-                    hirUclassQuery(ClassQuery.Binary("greek")),
-                    hirUclassQuery(ClassQuery.Binary("separator")),
+                    hirUclassQuery(ClassQuery.ByValue("age", "3.0")),
+                    hirUnion(
+                        hirUclassQuery(ClassQuery.Binary("greek")),
+                        hirUclassQuery(ClassQuery.Binary("separator")),
+                    ),
                 ),
-            )),
+            ),
         )
         assertEquals(
             t("""(?i)[^\p{age:3.0}\pZ\p{Greek}]"""),
-            hirNegate(hirCaseFold(hirUnion(
-                hirUclassQuery(ClassQuery.ByValue("age", "3.0")),
-                hirUnion(
-                    hirUclassQuery(ClassQuery.Binary("greek")),
-                    hirUclassQuery(ClassQuery.Binary("separator")),
+            hirNegate(
+                hirCaseFold(
+                    hirUnion(
+                        hirUclassQuery(ClassQuery.ByValue("age", "3.0")),
+                        hirUnion(
+                            hirUclassQuery(ClassQuery.Binary("greek")),
+                            hirUclassQuery(ClassQuery.Binary("separator")),
+                        ),
+                    ),
                 ),
-            ))),
+            ),
         )
     }
 
@@ -1218,36 +1284,44 @@ class TranslateTest {
         assertEquals(t("""(?x)\12 3"""), hirLit("\n3"))
         assertEquals(t("""(?x)\x { 53 }"""), hirLit("S"))
         assertEquals(
-            t("""(?x)\x # comment
+            t(
+                """(?x)\x # comment
 { # comment
     53 # comment
-} #comment"""),
+} #comment""",
+            ),
             hirLit("S"),
         )
 
         assertEquals(t("""(?x)\x 53"""), hirLit("S"))
         assertEquals(
-            t("""(?x)\x # comment
-        53 # comment"""),
+            t(
+                """(?x)\x # comment
+        53 # comment""",
+            ),
             hirLit("S"),
         )
         assertEquals(t("""(?x)\x5 3"""), hirLit("S"))
 
         assertEquals(
-            t("""(?x)\p # comment
+            t(
+                """(?x)\p # comment
 { # comment
     Separator # comment
-} # comment"""),
+} # comment""",
+            ),
             hirUclassQuery(ClassQuery.Binary("separator")),
         )
 
         assertEquals(
-            t("""(?x)a # comment
+            t(
+                """(?x)a # comment
 { # comment
     5 # comment
     , # comment
     10 # comment
-} # comment"""),
+} # comment""",
+            ),
             hirRange(true, 5u, 10u, hirLit("a")),
         )
 
@@ -1559,19 +1633,23 @@ class TranslateTest {
         assertEquals(t("quux(?:foo)(?:bar)baz"), hirLit("quuxfoobarbaz"))
         assertEquals(
             t("foo(?:bar^baz)quux"),
-            hirCat(listOf(
-                hirLit("foobar"),
-                hirLook(Look.Start),
-                hirLit("bazquux"),
-            )),
+            hirCat(
+                listOf(
+                    hirLit("foobar"),
+                    hirLook(Look.Start),
+                    hirLit("bazquux"),
+                ),
+            ),
         )
         assertEquals(
             t("foo(?:ba(?:r^b)az)quux"),
-            hirCat(listOf(
-                hirLit("foobar"),
-                hirLook(Look.Start),
-                hirLit("bazquux"),
-            )),
+            hirCat(
+                listOf(
+                    hirLit("foobar"),
+                    hirLook(Look.Start),
+                    hirLit("bazquux"),
+                ),
+            ),
         )
     }
 
@@ -1585,24 +1663,28 @@ class TranslateTest {
         )
         assertEquals(
             t("quux|(?:abc|def|xyz)|baz"),
-            hirAlt(listOf(
-                hirLit("quux"),
-                hirLit("abc"),
-                hirLit("def"),
-                hirLit("xyz"),
-                hirLit("baz"),
-            )),
+            hirAlt(
+                listOf(
+                    hirLit("quux"),
+                    hirLit("abc"),
+                    hirLit("def"),
+                    hirLit("xyz"),
+                    hirLit("baz"),
+                ),
+            ),
         )
         assertEquals(
             t("quux|(?:abc|(?:def|mno)|xyz)|baz"),
-            hirAlt(listOf(
-                hirLit("quux"),
-                hirLit("abc"),
-                hirLit("def"),
-                hirLit("mno"),
-                hirLit("xyz"),
-                hirLit("baz"),
-            )),
+            hirAlt(
+                listOf(
+                    hirLit("quux"),
+                    hirLit("abc"),
+                    hirLit("def"),
+                    hirLit("mno"),
+                    hirLit("xyz"),
+                    hirLit("baz"),
+                ),
+            ),
         )
         assertEquals(
             t("a|b|c|d|e|f|x|y|z"),
@@ -1611,51 +1693,61 @@ class TranslateTest {
         // Tests that we lift common prefixes out of an alternation.
         assertEquals(
             t("[A-Z]foo|[A-Z]quux"),
-            hirCat(listOf(
-                hirUclass(c('A') to c('Z')),
-                hirAlt(listOf(hirLit("foo"), hirLit("quux"))),
-            )),
+            hirCat(
+                listOf(
+                    hirUclass(c('A') to c('Z')),
+                    hirAlt(listOf(hirLit("foo"), hirLit("quux"))),
+                ),
+            ),
         )
         assertEquals(
             t("[A-Z][A-Z]|[A-Z]quux"),
-            hirCat(listOf(
-                hirUclass(c('A') to c('Z')),
-                hirAlt(listOf(hirUclass(c('A') to c('Z')), hirLit("quux"))),
-            )),
+            hirCat(
+                listOf(
+                    hirUclass(c('A') to c('Z')),
+                    hirAlt(listOf(hirUclass(c('A') to c('Z')), hirLit("quux"))),
+                ),
+            ),
         )
         assertEquals(
             t("[A-Z][A-Z]|[A-Z][A-Z]quux"),
-            hirCat(listOf(
-                hirUclass(c('A') to c('Z')),
-                hirUclass(c('A') to c('Z')),
-                hirAlt(listOf(Hir.empty(), hirLit("quux"))),
-            )),
+            hirCat(
+                listOf(
+                    hirUclass(c('A') to c('Z')),
+                    hirUclass(c('A') to c('Z')),
+                    hirAlt(listOf(Hir.empty(), hirLit("quux"))),
+                ),
+            ),
         )
         assertEquals(
             t("[A-Z]foo|[A-Z]foobar"),
-            hirCat(listOf(
-                hirUclass(c('A') to c('Z')),
-                hirAlt(listOf(hirLit("foo"), hirLit("foobar"))),
-            )),
+            hirCat(
+                listOf(
+                    hirUclass(c('A') to c('Z')),
+                    hirAlt(listOf(hirLit("foo"), hirLit("foobar"))),
+                ),
+            ),
         )
     }
 
     @Test
     fun regressionAltEmptyConcat() {
         val span = spanSplat(Position.new(0, 0, 0))
-        val ast = Ast.Alternation(
-            AstAlternation(
-                span = span,
-                asts = mutableListOf(
-                    Ast.Concat(
-                        AstConcat(
-                            span = span,
-                            asts = mutableListOf(),
+        val ast =
+            Ast.Alternation(
+                AstAlternation(
+                    span = span,
+                    asts =
+                        mutableListOf(
+                            Ast.Concat(
+                                AstConcat(
+                                    span = span,
+                                    asts = mutableListOf(),
+                                ),
+                            ),
                         ),
-                    ),
                 ),
-            ),
-        )
+            )
 
         val t = Translator()
         assertEquals(Result.success(Hir.empty()), t.translate("", ast))
@@ -1664,19 +1756,21 @@ class TranslateTest {
     @Test
     fun regressionEmptyAlt() {
         val span = spanSplat(Position.new(0, 0, 0))
-        val ast = Ast.Concat(
-            AstConcat(
-                span = span,
-                asts = mutableListOf(
-                    Ast.Alternation(
-                        AstAlternation(
-                            span = span,
-                            asts = mutableListOf(),
+        val ast =
+            Ast.Concat(
+                AstConcat(
+                    span = span,
+                    asts =
+                        mutableListOf(
+                            Ast.Alternation(
+                                AstAlternation(
+                                    span = span,
+                                    asts = mutableListOf(),
+                                ),
+                            ),
                         ),
-                    ),
                 ),
-            ),
-        )
+            )
 
         val t = Translator()
         assertEquals(Result.success(Hir.fail()), t.translate("", ast))
@@ -1685,19 +1779,21 @@ class TranslateTest {
     @Test
     fun regressionSingletonAlt() {
         val span = spanSplat(Position.new(0, 0, 0))
-        val ast = Ast.Concat(
-            AstConcat(
-                span = span,
-                asts = mutableListOf(
-                    Ast.Alternation(
-                        AstAlternation(
-                            span = span,
-                            asts = mutableListOf<Ast>(Ast.Dot(span)),
+        val ast =
+            Ast.Concat(
+                AstConcat(
+                    span = span,
+                    asts =
+                        mutableListOf(
+                            Ast.Alternation(
+                                AstAlternation(
+                                    span = span,
+                                    asts = mutableListOf<Ast>(Ast.Dot(span)),
+                                ),
+                            ),
                         ),
-                    ),
                 ),
-            ),
-        )
+            )
 
         val t = Translator()
         assertEquals(Result.success(Hir.dot(Dot.AnyCharExceptLF)), t.translate("", ast))
@@ -1707,28 +1803,34 @@ class TranslateTest {
     @Test
     fun regressionFuzzMatch() {
         val pat = rustEscaped("""[(\u{6} \0-\u{afdf5}]  \0 """)
-        val ast = ParserBuilder.new()
-            .octal(false)
-            .ignoreWhitespace(true)
-            .build()
-            .parse(pat)
-            .getOrThrow()
-        val hir = TranslatorBuilder.new()
-            .utf8(true)
-            .caseInsensitive(false)
-            .multiLine(false)
-            .dotMatchesNewLine(false)
-            .swapGreed(true)
-            .unicode(true)
-            .build()
-            .translate(pat, ast)
-            .getOrThrow()
+        val ast =
+            ParserBuilder
+                .new()
+                .octal(false)
+                .ignoreWhitespace(true)
+                .build()
+                .parse(pat)
+                .getOrThrow()
+        val hir =
+            TranslatorBuilder
+                .new()
+                .utf8(true)
+                .caseInsensitive(false)
+                .multiLine(false)
+                .dotMatchesNewLine(false)
+                .swapGreed(true)
+                .unicode(true)
+                .build()
+                .translate(pat, ast)
+                .getOrThrow()
         assertEquals(
             hir,
-            Hir.concat(listOf(
-                hirUclass(0 to 0xAFDF5),
-                hirLit("\u0000"),
-            )),
+            Hir.concat(
+                listOf(
+                    hirUclass(0 to 0xAFDF5),
+                    hirLit("\u0000"),
+                ),
+            ),
         )
     }
 

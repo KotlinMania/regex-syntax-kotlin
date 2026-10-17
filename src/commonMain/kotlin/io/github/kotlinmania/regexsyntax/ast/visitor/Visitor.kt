@@ -104,9 +104,7 @@ interface Visitor<Output, Err> {
  * If the visitor returns an error at any point, then visiting is stopped and
  * the error is returned.
  */
-fun <Output, Err> visit(ast: Ast, visitor: Visitor<Output, Err>): Result<Output> {
-    return HeapVisitor.new().visit(ast, visitor)
-}
+fun <Output, Err> visit(ast: Ast, visitor: Visitor<Output, Err>): Result<Output> = HeapVisitor.new().visit(ast, visitor)
 
 /**
  * [HeapVisitor] visits every item in an [Ast] recursively using constant stack
@@ -192,37 +190,54 @@ private class HeapVisitor {
      * If this visits a class, then the underlying visitor implementation may
      * return an error which will be passed on here.
      */
-    private fun <Output, Err> induct(ast: Ast, visitor: Visitor<Output, Err>): Result<Frame?> {
-        return when (ast) {
+    private fun <Output, Err> induct(ast: Ast, visitor: Visitor<Output, Err>): Result<Frame?> =
+        when (ast) {
             is Ast.ClassBracketed -> {
                 val r = visitClass(ast.value, visitor)
-                if (r.isFailure) Result.failure(r.exceptionOrNull()!!)
-                else Result.success(null)
+                if (r.isFailure) {
+                    Result.failure(r.exceptionOrNull()!!)
+                } else {
+                    Result.success(null)
+                }
             }
             is Ast.Repetition -> Result.success(Frame.Repetition(ast.value))
             is Ast.Group -> Result.success(Frame.Group(ast.value))
-            is Ast.Concat -> if (ast.value.asts.isEmpty()) Result.success(null) else
-                Result.success(Frame.Concat(head = ast.value.asts[0], tail = ast.value.asts.subList(1, ast.value.asts.size)))
-            is Ast.Alternation -> if (ast.value.asts.isEmpty()) Result.success(null) else
-                Result.success(Frame.Alternation(head = ast.value.asts[0], tail = ast.value.asts.subList(1, ast.value.asts.size)))
+            is Ast.Concat ->
+                if (ast.value.asts.isEmpty()) {
+                    Result.success(null)
+                } else {
+                    Result.success(Frame.Concat(head = ast.value.asts[0], tail = ast.value.asts.subList(1, ast.value.asts.size)))
+                }
+            is Ast.Alternation ->
+                if (ast.value.asts.isEmpty()) {
+                    Result.success(null)
+                } else {
+                    Result.success(Frame.Alternation(head = ast.value.asts[0], tail = ast.value.asts.subList(1, ast.value.asts.size)))
+                }
             else -> Result.success(null)
         }
-    }
 
     /**
      * Pops the given frame. If the frame has an additional inductive step,
      * then return it, otherwise return `null`.
      */
-    private fun pop(induct: Frame): Frame? {
-        return when (induct) {
+    private fun pop(induct: Frame): Frame? =
+        when (induct) {
             is Frame.Repetition -> null
             is Frame.Group -> null
-            is Frame.Concat -> if (induct.tail.isEmpty()) null else
-                Frame.Concat(head = induct.tail[0], tail = induct.tail.subList(1, induct.tail.size))
-            is Frame.Alternation -> if (induct.tail.isEmpty()) null else
-                Frame.Alternation(head = induct.tail[0], tail = induct.tail.subList(1, induct.tail.size))
+            is Frame.Concat ->
+                if (induct.tail.isEmpty()) {
+                    null
+                } else {
+                    Frame.Concat(head = induct.tail[0], tail = induct.tail.subList(1, induct.tail.size))
+                }
+            is Frame.Alternation ->
+                if (induct.tail.isEmpty()) {
+                    null
+                } else {
+                    Frame.Alternation(head = induct.tail[0], tail = induct.tail.subList(1, induct.tail.size))
+                }
         }
-    }
 
     private fun <Output, Err> visitClass(bracketed: ClassBracketed, visitor: Visitor<Output, Err>): Result<Unit> {
         var ast: ClassInduct = ClassInduct.fromBracketed(bracketed)
@@ -265,53 +280,59 @@ private class HeapVisitor {
     }
 
     /** Call the appropriate [Visitor] methods given an inductive step. */
-    private fun <Output, Err> visitClassPre(ast: ClassInduct, visitor: Visitor<Output, Err>): Result<Unit> {
-        return when (ast) {
+    private fun <Output, Err> visitClassPre(ast: ClassInduct, visitor: Visitor<Output, Err>): Result<Unit> =
+        when (ast) {
             is ClassInduct.Item -> visitor.visitClassSetItemPre(ast.item)
             is ClassInduct.BinaryOp -> visitor.visitClassSetBinaryOpPre(ast.op)
         }
-    }
 
     /** Call the appropriate [Visitor] methods given an inductive step. */
-    private fun <Output, Err> visitClassPost(ast: ClassInduct, visitor: Visitor<Output, Err>): Result<Unit> {
-        return when (ast) {
+    private fun <Output, Err> visitClassPost(ast: ClassInduct, visitor: Visitor<Output, Err>): Result<Unit> =
+        when (ast) {
             is ClassInduct.Item -> visitor.visitClassSetItemPost(ast.item)
             is ClassInduct.BinaryOp -> visitor.visitClassSetBinaryOpPost(ast.op)
         }
-    }
 
     /**
      * Build a stack frame for the given class node if one is needed (which
      * occurs if and only if there are child nodes). Otherwise, return null.
      */
-    private fun inductClass(ast: ClassInduct): ClassFrame? {
-        return when (ast) {
-            is ClassInduct.Item -> when (val item = ast.item) {
-                is ClassSetItem.Bracketed -> when (val k = item.value.kind) {
-                    is ClassSet.Item -> ClassFrame.Union(head = k.value, tail = emptyList())
-                    is ClassSet.BinaryOp -> ClassFrame.Binary(op = k.value)
+    private fun inductClass(ast: ClassInduct): ClassFrame? =
+        when (ast) {
+            is ClassInduct.Item ->
+                when (val item = ast.item) {
+                    is ClassSetItem.Bracketed ->
+                        when (val k = item.value.kind) {
+                            is ClassSet.Item -> ClassFrame.Union(head = k.value, tail = emptyList())
+                            is ClassSet.BinaryOp -> ClassFrame.Binary(op = k.value)
+                        }
+                    is ClassSetItem.Union ->
+                        if (item.value.items.isEmpty()) {
+                            null
+                        } else {
+                            ClassFrame.Union(head = item.value.items[0], tail = item.value.items.subList(1, item.value.items.size))
+                        }
+                    else -> null
                 }
-                is ClassSetItem.Union -> if (item.value.items.isEmpty()) null else
-                    ClassFrame.Union(head = item.value.items[0], tail = item.value.items.subList(1, item.value.items.size))
-                else -> null
-            }
             is ClassInduct.BinaryOp -> ClassFrame.BinaryLHS(op = ast.op, lhs = ast.op.lhs, rhs = ast.op.rhs)
         }
-    }
 
     /**
      * Pops the given frame. If the frame has an additional inductive step,
      * then return it, otherwise return `null`.
      */
-    private fun popClass(induct: ClassFrame): ClassFrame? {
-        return when (induct) {
-            is ClassFrame.Union -> if (induct.tail.isEmpty()) null else
-                ClassFrame.Union(head = induct.tail[0], tail = induct.tail.subList(1, induct.tail.size))
+    private fun popClass(induct: ClassFrame): ClassFrame? =
+        when (induct) {
+            is ClassFrame.Union ->
+                if (induct.tail.isEmpty()) {
+                    null
+                } else {
+                    ClassFrame.Union(head = induct.tail[0], tail = induct.tail.subList(1, induct.tail.size))
+                }
             is ClassFrame.Binary -> null
             is ClassFrame.BinaryLHS -> ClassFrame.BinaryRHS(op = induct.op, rhs = induct.rhs)
             is ClassFrame.BinaryRHS -> null
         }
-    }
 }
 
 /**
@@ -323,13 +344,17 @@ private sealed class Frame {
      * A stack frame allocated just before descending into a repetition
      * operator's child node.
      */
-    class Repetition(val rep: io.github.kotlinmania.regexsyntax.ast.Repetition) : Frame()
+    class Repetition(
+        val rep: io.github.kotlinmania.regexsyntax.ast.Repetition,
+    ) : Frame()
 
     /**
      * A stack frame allocated just before descending into a group's child
      * node.
      */
-    class Group(val group: io.github.kotlinmania.regexsyntax.ast.Group) : Frame()
+    class Group(
+        val group: io.github.kotlinmania.regexsyntax.ast.Group,
+    ) : Frame()
 
     /**
      * The stack frame used while visiting every child node of a concatenation
@@ -357,12 +382,13 @@ private sealed class Frame {
      * Perform the next inductive step on this frame and return the next
      * child AST node to visit.
      */
-    fun child(): Ast = when (this) {
-        is Repetition -> rep.ast
-        is Group -> group.ast
-        is Concat -> head
-        is Alternation -> head
-    }
+    fun child(): Ast =
+        when (this) {
+            is Repetition -> rep.ast
+            is Group -> group.ast
+            is Concat -> head
+            is Alternation -> head
+        }
 }
 
 /**
@@ -382,7 +408,9 @@ private sealed class ClassFrame {
     ) : ClassFrame()
 
     /** The stack frame used while a binary class operation. */
-    class Binary(val op: ClassSetBinaryOp) : ClassFrame()
+    class Binary(
+        val op: ClassSetBinaryOp,
+    ) : ClassFrame()
 
     /**
      * A stack frame allocated just before descending into a binary operator's
@@ -398,25 +426,30 @@ private sealed class ClassFrame {
      * A stack frame allocated just before descending into a binary operator's
      * right hand child node.
      */
-    class BinaryRHS(val op: ClassSetBinaryOp, val rhs: ClassSet) : ClassFrame()
+    class BinaryRHS(
+        val op: ClassSetBinaryOp,
+        val rhs: ClassSet,
+    ) : ClassFrame()
 
     /**
      * Perform the next inductive step on this frame and return the next
      * child class node to visit.
      */
-    fun child(): ClassInduct = when (this) {
-        is Union -> ClassInduct.Item(head)
-        is Binary -> ClassInduct.BinaryOp(op)
-        is BinaryLHS -> ClassInduct.fromSet(lhs)
-        is BinaryRHS -> ClassInduct.fromSet(rhs)
-    }
+    fun child(): ClassInduct =
+        when (this) {
+            is Union -> ClassInduct.Item(head)
+            is Binary -> ClassInduct.BinaryOp(op)
+            is BinaryLHS -> ClassInduct.fromSet(lhs)
+            is BinaryRHS -> ClassInduct.fromSet(rhs)
+        }
 
-    override fun toString(): String = when (this) {
-        is Union -> "Union"
-        is Binary -> "Binary"
-        is BinaryLHS -> "BinaryLHS"
-        is BinaryRHS -> "BinaryRHS"
-    }
+    override fun toString(): String =
+        when (this) {
+            is Union -> "Union"
+            is Binary -> "Binary"
+            is BinaryLHS -> "BinaryLHS"
+            is BinaryRHS -> "BinaryRHS"
+        }
 }
 
 /**
@@ -431,33 +464,42 @@ private sealed class ClassFrame {
  * syntax, which is not possible.)
  */
 private sealed class ClassInduct {
-    class Item(val item: ClassSetItem) : ClassInduct()
-    class BinaryOp(val op: ClassSetBinaryOp) : ClassInduct()
+    class Item(
+        val item: ClassSetItem,
+    ) : ClassInduct()
 
-    override fun toString(): String = when (this) {
-        is Item -> when (item) {
-            is ClassSetItem.Empty -> "Item(Empty)"
-            is ClassSetItem.Literal -> "Item(Literal)"
-            is ClassSetItem.Range -> "Item(Range)"
-            is ClassSetItem.Ascii -> "Item(Ascii)"
-            is ClassSetItem.Perl -> "Item(Perl)"
-            is ClassSetItem.Unicode -> "Item(Unicode)"
-            is ClassSetItem.Bracketed -> "Item(Bracketed)"
-            is ClassSetItem.Union -> "Item(Union)"
+    class BinaryOp(
+        val op: ClassSetBinaryOp,
+    ) : ClassInduct()
+
+    override fun toString(): String =
+        when (this) {
+            is Item ->
+                when (item) {
+                    is ClassSetItem.Empty -> "Item(Empty)"
+                    is ClassSetItem.Literal -> "Item(Literal)"
+                    is ClassSetItem.Range -> "Item(Range)"
+                    is ClassSetItem.Ascii -> "Item(Ascii)"
+                    is ClassSetItem.Perl -> "Item(Perl)"
+                    is ClassSetItem.Unicode -> "Item(Unicode)"
+                    is ClassSetItem.Bracketed -> "Item(Bracketed)"
+                    is ClassSetItem.Union -> "Item(Union)"
+                }
+            is BinaryOp ->
+                when (op.kind) {
+                    ClassSetBinaryOpKind.Intersection -> "BinaryOp(Intersection)"
+                    ClassSetBinaryOpKind.Difference -> "BinaryOp(Difference)"
+                    ClassSetBinaryOpKind.SymmetricDifference -> "BinaryOp(SymmetricDifference)"
+                }
         }
-        is BinaryOp -> when (op.kind) {
-            ClassSetBinaryOpKind.Intersection -> "BinaryOp(Intersection)"
-            ClassSetBinaryOpKind.Difference -> "BinaryOp(Difference)"
-            ClassSetBinaryOpKind.SymmetricDifference -> "BinaryOp(SymmetricDifference)"
-        }
-    }
 
     companion object {
         fun fromBracketed(ast: ClassBracketed): ClassInduct = fromSet(ast.kind)
 
-        fun fromSet(ast: ClassSet): ClassInduct = when (ast) {
-            is ClassSet.Item -> Item(ast.value)
-            is ClassSet.BinaryOp -> BinaryOp(ast.value)
-        }
+        fun fromSet(ast: ClassSet): ClassInduct =
+            when (ast) {
+                is ClassSet.Item -> Item(ast.value)
+                is ClassSet.BinaryOp -> BinaryOp(ast.value)
+            }
     }
 }

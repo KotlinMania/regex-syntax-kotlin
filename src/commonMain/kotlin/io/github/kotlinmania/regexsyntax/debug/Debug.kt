@@ -10,7 +10,9 @@ package io.github.kotlinmania.regexsyntax.debug
  * A type that wraps a single byte with a convenient debug rendering that
  * escapes the byte.
  */
-internal data class Byte(val value: kotlin.Byte) {
+internal data class Byte(
+    val value: kotlin.Byte,
+) {
     fun fmt(): String = toString()
 
     override fun toString(): String {
@@ -42,7 +44,9 @@ internal data class Byte(val value: kotlin.Byte) {
  *
  * N.B. This is copied nearly verbatim from regex-automata. Sigh.
  */
-internal class Bytes(val bytes: ByteArray) {
+internal class Bytes(
+    val bytes: ByteArray,
+) {
     fun fmt(): String = toString()
 
     override fun toString(): String {
@@ -81,9 +85,14 @@ internal class Bytes(val bytes: ByteArray) {
 /** Result of attempting to decode a UTF-8 codepoint at the start of a byte slice. */
 internal sealed class Utf8Decoded {
     /** Successfully decoded codepoint. */
-    class Ok(val codepoint: Int) : Utf8Decoded()
+    class Ok(
+        val codepoint: Int,
+    ) : Utf8Decoded()
+
     /** Bad byte; the value is the offending byte. */
-    class Failed(val byte: kotlin.Byte) : Utf8Decoded()
+    class Failed(
+        val byte: kotlin.Byte,
+    ) : Utf8Decoded()
 }
 
 /**
@@ -135,14 +144,13 @@ internal fun utf8Decode(bytes: ByteArray): Utf8Decoded? {
  *
  * This is the Kotlin equivalent of Rust's `char.lenUtf8()`.
  */
-internal fun Int.len(): Int {
-    return when {
+internal fun Int.len(): Int =
+    when {
         this < 0x80 -> 1
         this < 0x800 -> 2
         this < 0x10000 -> 3
         else -> 4
     }
-}
 
 /**
  * Replicates Rust's ASCII "escape default" behavior: for any byte, produce the
@@ -178,8 +186,8 @@ internal fun byteToHex2(b: kotlin.Byte): String {
 }
 
 /** Replicates Rust's "escape debug" behavior: produce the human-readable escape for a codepoint. */
-internal fun charEscapeDebug(codepoint: Int): String {
-    return when (codepoint) {
+internal fun charEscapeDebug(codepoint: Int): String =
+    when (codepoint) {
         '\t'.code -> "\\t"
         '\n'.code -> "\\n"
         '\r'.code -> "\\r"
@@ -195,7 +203,6 @@ internal fun charEscapeDebug(codepoint: Int): String {
             }
         }
     }
-}
 
 private fun String.codePointAtCompat(index: Int): Int {
     val first = this[index]

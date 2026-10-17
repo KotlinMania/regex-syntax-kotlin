@@ -7,13 +7,9 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-private fun simpleFoldOk(c: Int): IntArray {
-    return SimpleCaseFolder.new().getOrThrow().mapping(c)
-}
+private fun simpleFoldOk(c: Int): IntArray = SimpleCaseFolder.new().getOrThrow().mapping(c)
 
-private fun containsCaseMap(start: Int, end: Int): Boolean {
-    return SimpleCaseFolder.new().getOrThrow().overlaps(start, end)
-}
+private fun containsCaseMap(start: Int, end: Int): Boolean = SimpleCaseFolder.new().getOrThrow().overlaps(start, end)
 
 class UnicodeTest {
     @Test
@@ -86,15 +82,16 @@ class UnicodeTest {
 
     @Test
     fun validUtf8Symbolic() {
-        val x = byteArrayOf(
-            'a'.code.toByte(),
-            'b'.code.toByte(),
-            'c'.code.toByte(),
-            0xFF.toByte(),
-            'x'.code.toByte(),
-            'y'.code.toByte(),
-            'z'.code.toByte(),
-        )
+        val x =
+            byteArrayOf(
+                'a'.code.toByte(),
+                'b'.code.toByte(),
+                'c'.code.toByte(),
+                0xFF.toByte(),
+                'x'.code.toByte(),
+                'y'.code.toByte(),
+                'z'.code.toByte(),
+            )
         val len = symbolicNameNormalizeBytes(x)
         assertEquals("abcxyz", x.decodeToString(0, len))
     }
