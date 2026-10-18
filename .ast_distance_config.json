@@ -2,11 +2,11 @@
   "type": "port",
   "name": "regex-syntax-kotlin",
   "source": {
-    "path": "/Volumes/stuff/Projects/kotlinmania/regex-syntax-kotlin/tmp/regex-syntax/src/",
+    "path": "tmp/regex-syntax/src/",
     "lang": "rust"
   },
   "target": {
-    "path": "/Volumes/stuff/Projects/kotlinmania/regex-syntax-kotlin/src/",
+    "path": "src/",
     "lang": "kotlin"
   },
   "checks": {
