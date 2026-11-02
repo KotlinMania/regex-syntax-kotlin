@@ -106,30 +106,81 @@ sealed class Utf8Sequence :
     ) : Utf8Sequence()
 
     /** Two successive byte ranges. */
-    data class Two(
-        val rs: List<Utf8Range>,
+    class Two(
+        rs: List<Utf8Range>,
     ) : Utf8Sequence() {
+        var rs: List<Utf8Range> = rs
+            private set
+
         init {
             check(rs.size == 2)
         }
+
+        internal fun reverseRanges() {
+            rs = listOf(rs[1], rs[0])
+        }
+
+        operator fun component1(): List<Utf8Range> = rs
+
+        fun copy(rs: List<Utf8Range> = this.rs): Two = Two(rs)
+
+        override fun equals(other: Any?): Boolean = other is Two && rs == other.rs
+
+        override fun hashCode(): Int = rs.hashCode()
+
+        override fun toString(): String = "Two(rs=$rs)"
     }
 
     /** Three successive byte ranges. */
-    data class Three(
-        val rs: List<Utf8Range>,
+    class Three(
+        rs: List<Utf8Range>,
     ) : Utf8Sequence() {
+        var rs: List<Utf8Range> = rs
+            private set
+
         init {
             check(rs.size == 3)
         }
+
+        internal fun reverseRanges() {
+            rs = listOf(rs[2], rs[1], rs[0])
+        }
+
+        operator fun component1(): List<Utf8Range> = rs
+
+        fun copy(rs: List<Utf8Range> = this.rs): Three = Three(rs)
+
+        override fun equals(other: Any?): Boolean = other is Three && rs == other.rs
+
+        override fun hashCode(): Int = rs.hashCode()
+
+        override fun toString(): String = "Three(rs=$rs)"
     }
 
     /** Four successive byte ranges. */
-    data class Four(
-        val rs: List<Utf8Range>,
+    class Four(
+        rs: List<Utf8Range>,
     ) : Utf8Sequence() {
+        var rs: List<Utf8Range> = rs
+            private set
+
         init {
             check(rs.size == 4)
         }
+
+        internal fun reverseRanges() {
+            rs = listOf(rs[3], rs[2], rs[1], rs[0])
+        }
+
+        operator fun component1(): List<Utf8Range> = rs
+
+        fun copy(rs: List<Utf8Range> = this.rs): Four = Four(rs)
+
+        override fun equals(other: Any?): Boolean = other is Four && rs == other.rs
+
+        override fun hashCode(): Int = rs.hashCode()
+
+        override fun toString(): String = "Four(rs=$rs)"
     }
 
     companion object {
@@ -210,13 +261,14 @@ sealed class Utf8Sequence :
      * This is useful when one is constructing a UTF-8 automaton to accept
      * character classes in reverse.
      */
-    fun reverse(): Utf8Sequence =
+    fun reverse() {
         when (this) {
-            is One -> this
-            is Two -> Two(listOf(rs[1], rs[0]))
-            is Three -> Three(listOf(rs[2], rs[1], rs[0]))
-            is Four -> Four(listOf(rs[3], rs[2], rs[1], rs[0]))
+            is One -> Unit
+            is Two -> reverseRanges()
+            is Three -> reverseRanges()
+            is Four -> reverseRanges()
         }
+    }
 
     /**
      * Returns true if and only if a prefix of [bytes] satisfies this sequence

@@ -28,16 +28,30 @@ three focused ordering tests and four original upstream tests, including
 surrogate rejection and all Unicode scalar values. The harness reports one
 ordinary dead-code warning for unused upstream reset; it is not suppressed.
 
-## Remaining reversal gap
+## Reversal contract repair
 
-Upstream reverse mutates the sequence and returns unit. The existing Kotlin
-reverse returns a new sequence and leaves the original unchanged. Existing
-Kotlin tests assign the result, unlike the upstream tests. This repair leaves
-that mismatch explicit: a source-faithful correction must reconcile the
-current public immutable List properties, data-class copy/equality behavior
-and callers together. It must not merely discard the new value, mutate only
-some list implementations, or claim Kotlin's list references enforce Rust
-borrow/copy rules. This ordering repair makes no ownership equivalence claim.
+The subsequent reversal pass restores upstream reverse's in-place mutation
+and unit return. Three new regressions failed against the original functional
+implementation; the unchanged Rust oracle now includes mutation/unit/double
+reversal, copy independence and prefix matching (ten total tests).
+Fresh comparison output is in build/rust-kotlin-utf8-reverse/Utf8Review.kt.
+It emits a unit-returning reverse, although its List mutation calls still
+need adaptation; no generator repair is claimed.
+
+The three multi-range variants now use private setters for their List
+properties. They remain publicly read-only; reversal replaces the sequence's
+list in reverse order. Explicit copy, component1, equals, hashCode and debug
+methods preserve the previous data-class API. The variants are ordinary
+classes now; Kotlin reflection's isData flag changes. The fixed-size checks
+remain at construction/copy and cannot be bypassed via a new public setter.
+The single-range data class remains unchanged. Existing test callers now call
+reverse without assigning a returned sequence, matching upstream.
+
+Kotlin reference identity, aliased input Lists and borrowed-list views still
+do not enforce Rust Copy or shared/exclusive borrow rules. Explicit copy is
+independent under this reversal operation because reversal replaces the list;
+no general ownership equivalence is claimed. Existing variant debug output
+is retained, rather than silently changing another formatting contract.
 
 A read-only workspace commonMain search for Utf8Sequence/Utf8Sequences found
 only the defining source file; no external production caller was changed.
@@ -53,4 +67,13 @@ reported Utf8.kt locations map to unchanged lines of checkpoint 014ed19.
 The new ordering test has no ktlint finding. Baseline comparison evidence is
 in build/rust-kotlin-utf8/static-baseline-comparison.txt. No checks were disabled
 or suppressed. No dependency pins changed. Other targets and downstream
-builds are unverified. Reversal remains unresolved as described above.
+builds are unverified. Reversal was unresolved at the ordering checkpoint; the subsequent pass above resolves its mutation/return contract.
+
+Reversal validation: all 159 JVM tests, 159 macOS ARM64 tests and ten actual
+upstream Rust tests passed. Three new Kotlin reversal tests failed before
+repair. Static checks still report the same four Detekt findings and 571
+commonMain / 21 commonTest ktlint findings. All ten flagged Utf8.kt lines map
+to unchanged lines in 97df02a; the new reversal test has no lint finding.
+Evidence: build/rust-kotlin-utf8-reverse/static-baseline-comparison.json.
+No Unicode tables/version, dependency pins or generator files changed.
+Other targets and downstream builds remain unverified.

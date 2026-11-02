@@ -40,6 +40,8 @@ class Utf8OrderingParityTest {
         val three = Utf8Sequence.Three(listOf(range(0xe0), range(0xa0, 0xbf), range(0x80, 0xbf)))
         val four = Utf8Sequence.Four(listOf(range(0xf0), range(0x90, 0xbf), range(0x80, 0xbf), range(0x80, 0xbf)))
         assertEquals(listOf(one, two, three, four), listOf(four, two, three, one).sorted())
-        assertTrue(two.reverse() < three.reverse())
+        two.reverse()
+        three.reverse()
+        assertTrue(two < three)
     }
 }

@@ -65,19 +65,19 @@ class Utf8Test {
     @Test
     fun reverse() {
         var s: Utf8Sequence = Utf8Sequence.One(rutf8(0xA, 0xB))
-        s = s.reverse()
+        s.reverse()
         assertEquals(listOf(rutf8(0xA, 0xB)), s.asSlice())
 
         s = Utf8Sequence.Two(listOf(rutf8(0xA, 0xB), rutf8(0xB, 0xC)))
-        s = s.reverse()
+        s.reverse()
         assertEquals(listOf(rutf8(0xB, 0xC), rutf8(0xA, 0xB)), s.asSlice())
 
         s = Utf8Sequence.Three(listOf(rutf8(0xA, 0xB), rutf8(0xB, 0xC), rutf8(0xC, 0xD)))
-        s = s.reverse()
+        s.reverse()
         assertEquals(listOf(rutf8(0xC, 0xD), rutf8(0xB, 0xC), rutf8(0xA, 0xB)), s.asSlice())
 
         s = Utf8Sequence.Four(listOf(rutf8(0xA, 0xB), rutf8(0xB, 0xC), rutf8(0xC, 0xD), rutf8(0xD, 0xE)))
-        s = s.reverse()
+        s.reverse()
         assertEquals(listOf(rutf8(0xD, 0xE), rutf8(0xC, 0xD), rutf8(0xB, 0xC), rutf8(0xA, 0xB)), s.asSlice())
     }
 

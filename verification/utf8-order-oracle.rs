@@ -51,3 +51,51 @@ mod parity {
         assert!(two < three);
     }
 }
+
+#[cfg(test)]
+mod reversal_parity {
+    use super::utf8::{Utf8Range, Utf8Sequence};
+    fn range(value: u8) -> Utf8Range { Utf8Range { start: value, end: value } }
+
+    #[test]
+    fn mutation_unit_and_involution() {
+        let mut variants = [
+            Utf8Sequence::One(range(1)),
+            Utf8Sequence::Two([range(1),range(2)]),
+            Utf8Sequence::Three([range(1),range(2),range(3)]),
+            Utf8Sequence::Four([range(1),range(2),range(3),range(4)]),
+        ];
+        for sequence in &mut variants {
+            let before = sequence.as_slice().to_vec();
+            let result: () = sequence.reverse();
+            assert_eq!(result, ());
+            assert_eq!(sequence.as_slice(), before.iter().rev().copied().collect::<Vec<_>>());
+            sequence.reverse();
+            assert_eq!(sequence.as_slice(), before);
+        }
+    }
+
+    #[test]
+    fn copies_keep_original_order() {
+        let mut original = Utf8Sequence::Two([range(1),range(2)]);
+        let mut copy = original;
+        original.reverse();
+        assert_eq!(original.as_slice(), &[range(2),range(1)]);
+        assert_eq!(copy.as_slice(), &[range(1),range(2)]);
+        assert_ne!(original, copy);
+        copy.reverse();
+        assert_eq!(original, copy);
+    }
+
+    #[test]
+    fn matching_uses_mutated_ranges_and_accepts_prefix() {
+        let mut sequence = Utf8Sequence::Two([Utf8Range { start: 0xd0,end: 0xd3 }, Utf8Range { start: 0x80,end: 0xbf }]);
+        assert!(sequence.matches(&[0xd1,0x90]));
+        assert!(!sequence.matches(&[0x90,0xd1]));
+        sequence.reverse();
+        assert!(sequence.matches(&[0x90,0xd1]));
+        assert!(sequence.matches(&[0x90,0xd1,0]));
+        assert!(!sequence.matches(&[0xd1,0x90]));
+        assert!(!sequence.matches(&[0x90]));
+    }
+}
