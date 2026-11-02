@@ -249,11 +249,14 @@ sealed class Utf8Sequence :
     override fun compareTo(other: Utf8Sequence): Int {
         val a = asSlice()
         val b = other.asSlice()
-        for (i in 0 until minOf(a.size, b.size)) {
+        // Upstream derives Ord: compare the One/Two/Three/Four variant first.
+        val variantOrder = a.size.compareTo(b.size)
+        if (variantOrder != 0) return variantOrder
+        for (i in a.indices) {
             val c = a[i].compareTo(b[i])
             if (c != 0) return c
         }
-        return a.size.compareTo(b.size)
+        return 0
     }
 }
 
