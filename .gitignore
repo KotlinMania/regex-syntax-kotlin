@@ -22,6 +22,8 @@ tmp/
 # AST distance reports and binaries
 port_status_report.md
 high_priority_ports.md
+NEXT_ACTIONS.md
+port_lint_proposed_changes.md
 ast_distance_*.txt
 .cache/
 *.lock
@@ -32,6 +34,8 @@ kotlin-js-store/*
 !kotlin-js-store/wasm/yarn.lock
 tools/ast_distance/ast_distance
 tools/ast_distance/build/
+tools/ast_distance
+tools/
 
 # JVM heap dumps
 *.hprof
@@ -46,9 +50,6 @@ __pycache__/
 
 # Android SDK
 /.android-sdk/
-local.properties
-
-# Machine-specific Android SDK pointer — never tracked.
 local.properties
 
 # Swift Package Manager / Xcode workspace state.
@@ -69,3 +70,16 @@ DerivedData/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
+local.properties
+
+# npm install output; JS dependencies come from yarn via the Kotlin Gradle plugin
+node_modules/
+package-lock.json
+!native/node-ffi/package-lock.json
+
+# Java build helpers are source; buildSrc/build remains generated output.
+!buildSrc/
+!buildSrc/src/
+!buildSrc/src/**
+!buildSrc/build.gradle.kts
+!buildSrc/settings.gradle.kts

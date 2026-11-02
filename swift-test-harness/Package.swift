@@ -4,23 +4,24 @@ import PackageDescription
 let package = Package(
     name: "SwiftTestHarness",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v15),
     ],
     dependencies: [
-        .package(name: "RegexSyntax", path: "../build/SPMPackage/macosArm64/Debug")
+        .package(name: "Template", path: "../build/SPMPackage/macosArm64/Debug")
     ],
     targets: [
         .testTarget(
             name: "SwiftTestHarnessTests",
             dependencies: [
-                .product(name: "RegexSyntaxLibrary", package: "RegexSyntax")
+                .product(name: "TemplateLibrary", package: "Template")
             ],
             linkerSettings: [
                 .unsafeFlags([
                     "-L", "../build/swift-test",
-                    "-lRegexSyntax",
+                    "-lTemplate",
                 ]),
             ]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
