@@ -27,7 +27,22 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
-/** Builds the repository's N-API C/C++ bindings directly, without a script-language build generator. */
+/// Builds N-API addons with installed Node and C/C++ tools from a limited binding specification.
+///
+/// The template's `buildNode…` task invokes `run` after its npm header-install task. Inputs are
+/// explicit project/addon/build directories, JSON-compatible `binding.gyp`, installed
+/// `node-addon-api`, and the actual Node executable. The runtime selects the host platform and
+/// architecture; this command is not a general cross-compilation or GYP implementation.
+///
+/// Each target produces `<addon>/build/Release/<name>.node`. The supplied build directory holds
+/// release-header/import-library caches, temporary objects and a JSON build receipt. Unless
+/// offline mode can use existing inputs, missing release files are downloaded from nodejs.org
+/// and checked against its SHA-256 manifest. No npm package or compiler is installed here.
+///
+/// Settings, conditions and expansion forms outside the explicit supported subset fail rather
+/// than invoking GYP scripts. Compiler commands execute directly as argument lists. Public
+/// parsing/archive helpers can also be used independently; they do not all enforce the project
+/// ownership checks performed by `run`.
 public final class NodeFfiBuilder {
     private static final String ADDON_INCLUDE = "<!@(node -p \"require('node-addon-api').include\")";
     private static final String ADDON_DEPENDENCY = "<!(node -p \"require('node-addon-api').gyp\")";
@@ -43,10 +58,32 @@ public final class NodeFfiBuilder {
 
     private NodeFfiBuilder() {}
 
+    /// Parsed command inputs, with absolute normalized directory paths and optional overrides.
+    ///
+    /// Paths are normalized during parsing; existence, real-path containment and runtime version
+    /// checks happen later. A null compiler/header/version override selects the documented default.
     private record Options(Path project, Path addon, Path build, String node, String version,
                            Path headers, String cc, String cxx, String linker, boolean offline) {}
 
-    /** Resolve only the explicitly supported binding settings; unsupported settings always fail. */
+    /// Resolves target defaults and matching conditions in the supported binding settings.
+    ///
+    /// The input is an already parsed JSON object containing `targets` and optional
+    /// `target_defaults`. List settings accumulate, scalar settings override defaults, and
+    /// `OS`/`target_arch` equality or inequality conditions choose a branch. Removal lists remain
+    /// in the result for the compiler-option reader to apply. Both condition branches are checked
+    /// for unsupported settings even when only one branch is selected.
+    ///
+    /// Target names must be unique identifiers, target type must be `loadable_module`, and each
+    /// target must contain sources. The only target dependency accepted is the recognized
+    /// `node-addon-api` marker. No files, shell expansions or compiler processes are evaluated.
+    ///
+    /// @param specification the parsed `binding.gyp` object
+    /// @param platform `darwin`/`mac`, `linux`, or `win32`/`win`, normalized for GYP conditions
+    /// @param architecture the value used in `target_arch` conditions; `run` restricts it to
+    ///   x64/arm64
+    /// @return new mutable target maps in declaration order
+    /// @throws IllegalArgumentException if structure, settings, conditions or target names are
+    ///   invalid
     public static List<Map<String, Object>> resolveTargets(Object specification, String platform, String architecture) {
         String os = switch (platform) {
             case "darwin", "mac" -> "mac";
@@ -93,6 +130,15 @@ public final class NodeFfiBuilder {
         return resolved;
     }
 
+    /// Checks the supported setting vocabulary, including inactive conditional branches.
+    ///
+    /// Recognized node-addon-api markers are handled internally; other expansion-bearing values
+    /// are rejected where literal settings are required. This prevents unsupported GYP behavior
+    /// from being silently treated as a compiler flag or command to evaluate.
+    ///
+    /// @param settings one defaults, target or condition-branch object
+    /// @throws IllegalArgumentException if a key, value shape or conditional expression is
+    ///   unsupported
     private static void validateSettings(Map<String, Object> settings) {
         for (Map.Entry<String, Object> entry : settings.entrySet()) {
             String key = entry.getKey();
@@ -155,6 +201,17 @@ public final class NodeFfiBuilder {
         }
     }
 
+    /// Merges base settings and then the selected conditional branches into a target map.
+    ///
+    /// Lists append, scalars replace, supported nested maps merge, and `link_settings` is flattened
+    /// into target options. Conditions run after the base entries; `name!` lists are retained for
+    /// later removal rather than applied during this merge.
+    ///
+    /// @param destination the mutable accumulated configuration
+    /// @param source validated defaults, target settings or a selected branch
+    /// @param os the normalized GYP operating-system value
+    /// @param arch the Node architecture used for conditions
+    /// @throws IllegalArgumentException if a condition or expected value shape is invalid
     private static void merge(Map<String, Object> destination, Map<String, Object> source, String os, String arch) {
         for (Map.Entry<String, Object> entry : source.entrySet()) {
             String key = entry.getKey();
@@ -200,6 +257,25 @@ public final class NodeFfiBuilder {
         }
     }
 
+    /// Builds every declared addon target and records the result beneath the owning project.
+    ///
+    /// Required options are `--project-dir`, `--addon-dir` and `--build-dir`. Optional overrides
+    /// select Node, its expected version, existing headers, C/C++ compilers and linker. `--offline`
+    /// requires needed release inputs to be cached; `--help` prints usage without building.
+    /// Directory options resolve from the caller's working directory, not from `--project-dir`.
+    ///
+    /// Real addon and scratch paths must remain inside the project. Node reports its own version,
+    /// platform and architecture, and resolves the installed node-addon-api package. The command
+    /// then obtains matching headers, compiles and links, replaces target binaries and records
+    /// output hashes in `reports/node-ffi/<addon-directory-name>.json` under the build directory.
+    ///
+    /// Build exceptions normally become status 1 and an error receipt. Failures before the report
+    /// path is established produce only a diagnostic. Interrupt status is restored. Temporary
+    /// compilation files are removed; caches and produced or partial output binaries may remain.
+    ///
+    /// @param arguments the named command options and their values
+    /// @return zero on success or help, or one when the build path catches an exception
+    /// @throws IllegalStateException if final scratch cleanup or receipt writing fails
     public static int run(String... arguments) {
         if (List.of(arguments).contains("--help")) {
             System.out.println("NodeFfiBuilder --project-dir DIR --addon-dir DIR --build-dir DIR"
@@ -278,10 +354,35 @@ public final class NodeFfiBuilder {
         }
     }
 
+    /// Runs the addon command and exits the JVM with its result.
+    ///
+    /// @param arguments the options accepted by `run`
+    /// @throws IllegalStateException if `run` cannot complete cleanup or receipt writing
     public static void main(String[] arguments) {
         System.exit(run(arguments));
     }
 
+    /// Compiles and links one resolved target, replacing its previous addon binary.
+    ///
+    /// C and C++ sources become temporary object files. Unix uses shared-library/bundle flags;
+    /// Windows uses MSVC-compatible compiler/linker arguments and the Node import library.
+    /// Only native source files and the output directory are constrained to the owning project;
+    /// explicitly supplied include and library paths are not a complete hermetic dependency set.
+    ///
+    /// @param options parsed compiler and storage overrides
+    /// @param project the real owning-project root
+    /// @param addon the real addon source root
+    /// @param target the resolved binding target
+    /// @param platform the actual Node platform
+    /// @param arch the actual Node architecture
+    /// @param headers matching Node development headers
+    /// @param api installed node-addon-api headers
+    /// @param nodeLibrary the Windows Node import library, or null on other platforms
+    /// @param temporary the invocation-owned object/log directory
+    /// @return the nonempty linked `.node` file
+    /// @throws IOException if a command fails or a required file cannot be read or produced
+    /// @throws InterruptedException if child-process waiting is interrupted
+    /// @throws IllegalArgumentException if a source, output path or compiler setting is unsupported
     private static Path compile(Options options, Path project, Path addon, Map<String, Object> target, String platform,
                                 String arch, Path headers, Path api, Path nodeLibrary, Path temporary)
             throws IOException, InterruptedException {
@@ -401,6 +502,10 @@ public final class NodeFfiBuilder {
         return output;
     }
 
+    /// Appends the supported Xcode settings to a compile or link command's flags.
+    ///
+    /// The fallback deployment target is 11.0, independent of the Swift manifest helper's policy.
+    /// C++ language/exception flags apply during compilation; linker-specific flags apply at link.
     private static void addMacFlags(List<String> flags, Map<String, Object> xcode, boolean cpp, boolean link) {
         String minimum = String.valueOf(xcode.getOrDefault("MACOSX_DEPLOYMENT_TARGET", "11.0"));
         if (!minimum.matches("[0-9]+(?:\\.[0-9]+){1,2}")) {
@@ -422,6 +527,9 @@ public final class NodeFfiBuilder {
         if (cpp && !link) flags.addAll(strings(xcode.getOrDefault("OTHER_CPLUSPLUSFLAGS", List.of()), "C++ flags"));
     }
 
+    /// Translates supported GNU-style C++ flags to MSVC form and retains literal slash options.
+    ///
+    /// Unknown dash options fail instead of being silently dropped or guessed.
     private static void addWindowsFlags(List<String> command, List<String> flags) {
         for (String flag : flags) {
             if (flag.startsWith("-std=c++") || flag.startsWith("-std=gnu++")) {
@@ -438,6 +546,10 @@ public final class NodeFfiBuilder {
         }
     }
 
+    /// Selects explicit, matching installed, or verified release headers in that order.
+    ///
+    /// An invalid explicit directory fails. Installed headers with a different version are
+    /// skipped; otherwise a release cache/download is used and its origin is added to the receipt.
     private static Path headers(Options options, Map<String, Object> runtime, String version, Path temporary,
                                 Map<String, Object> receipt) throws IOException, InterruptedException {
         if (options.headers() != null) {
@@ -464,7 +576,20 @@ public final class NodeFfiBuilder {
         return destination;
     }
 
-    /** Download the exact official release headers into a caller-provided project build directory. */
+    /// Acquires matching official Node release headers in a caller-selected build directory.
+    ///
+    /// The release archive and checksum manifest are reused when valid or downloaded when missing.
+    /// Extracted headers under `node-ffi/node-v<version>/headers` are replaced on each call, then
+    /// their version and required files are checked. Temporary download files are cleaned.
+    /// Unlike `run`, this helper cannot establish project ownership; the caller chooses the root.
+    ///
+    /// @param buildDirectory the caller-owned location for persistent cache and temporary files
+    /// @param version an exact `MAJOR.MINOR.PATCH` release, optionally prefixed by `v`
+    /// @return the extracted and checked header directory
+    /// @throws IOException if download, checksum validation, extraction, file access or cleanup
+    ///   fails
+    /// @throws InterruptedException if a release download is interrupted
+    /// @throws IllegalArgumentException if version or checksum/header metadata is invalid
     public static Path acquireReleaseHeaders(Path buildDirectory, String version) throws IOException, InterruptedException {
         Path build = buildDirectory.toAbsolutePath().normalize();
         Path scratch = build.resolve("tmp/node-ffi");
@@ -477,6 +602,10 @@ public final class NodeFfiBuilder {
         }
     }
 
+    /// Reuses or downloads the release archive, replacing its extracted header tree.
+    ///
+    /// Archive verification precedes replacement. An extraction failure can leave a partial
+    /// header tree; the next invocation recreates that tree from the verified archive.
     private static Path releaseHeaders(Path build, String version, Path temporary, Map<String, Object> receipt, boolean offline)
             throws IOException, InterruptedException {
         Path cache = build.resolve("node-ffi/node-v" + version);
@@ -498,6 +627,12 @@ public final class NodeFfiBuilder {
         return verifiedDownload(version, "win-" + architecture + "/node.lib", destination, temporary, receipt, options.offline());
     }
 
+    /// Acquires one release file whose bytes match the exact entry in `SHASUMS256.txt`.
+    ///
+    /// Offline mode fails if either the manifest or a matching cached file is absent. Online mode
+    /// replaces mismatched files and removes a newly downloaded file that fails verification.
+    /// The digest is recorded in the receipt; this checks the HTTPS-published checksum manifest,
+    /// not a separate signature or a user-supplied trust pin.
     private static Path verifiedDownload(String version, String filename, Path destination, Path temporary,
                                           Map<String, Object> receipt, boolean offline) throws IOException, InterruptedException {
         URI base = URI.create("https://nodejs.org/download/release/v" + version + "/");
@@ -520,6 +655,15 @@ public final class NodeFfiBuilder {
         return destination;
     }
 
+    /// Finds one exact filename's SHA-256 entry in a Node release checksum manifest.
+    ///
+    /// Both ordinary and asterisk-prefixed filename forms are accepted. Malformed or unrelated
+    /// lines are ignored; duplicate matching entries are rejected even if their hashes agree.
+    ///
+    /// @param manifest the complete checksum manifest text
+    /// @param filename the exact release-relative filename, including a subdirectory if applicable
+    /// @return the matching 64-character digest normalized to lowercase
+    /// @throws IllegalArgumentException if no valid entry or more than one matching entry is found
     public static String checksum(String manifest, String filename) {
         String found = null;
         for (String line : manifest.lines().toList()) {
@@ -533,6 +677,10 @@ public final class NodeFfiBuilder {
         return found;
     }
 
+    /// Downloads a bounded HTTP 200 response through an invocation-owned partial file.
+    ///
+    /// Redirects are refused. Connection/request timeouts and a 64 MiB byte limit apply; the
+    /// completed partial file replaces the destination, and leftover partial files are deleted.
     private static void download(URI uri, Path destination, Path temporary) throws IOException, InterruptedException {
         Path partial = Files.createTempFile(temporary, "node-release-", ".download");
         try (HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30))
@@ -549,7 +697,21 @@ public final class NodeFfiBuilder {
         }
     }
 
-    /** Extract only Node header files, checking tar integrity and refusing links or path traversal. */
+    /// Extracts a selected header subtree from a gzip-compressed Node release tar archive.
+    ///
+    /// Tar header checksums, octal sizes and member padding are checked. GNU long names are
+    /// supported; PAX metadata, link members and unsafe path forms are rejected. The total stated
+    /// member payload is limited to 256 MiB, including members outside the selected prefix.
+    ///
+    /// Matching files replace destination files; unrelated existing files are not cleared. Supply
+    /// a clean caller-owned destination, since pre-existing destination symlinks are not audited.
+    /// On failure, files already extracted can remain. This method does not verify the compressed
+    /// archive's release checksum or header version; the acquisition path performs those checks.
+    ///
+    /// @param archive the existing gzip-compressed tar file
+    /// @param destination the caller-owned extraction root
+    /// @param prefix the archive path prefix to strip, normally ending in `include/node/`
+    /// @throws IOException if archive structure, size/path checks or extraction I/O fails
     public static void extractHeaders(Path archive, Path destination, String prefix) throws IOException {
         Path root = destination.toAbsolutePath().normalize();
         Files.createDirectories(root);
@@ -609,6 +771,16 @@ public final class NodeFfiBuilder {
         }
     }
 
+    /// Checks exact Node version macros and the presence of required development headers.
+    ///
+    /// The directory must contain `node_version.h`, `node_api.h`, `node.h`, `uv.h` and `v8.h`.
+    /// This is a read-only version/completeness check, not compilation or an ABI compatibility
+    /// test.
+    ///
+    /// @param headers the directory containing Node development headers
+    /// @param version the expected exact numeric release, optionally prefixed by `v`
+    /// @throws IOException if `node_version.h` cannot be read
+    /// @throws IllegalArgumentException if the version, version macros or required files disagree
     public static void verifyHeaderVersion(Path headers, String version) throws IOException {
         Matcher expected = VERSION.matcher(version);
         if (!expected.matches()) throw new IllegalArgumentException("An exact Node version is required");
@@ -627,6 +799,20 @@ public final class NodeFfiBuilder {
         }
     }
 
+    /// Runs a direct child command, collecting combined output in a temporary log.
+    ///
+    /// Child temporary-directory variables point at the invocation directory. The normal wait is
+    /// limited to five minutes; timeout kills descendants and then waits for forced parent exit
+    /// without a second time bound. Failure diagnostics contain at most the last 12,000 output
+    /// characters. Logs are removed in all normal cleanup paths.
+    ///
+    /// @param command executable and separate argument values; no shell is inserted
+    /// @param directory the child's working directory
+    /// @param temporary the caller-owned directory for its log and temporary-file environment
+    /// @return complete combined standard output and error from a successful process
+    /// @throws IOException if launch, logging or cleanup fails, or the process times out/exits
+    ///   nonzero
+    /// @throws InterruptedException if waiting is interrupted
     private static String execute(List<String> command, Path directory, Path temporary) throws IOException, InterruptedException {
         Path log = Files.createTempFile(temporary, "native-command-", ".log");
         Process process = null;
@@ -656,6 +842,11 @@ public final class NodeFfiBuilder {
         }
     }
 
+    /// Parses named options without touching paths or launching tools.
+    ///
+    /// Directory values become absolute relative to the invoking process. Valued options cannot
+    /// repeat; `--offline` is a flag. Executable overrides are single argument values, not shell
+    /// command lines. Later stages check path ownership and installed tool versions.
     private static Options parse(String[] arguments) {
         Map<String, String> values = new LinkedHashMap<>();
         Set<String> allowed = Set.of("--project-dir", "--addon-dir", "--build-dir", "--node", "--node-version", "--headers-dir", "--cc", "--cxx", "--linker");
@@ -686,6 +877,7 @@ public final class NodeFfiBuilder {
         return matcher.group(1) + "." + matcher.group(2) + "." + matcher.group(3);
     }
 
+    /// Copies a list setting and removes every value named by its matching `name!` list.
     private static List<String> option(Map<String, Object> target, String name) {
         List<String> values = new ArrayList<>(strings(target.getOrDefault(name, List.of()), name));
         values.removeAll(strings(target.getOrDefault(name + "!", List.of()), name + "!"));
@@ -701,6 +893,9 @@ public final class NodeFfiBuilder {
         return addon.resolve(literal(value)).normalize();
     }
 
+    /// Rejects expansion markers and embedded line/NUL characters without applying shell escaping.
+    ///
+    /// Values are later passed as separate process arguments, so whitespace alone is not rejected.
     private static String literal(String value) {
         if (value.contains("<") || value.contains("\u0000") || value.contains("\n") || value.contains("\r")) {
             throw new IllegalArgumentException("Unsupported binding expansion or invalid value: " + value);
