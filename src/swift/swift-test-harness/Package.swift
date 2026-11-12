@@ -16,26 +16,26 @@ let package = Package(
         .macOS(.v15),
     ],
     dependencies: [
-        .package(name: "Template", path: "../../../build/SPMPackage/macosArm64/\(swiftExportConfiguration)"),
+        .package(name: "RegexSyntax", path: "../../../build/SPMPackage/macosArm64/\(swiftExportConfiguration)"),
     ],
     targets: [
         .testTarget(
             name: "SwiftTestHarnessTests",
             dependencies: [
-                .product(name: "TemplateLibrary", package: "Template"),
+                .product(name: "RegexSyntaxLibrary", package: "RegexSyntax"),
             ],
             linkerSettings: [
                 .unsafeFlags(
                     [
                         "-L", "../../../build/swift-test/Debug",
-                        "-lTemplate",
+                        "-lRegexSyntax",
                     ],
                     .when(configuration: .debug)
                 ),
                 .unsafeFlags(
                     [
                         "-L", "../../../build/swift-test/Release",
-                        "-lTemplate",
+                        "-lRegexSyntax",
                     ],
                     .when(configuration: .release)
                 ),

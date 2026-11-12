@@ -1,21 +1,12 @@
-#if canImport(Testing)
 import Testing
-import Template
+import RegexSyntax
 
-@Suite("Template Swift Export Tests")
-struct TemplateExportTests {
-    @Test("Template swift module imported cleanly")
-    func testSwiftModuleLoads() throws {
-        #expect(Bool(true), "Template swift module imported cleanly")
+@Suite("RegexSyntax escaping")
+struct RegexSyntaxEscapingTests {
+    @Test("Regex metacharacters are escaped without changing plain text")
+    func escapesMetacharacters() {
+        #expect(escape(text: "a+b(c).") == #"a\+b\(c\)\."#)
+        #expect(escape(text: "plain text") == "plain text")
+        #expect(escape(text: "") == "")
     }
 }
-#elseif canImport(XCTest)
-import XCTest
-import Template
-
-final class TemplateExportTests: XCTestCase {
-    func testSwiftModuleLoads() throws {
-        XCTAssertTrue(true, "Template swift module imported cleanly")
-    }
-}
-#endif

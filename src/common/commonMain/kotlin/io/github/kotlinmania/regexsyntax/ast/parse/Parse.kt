@@ -1932,7 +1932,11 @@ internal class ParserI(
             }
         }
         val nameStart = offset()
-        while (char() != ':'.code && bump()) { }
+        while (char() != ':'.code) {
+            if (!bump()) {
+                break
+            }
+        }
         if (isEof()) {
             parser().pos = start
             return null

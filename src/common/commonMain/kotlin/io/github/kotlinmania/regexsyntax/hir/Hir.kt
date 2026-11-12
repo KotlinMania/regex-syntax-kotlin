@@ -1001,7 +1001,12 @@ class ClassUnicodeIter internal constructor(
 ) : Iterator<ClassUnicodeRange> {
     override fun hasNext(): Boolean = inner.hasNext()
 
-    override fun next(): ClassUnicodeRange = inner.next()
+    override fun next(): ClassUnicodeRange {
+        if (!inner.hasNext()) {
+            throw NoSuchElementException()
+        }
+        return inner.next()
+    }
 }
 
 /**
@@ -1214,7 +1219,12 @@ class ClassBytesIter internal constructor(
 ) : Iterator<ClassBytesRange> {
     override fun hasNext(): Boolean = inner.hasNext()
 
-    override fun next(): ClassBytesRange = inner.next()
+    override fun next(): ClassBytesRange {
+        if (!inner.hasNext()) {
+            throw NoSuchElementException()
+        }
+        return inner.next()
+    }
 }
 
 /**

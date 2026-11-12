@@ -420,7 +420,12 @@ class IntervalSetIter<I> internal constructor(
 ) : Iterator<I> {
     override fun hasNext(): Boolean = inner.hasNext()
 
-    override fun next(): I = inner.next()
+    override fun next(): I {
+        if (!inner.hasNext()) {
+            throw NoSuchElementException()
+        }
+        return inner.next()
+    }
 }
 
 /**
