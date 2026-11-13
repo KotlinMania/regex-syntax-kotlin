@@ -1,50 +1,40 @@
 // port-lint: source parser.rs
 package io.github.kotlinmania.regexsyntax.parser
 
-/*
- * Copyright (c) The rust-lang regex contributors.
- * Licensed under either of Apache-2.0 OR MIT.
- */
-
+import io.github.kotlinmania.regexsyntax.ast.Ast
 import io.github.kotlinmania.regexsyntax.hir.Hir
-import io.github.kotlinmania.regexsyntax.hir.translate.Translator
-import io.github.kotlinmania.regexsyntax.hir.translate.TranslatorBuilder
-import io.github.kotlinmania.regexsyntax.ast.parse.Parser as AstParser
-import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder as AstParserBuilder
 
 /**
  * A convenience routine for parsing a regex using default options.
  *
- * This is equivalent to [Parser.new].`parse(pattern)`.
+ * This is equivalent to `Parser.new().parse(pattern)`.
  *
  * If you need to set non-default options, then use a [ParserBuilder].
  *
- * This routine returns an [Hir] value. Namely, it automatically
- * parses the pattern as an `Ast` and then invokes the translator
- * to convert the `Ast` into an [Hir]. If you need access to the `Ast`, then
- * you should use [AstParser].
+ * This routine returns an [`Hir`](hir.Hir) value. Namely, it automatically
+ * parses the pattern as an [`Ast`](ast.Ast) and then invokes the translator
+ * to convert the `Ast` into an `Hir`. If you need access to the `Ast`, then
+ * you should use a [ast.parse.Parser].
  */
-fun parse(pattern: String): Result<Hir> = Parser.new().parse(pattern)
+public fun parse(pattern: String): Result<Hir> = Parser.new().parse(pattern)
 
 /**
  * A builder for a regular expression parser.
  *
  * This builder permits modifying configuration options for the parser.
  *
- * This type combines the builder options for both the AST [AstParserBuilder]
- * and the HIR [TranslatorBuilder].
+ * This type combines the builder options for both the [AST
+ * `ParserBuilder`](ast.parse.ParserBuilder) and the [HIR
+ * `TranslatorBuilder`](hir.translate.TranslatorBuilder).
  */
-data class ParserBuilder(
-    val ast: AstParserBuilder = AstParserBuilder(),
-    val hir: TranslatorBuilder = TranslatorBuilder(),
+public open class ParserBuilder(
+    public var ast: ParserBuilder,
+    public var hir: TranslatorBuilder,
 ) {
-    companion object {
-        /** Create a new parser builder with a default configuration. */
-        fun new(): ParserBuilder = ParserBuilder()
-    }
-
-    /** Build a parser from this configuration with the given pattern. */
-    fun build(): Parser = Parser(ast = ast.build(), hir = hir.build())
+    /**
+     * Build a parser from this configuration with the given pattern.
+     */
+    public open fun build(): Parser = Parser(ast = this.ast.build(), hir = this.hir.build())
 
     /**
      * Set the nesting limit for this parser.
@@ -73,8 +63,8 @@ data class ParserBuilder(
      * in an obvious way in the concrete syntax, therefore, it should not be
      * used in a granular way.
      */
-    fun nestLimit(limit: Int): ParserBuilder {
-        ast.nestLimit(limit.toUInt())
+    public open fun nestLimit(limit: UInt): ParserBuilder {
+        this.ast.nestLimit(limit)
         return this
     }
 
@@ -82,7 +72,7 @@ data class ParserBuilder(
      * Whether to support octal syntax or not.
      *
      * Octal syntax is a little-known way of uttering Unicode codepoints in
-     * a regular expression. For example, `a`, `\x61`, `a` and
+     * a regular expression. For example, `a`, `\x61`, `\u0061` and
      * `\141` are all equivalent regular expressions, where the last example
      * shows octal syntax.
      *
@@ -95,8 +85,8 @@ data class ParserBuilder(
      *
      * Octal syntax is disabled by default.
      */
-    fun octal(yes: Boolean): ParserBuilder {
-        ast.octal(yes)
+    public open fun octal(yes: Boolean): ParserBuilder {
+        this.ast.octal(yes)
         return this
     }
 
@@ -117,8 +107,8 @@ data class ParserBuilder(
      * these cases if necessary (perhaps by suppressing any zero-width matches
      * that split a codepoint).
      */
-    fun utf8(yes: Boolean): ParserBuilder {
-        hir.utf8(yes)
+    public open fun utf8(yes: Boolean): ParserBuilder {
+        this.hir.utf8(yes)
         return this
     }
 
@@ -132,8 +122,8 @@ data class ParserBuilder(
      * By default, this is disabled. It may be selectively enabled in the
      * regular expression by using the `x` flag regardless of this setting.
      */
-    fun ignoreWhitespace(yes: Boolean): ParserBuilder {
-        ast.ignoreWhitespace(yes)
+    public open fun ignoreWhitespace(yes: Boolean): ParserBuilder {
+        this.ast.ignoreWhitespace(yes)
         return this
     }
 
@@ -143,8 +133,8 @@ data class ParserBuilder(
      * By default this is disabled. It may alternatively be selectively
      * enabled in the regular expression itself via the `i` flag.
      */
-    fun caseInsensitive(yes: Boolean): ParserBuilder {
-        hir.caseInsensitive(yes)
+    public open fun caseInsensitive(yes: Boolean): ParserBuilder {
+        this.hir.caseInsensitive(yes)
         return this
     }
 
@@ -154,8 +144,8 @@ data class ParserBuilder(
      * By default this is disabled. It may alternatively be selectively
      * enabled in the regular expression itself via the `m` flag.
      */
-    fun multiLine(yes: Boolean): ParserBuilder {
-        hir.multiLine(yes)
+    public open fun multiLine(yes: Boolean): ParserBuilder {
+        this.hir.multiLine(yes)
         return this
     }
 
@@ -165,8 +155,8 @@ data class ParserBuilder(
      * By default this is disabled. It may alternatively be selectively
      * enabled in the regular expression itself via the `s` flag.
      */
-    fun dotMatchesNewLine(yes: Boolean): ParserBuilder {
-        hir.dotMatchesNewLine(yes)
+    public open fun dotMatchesNewLine(yes: Boolean): ParserBuilder {
+        this.hir.dotMatchesNewLine(yes)
         return this
     }
 
@@ -184,13 +174,13 @@ data class ParserBuilder(
      * `\r` and `\n` as line terminators. And in particular, neither will
      * match between a `\r` and a `\n`.
      */
-    fun crlf(yes: Boolean): ParserBuilder {
-        hir.crlf(yes)
+    public open fun crlf(yes: Boolean): ParserBuilder {
+        this.hir.crlf(yes)
         return this
     }
 
     /**
-     * Sets the line terminator for use with `(?u-s:.)` and `(?-us:.)`.
+     * Sets the line terminator for use with `(? u - s:.)` and `(? - us:.)`.
      *
      * Namely, instead of `.` (by default) matching everything except for `\n`,
      * this will cause `.` to match everything except for the byte given.
@@ -208,11 +198,11 @@ data class ParserBuilder(
      * the line terminator will be treated as `\r` and `\n` simultaneously.
      *
      * Note also that this *doesn't* impact the look-around assertions
-     * `(?m:^)` and `(?m:$)`. That's usually controlled by additional
+     * `(? m: ^)` and `(? m: $)`. That's usually controlled by additional
      * configuration in the regex engine itself.
      */
-    fun lineTerminator(byte: Byte): ParserBuilder {
-        hir.lineTerminator(byte)
+    public open fun lineTerminator(byte: UByte): ParserBuilder {
+        this.hir.lineTerminator(byte)
         return this
     }
 
@@ -222,8 +212,8 @@ data class ParserBuilder(
      * By default this is disabled. It may alternatively be selectively
      * enabled in the regular expression itself via the `U` flag.
      */
-    fun swapGreed(yes: Boolean): ParserBuilder {
-        hir.swapGreed(yes)
+    public open fun swapGreed(yes: Boolean): ParserBuilder {
+        this.hir.swapGreed(yes)
         return this
     }
 
@@ -237,9 +227,16 @@ data class ParserBuilder(
      * regular expression will fail to parse if Unicode mode is disabled and a
      * sub-expression could possibly match invalid UTF-8.
      */
-    fun unicode(yes: Boolean): ParserBuilder {
-        hir.unicode(yes)
+    public open fun unicode(yes: Boolean): ParserBuilder {
+        this.hir.unicode(yes)
         return this
+    }
+
+    public companion object {
+        /**
+         * Create a new parser builder with a default configuration.
+         */
+        public fun new(): ParserBuilder = ParserBuilder.default()
     }
 }
 
@@ -254,37 +251,34 @@ data class ParserBuilder(
  * convenience for never having to deal with it at all.
  *
  * If callers have more fine grained use cases that need an AST, then please
- * see the [io.github.kotlinmania.regexsyntax.ast.parse] module.
+ * see the [ast.parse] module.
  *
- * A [Parser] can be configured in more detail via a [ParserBuilder].
+ * A `Parser` can be configured in more detail via a [ParserBuilder].
  */
-data class Parser(
-    val ast: AstParser,
-    val hir: Translator,
+public open class Parser(
+    public var ast: Parser,
+    public var hir: Translator,
 ) {
-    companion object {
+    /**
+     * Parse the regular expression into a high level intermediate
+     * representation.
+     */
+    public open fun parse(pattern: String): Result<Hir> {
+        val ast = this.ast.parse(pattern).getOrElse { return Result.failure(it) }
+        val hir = this.hir.translate(pattern, ast).getOrElse { return Result.failure(it) }
+        return Result.success(hir)
+    }
+
+    public companion object {
         /**
          * Create a new parser with a default configuration.
          *
-         * The parser can be run with [parse] method. The parse method returns
+         * The parser can be run with `parse` method. The parse method returns
          * a high level intermediate representation of the given regular
          * expression.
          *
          * To set configuration options on the parser, use [ParserBuilder].
          */
-        fun new(): Parser = ParserBuilder.new().build()
-    }
-
-    /**
-     * Parse the regular expression into a high level intermediate
-     * representation.
-     */
-    fun parse(pattern: String): Result<Hir> {
-        val astResult = ast.parse(pattern)
-        if (astResult.isFailure) {
-            return Result.failure(astResult.exceptionOrNull()!!)
-        }
-        val astValue = astResult.getOrThrow()
-        return hir.translate(pattern, astValue)
+        public fun new(): Parser = ParserBuilder.new().build()
     }
 }

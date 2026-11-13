@@ -6,12 +6,9 @@ package io.github.kotlinmania.regexsyntax.either
  *
  * This is occasionally useful in an ad hoc fashion.
  */
-sealed class Either<Left, Right> {
-    data class Left<L, R>(
-        val value: L,
-    ) : Either<L, R>()
+public sealed class Either<Left, Right> {
+    public data class Left<Left, Right>(public var value: Left) : Either<Left, Right>()
+    public data class Right<Left, Right>(public var value: Right) : Either<Left, Right>()
 
-    data class Right<L, R>(
-        val value: R,
-    ) : Either<L, R>()
+    public fun rustEquals(other: Either<Left, Right>): Boolean = this == other
 }
