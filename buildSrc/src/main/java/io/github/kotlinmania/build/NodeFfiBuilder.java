@@ -488,13 +488,21 @@ public final class NodeFfiBuilder {
                 throw new IllegalArgumentException("Native source must be a file inside the owning project: " + input);
             }
             boolean cpp = source.endsWith(".cc") || source.endsWith(".cpp") || source.endsWith(".cxx");
-            if (!cpp && !source.endsWith(".c")) {
+            boolean asm = source.endsWith(".S") || source.endsWith(".s");
+            if (!cpp && !asm && !source.endsWith(".c")) {
                 throw new IllegalArgumentException("Unsupported native source language: " + source);
             }
             Path object = temporary.resolve(name + "-" + objects.size() + (windows ? ".obj" : ".o"));
             List<String> command = new ArrayList<>(List.of(cpp ? cxx : cc));
             if (windows) {
-                command.addAll(List.of("/nologo", "/c", isDebug ? "/Od" : "/O2", "/MD", "/W3", cpp ? "/TP" : "/TC"));
+                if (asm && !toolset.equals("ClangCL")) {
+                    throw new IllegalArgumentException("Assembly source on Windows requires ClangCL toolset: " + source);
+                }
+                if (asm) {
+                    command.addAll(List.of("/nologo", "/c"));
+                } else {
+                    command.addAll(List.of("/nologo", "/c", isDebug ? "/Od" : "/O2", "/MD", "/W3", cpp ? "/TP" : "/TC"));
+                }
                 if (isDebug) command.add("/Z7");
                 if (cpp) {
                     command.add("/std:c++20");
@@ -507,9 +515,23 @@ public final class NodeFfiBuilder {
                 }
                 for (String include : includes) command.add("/I" + include);
                 for (String define : defines) command.add("/D" + literal(define));
-                addWindowsFlags(command, option(target, "cflags"));
-                addWindowsFlags(command, option(target, cpp ? "cflags_cc" : "cflags_c"));
+                if (!asm) {
+                    addWindowsFlags(command, option(target, "cflags"));
+                    addWindowsFlags(command, option(target, cpp ? "cflags_cc" : "cflags_c"));
+                }
                 command.addAll(List.of(input.toString(), "/Fo" + object));
+            } else if (asm) {
+                List<String> flags = new ArrayList<>(isDebug ? List.of("-g", "-fPIC") : List.of("-fPIC"));
+                if (mac) {
+                    flags.addAll(List.of("-arch", arch.equals("arm64") ? "arm64" : "x86_64"));
+                    if (xcode.containsKey("MACOSX_DEPLOYMENT_TARGET")) {
+                        flags.add("-mmacosx-version-min=" + literal(string(xcode.get("MACOSX_DEPLOYMENT_TARGET"), "MACOSX_DEPLOYMENT_TARGET")));
+                    }
+                }
+                flags.forEach(flag -> command.add(literal(flag)));
+                for (String include : includes) command.addAll(List.of("-I", include));
+                for (String define : defines) command.add("-D" + literal(define));
+                command.addAll(List.of("-c", input.toString(), "-o", object.toString()));
             } else {
                 List<String> flags = new ArrayList<>(isDebug
                         ? List.of("-O0", "-g", "-fPIC", "-fvisibility=hidden", "-pthread")
