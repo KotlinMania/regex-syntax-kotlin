@@ -1,6 +1,11 @@
 // port-lint: source utf8.rs
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package io.github.kotlinmania.regexsyntax.utf8
 
+import io.github.kotlinmania.regexsyntax.encodeScalarUtf8
+import io.github.kotlinmania.regexsyntax.formatHexUpper
+import io.github.kotlinmania.regexsyntax.scalarFromU32
 import io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts
 import io.github.kotlinmania.rustlang.core.mem.TypeLayout
 
@@ -95,7 +100,7 @@ public val MAX_UTF8_BYTES: Int = 4
  * For example, if there are two ranges, `[C2 - DF][80 - BF]`, then the byte
  * sequence `\xDD\x61` would not match because `0x61<0x80`.
  */
-public sealed class Utf8Sequence {
+public sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     /**
      * One byte range.
      */
@@ -115,27 +120,45 @@ public sealed class Utf8Sequence {
 
     public fun rustEquals(other: Utf8Sequence): Boolean = this == other
 
+    private fun variantRank(): Int =
+        when (this) {
+            is One -> 0
+            is Two -> 1
+            is Three -> 2
+            is Four -> 3
+        }
+
+    override fun compareTo(other: Utf8Sequence): Int {
+        val rankCmp = this.variantRank().compareTo(other.variantRank())
+        if (rankCmp != 0) return rankCmp
+        val a = this.asSlice()
+        val b = other.asSlice()
+        for (i in 0 until a.size) {
+            val cmp = a[i].compareTo(b[i])
+            if (cmp != 0) return cmp
+        }
+        return 0
+    }
+
+    public fun copy(): Utf8Sequence =
+        when (this) {
+            is One -> One(value.copy())
+            is Two -> Two(value.map { it.copy() })
+            is Three -> Three(value.map { it.copy() })
+            is Four -> Four(value.map { it.copy() })
+        }
+
+    override fun iterator(): kotlin.collections.Iterator<Utf8Range> = this.asSlice().iterator()
+
     /**
      * Returns the underlying sequence of byte ranges as a slice.
      */
     public open fun asSlice(): List<Utf8Range> =
         when (this) {
-            is One -> {
-                val (r) = this
-                slice.fromRef(r)
-            }
-            is Two -> {
-                val (r1) = this
-                r1
-            }
-            is Three -> {
-                val (r2) = this
-                r2
-            }
-            is Four -> {
-                val (r3) = this
-                r3
-            }
+            is One -> listOf(value)
+            is Two -> value
+            is Three -> value
+            is Four -> value
         }
 
     /**
@@ -143,7 +166,7 @@ public sealed class Utf8Sequence {
      *
      * The length is guaranteed to be in the closed interval `[1, 4]`.
      */
-    public open fun len(): Int = this.asSlice().len()
+    public open fun len(): Int = this.asSlice().size
 
     /**
      * Reverses the ranges in this sequence.
@@ -166,18 +189,9 @@ public sealed class Utf8Sequence {
     public open fun reverse() {
         when (this) {
             is Utf8Sequence.One -> {}
-            is Utf8Sequence.Two -> {
-                val (x) = this
-                x.reverse()
-            }
-            is Utf8Sequence.Three -> {
-                val (x1) = this
-                x1.reverse()
-            }
-            is Utf8Sequence.Four -> {
-                val (x2) = this
-                x2.reverse()
-            }
+            is Utf8Sequence.Two -> value = value.reversed()
+            is Utf8Sequence.Three -> value = value.reversed()
+            is Utf8Sequence.Four -> value = value.reversed()
         }
     }
 
@@ -189,7 +203,7 @@ public sealed class Utf8Sequence {
         if (bytes.size < this.len()) {
             return false
         }
-        for ((b, r) in (bytes.zip(this))) {
+        for ((b, r) in bytes.zip(this.asSlice())) {
             if (!r.matches(b)) {
                 return false
             }
@@ -197,7 +211,7 @@ public sealed class Utf8Sequence {
         return true
     }
 
-    public open fun intoIter(): ArrayDeque<Utf8Range> = this.asSlice().iter()
+    public open fun intoIter(): ArrayDeque<Utf8Range> = ArrayDeque(this.asSlice())
 
     public open fun fmt(f: StringBuilder) {
         when (this) {
@@ -219,6 +233,8 @@ public sealed class Utf8Sequence {
             }
         }
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 
     public companion object {
         /**
@@ -245,7 +261,7 @@ public sealed class Utf8Sequence {
 /**
  * A single inclusive range of UTF-8 bytes.
  */
-public open class Utf8Range(
+public data class Utf8Range(
     /**
      * Start of byte range (inclusive).
      */
@@ -254,19 +270,27 @@ public open class Utf8Range(
      * End of byte range (inclusive).
      */
     public var end: UByte,
-) {
+) : Comparable<Utf8Range> {
+    override fun compareTo(other: Utf8Range): Int {
+        val startCmp = this.start.compareTo(other.start)
+        if (startCmp != 0) return startCmp
+        return this.end.compareTo(other.end)
+    }
+
     /**
      * Returns true if and only if the given byte is in this range.
      */
-    public open fun matches(b: UByte): Boolean = this.start <= b && b <= this.end
+    public fun matches(b: UByte): Boolean = this.start <= b && b <= this.end
 
-    public open fun fmt(f: StringBuilder) {
+    public fun fmt(f: StringBuilder) {
         if (this.start == this.end) {
-            f.append("[${this.start}]")
+            f.append("[${formatHexUpper(this.start.toUInt())}]")
         } else {
-            f.append("[${this.start}-${this.end}]")
+            f.append("[${formatHexUpper(this.start.toUInt())}-${formatHexUpper(this.end.toUInt())}]")
         }
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 
     public companion object {
         public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<Utf8Range> =
@@ -339,8 +363,8 @@ public open class Utf8Range(
  * and compare it with the scalar value range directly. However, this is not
  * always possible (for example, in a byte based automaton).
  */
-public open class Utf8Sequences(
-    public var rangeStack: MutableList<ScalarRange>,
+public open class Utf8Sequences internal constructor(
+    private val rangeStack: MutableList<ScalarRange>,
 ) : Iterable<Utf8Sequence> {
     override fun iterator(): kotlin.collections.Iterator<Utf8Sequence> = object : AbstractIterator<Utf8Sequence>() {
         override fun computeNext() {
@@ -357,69 +381,64 @@ public open class Utf8Sequences(
      *
      * N.B. Benchmarks say that this method is dubious.
      */
-    public open fun reset(start: Char, end: Char) {
+    public open fun reset(start: UInt, end: UInt) {
         this.rangeStack.clear()
-        this.push(UInt.from(start), UInt.from(end))
+        this.push(start, end)
     }
 
-    public open fun push(start: UInt, end: UInt) {
+    internal open fun push(start: UInt, end: UInt) {
         this.rangeStack.add(ScalarRange(start = start, end = end))
     }
 
     public open fun next(): Utf8Sequence? {
-        while (true) {
-            val matchVal = this.rangeStack.removeLastOrNull()
-            if (matchVal == null) break
-            val r = matchVal
-            while (true) {
-                when (val matchVal1 = r.split()) {
-                    null -> {}
-                    else -> {
-                        val r1 = matchVal1.first
-                        val r2 = matchVal1.second
-                        this.push(r2.start, r2.end)
-                        r.start = r1.start
-                        r.end = r1.end
-                        continue
-                    }
+        top@ while (true) {
+            val r = this.rangeStack.removeLastOrNull() ?: break
+            inner@ while (true) {
+                val splitPair = r.split()
+                if (splitPair != null) {
+                    val (r1, r2) = splitPair
+                    this.push(r2.start, r2.end)
+                    r.start = r1.start
+                    r.end = r1.end
+                    continue@inner
                 }
                 if (!r.isValid()) {
-                    continue
+                    continue@top
                 }
                 for (i in 1 until MAX_UTF8_BYTES) {
                     val max = maxScalarValue(i)
                     if (r.start <= max && max < r.end) {
                         this.push(max + 1u, r.end)
                         r.end = max
-                        continue
+                        continue@inner
                     }
                 }
-                when (val matchVal2 = r.asAscii()) {
-                    null -> {}
-                    else -> {
-                        val asciiRange = matchVal2
-                        return Utf8Sequence.One(asciiRange)
-                    }
+                val asciiRange = r.asAscii()
+                if (asciiRange != null) {
+                    return Utf8Sequence.One(asciiRange)
                 }
                 for (i1 in 1 until MAX_UTF8_BYTES) {
-                    val m = (1 shl (6 * i1).toInt()) - 1
+                    val m = (1u shl (6 * i1)) - 1u
                     if ((r.start and m.inv()) != (r.end and m.inv())) {
-                        if ((r.start and m) != 0) {
-                            this.push((r.start or m) + 1, r.end)
+                        if ((r.start and m) != 0u) {
+                            this.push((r.start or m) + 1u, r.end)
                             r.end = r.start or m
-                            continue
+                            continue@inner
                         }
                         if ((r.end and m) != m) {
                             this.push(r.end and m.inv(), r.end)
-                            r.end = (r.end and m.inv()) - 1
-                            continue
+                            r.end = (r.end and m.inv()) - 1u
+                            continue@inner
                         }
                     }
                 }
-                val start = List(MAX_UTF8_BYTES) { 0 }
-                val end = List(MAX_UTF8_BYTES) { 0 }
+                val start = UByteArray(MAX_UTF8_BYTES)
+                val end = UByteArray(MAX_UTF8_BYTES)
                 val n = r.encode(start, end)
-                return Utf8Sequence.fromEncodedRange(start[0 until n], end[0 until n])
+                return Utf8Sequence.fromEncodedRange(
+                    start.slice(0 until n),
+                    end.slice(0 until n),
+                )
             }
         }
         return null
@@ -430,27 +449,29 @@ public open class Utf8Sequences(
          * Create a new iterator over UTF-8 byte ranges for the scalar value range
          * given.
          */
-        public fun new(start: Char, end: Char): Utf8Sequences {
-            val range = ScalarRange(start = UInt.from(start), end = UInt.from(end))
+        public fun new(start: UInt, end: UInt): Utf8Sequences {
+            val range = ScalarRange(start = start, end = end)
             return Utf8Sequences(rangeStack = mutableListOf(range))
         }
     }
 }
 
-public open class ScalarRange(
-    public var start: UInt,
-    public var end: UInt,
+internal data class ScalarRange(
+    internal var start: UInt,
+    internal var end: UInt,
 ) {
-    public open fun fmt(f: StringBuilder) {
+    internal fun fmt(f: StringBuilder) {
         f.append("ScalarRange(${this.start}, ${this.end})")
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 
     /**
      * split splits this range if it overlaps with a surrogate codepoint.
      *
      * Either or both ranges may be invalid.
      */
-    public open fun split(): Pair<ScalarRange, ScalarRange>? =
+    internal fun split(): Pair<ScalarRange, ScalarRange>? =
         if (this.start < 0xE000u && this.end > 0xD7FFu) {
             Pair(ScalarRange(start = this.start, end = 0xD7FFu), ScalarRange(start = 0xE000u, end = this.end))
         } else {
@@ -460,17 +481,15 @@ public open class ScalarRange(
     /**
      * isValid returns true if and only if start <= end.
      */
-    public open fun isValid(): Boolean = this.start <= this.end
+    internal fun isValid(): Boolean = this.start <= this.end
 
     /**
      * asAscii returns this range as a Utf8Range if and only if all scalar
      * values in this range can be encoded as a single byte.
      */
-    public open fun asAscii(): Utf8Range? =
+    internal fun asAscii(): Utf8Range? =
         if (this.isAscii()) {
-            val start = UByte.tryFrom(this.start).unwrap()
-            val end = UByte.tryFrom(this.end).unwrap()
-            Utf8Range.new(start, end)
+            Utf8Range.new(this.start.toUByte(), this.end.toUByte())
         } else {
             null
         }
@@ -479,7 +498,7 @@ public open class ScalarRange(
      * isAscii returns true if the range is ASCII only (i.e., takes a single
      * byte to encode any scalar value).
      */
-    public open fun isAscii(): Boolean = this.isValid() && this.end <= 0x7fu
+    internal fun isAscii(): Boolean = this.isValid() && this.end <= 0x7fu
 
     /**
      * encode writes the UTF-8 encoding of the start and end of this range
@@ -488,17 +507,17 @@ public open class ScalarRange(
      *
      * The slices should have room for at least `MAX_UTF8_BYTES`.
      */
-    public open fun encode(start: List<UByte>, end: List<UByte>): Int {
-        val cs = Char.fromU32(this.start).unwrap()
-        val ce = Char.fromU32(this.end).unwrap()
-        val ss = cs.encodeUtf8(start)
-        val se = ce.encodeUtf8(end)
-        check(ss.len() == se.len())
-        return ss.len()
+    internal fun encode(start: UByteArray, end: UByteArray): Int {
+        val cs = scalarFromU32(this.start)!!
+        val ce = scalarFromU32(this.end)!!
+        val ss = encodeScalarUtf8(cs, start)
+        val se = encodeScalarUtf8(ce, end)
+        check(ss == se)
+        return ss
     }
 
-    public companion object {
-        public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<ScalarRange> =
+    internal companion object {
+        internal fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<ScalarRange> =
             object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<ScalarRange> {
                 override val alignBytes: Long = 4L
                 override val sizeBytes: Long = 8L

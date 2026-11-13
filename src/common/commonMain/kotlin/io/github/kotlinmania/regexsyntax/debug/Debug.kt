@@ -1,8 +1,15 @@
 // port-lint: source debug.rs
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package io.github.kotlinmania.regexsyntax.debug
 
-import io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts
-import io.github.kotlinmania.rustlang.core.mem.TypeLayout
+import io.github.kotlinmania.regexsyntax.asciiEscapeDefault
+import io.github.kotlinmania.regexsyntax.formatHexLower2
+import io.github.kotlinmania.regexsyntax.scalarAtUtf16
+import io.github.kotlinmania.regexsyntax.scalarEscapeDebug
+import io.github.kotlinmania.regexsyntax.scalarLenUtf8
+import io.github.kotlinmania.rustlang.core.result.Result
+import io.github.kotlinmania.rustlang.core.str.fromUtf8
 
 /**
  * A type that wraps a single byte with a convenient fmt.Debug impl that
@@ -21,22 +28,26 @@ internal open class Byte(
         // Special case ASCII space. It's too hard to read otherwise, so
         // put quotes around it. I sometimes wonder whether just '\x20' would
         // be better...
-        if (this.value == 32u) {
-            return f.append("' '")
+        if (this.value == 32u.toUByte()) {
+            f.append("' '")
+            return
         }
         // 10 bytes is enough to cover any output from ascii.escapeDefault.
-        val bytes = List(10) { 0u.toUByte() }
+        val bytes = UByteArray(10)
         var len = 0
-        for ((i, b) in escapeDefault(this.value).enumerate()) {
+        for ((i, bRaw) in asciiEscapeDefault(this.value).withIndex()) {
+            var b = bRaw
             // capitalize \xab to \xAB
-            if (i >= 2 && 97u <= b && b <= 102u) {
-                b -= 32
+            if (i >= 2 && 97u.toUByte() <= b && b <= 102u.toUByte()) {
+                b = (b.toUInt() - 32u).toUByte()
             }
             bytes[len] = b
             len += 1
         }
-        f.append("${String.fromUtf8(bytes[0 until len]).unwrap()}")
+        f.append(fromUtf8(bytes.slice(0 until len)).unwrap())
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 
     public companion object {
         public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<Byte> =
@@ -72,38 +83,37 @@ internal open class Bytes(
         }
 
     public open fun fmt(f: StringBuilder) {
-        f.append("\"").getOrElse { return Result.failure(it) }
+        f.append('"')
         // This is a sad re-implementation of a similar impl found in bstr.
         var bytes = this.value
         while (true) {
-            val matchVal = utf8Decode(bytes)
-            if (matchVal == null) break
-            val result = matchVal
+            val result = utf8Decode(bytes) ?: break
             val ch1 =
-                if (result.isSuccess) {
-                    val ch = result.getOrThrow()
-                    ch
-                } else {
-                    val byte = result.exceptionOrNull()!!
-                    f.append("\\x$byte").getOrElse { return Result.failure(it) }
-                    bytes = bytes[1 until bytes.size]
-                    continue
+                when (result) {
+                    is Result.Ok -> result.value
+                    is Result.Err -> {
+                        val byte = result.error
+                        f.append("\\x${formatHexLower2(byte.toUInt())}")
+                        bytes = bytes.subList(1, bytes.size)
+                        continue
+                    }
                 }
-            bytes = bytes[ch1.lenUtf8() until bytes.size]
+            bytes = bytes.subList(scalarLenUtf8(ch1), bytes.size)
             when (ch1) {
-                '\u0000' -> { f.append("\\0").getOrElse { return Result.failure(it) } }
+                0u -> f.append("\\0")
                 // ASCII control characters except \0, \n, \r, \t
-                in '\u0001'..'\b', '\u000b', '\u000c', in '\u000e'..'\u0019', '\u007f' -> {
-                    f.append("\\x${UInt.from(ch1)}").getOrElse { return Result.failure(it) }
+                in 1u..8u, 11u, 12u, in 14u..25u, 127u -> {
+                    f.append("\\x${formatHexLower2(ch1)}")
                 }
-                '\n', '\r', '\t' -> {
-                    f.append("${ch1.escapeDebug()}").getOrElse { return Result.failure(it) }
+                else -> {
+                    f.append(scalarEscapeDebug(ch1))
                 }
             }
         }
-        f.append("\"").getOrElse { return Result.failure(it) }
-        Result.success(Unit)
+        f.append('"')
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 }
 
 /**
@@ -114,48 +124,30 @@ internal open class Bytes(
  *
  * This returns `None` if and only if `bytes` is empty.
  */
-internal fun utf8Decode(bytes: List<UByte>): Result<Char>? {
-    fun len(byte: UByte): Int? {
-        return if (byte <= 0x7Fu.toUByte()) {
-            return 1
-        } else if (byte and 0xC0u.toUByte() == 0x80u.toUByte()) {
-            return null
-        } else if (byte <= 0xDFu.toUByte()) {
-            2
-        } else if (byte <= 0xEFu.toUByte()) {
-            3
-        } else if (byte <= 0xF7u.toUByte()) {
-            4
-        } else {
-            null
+internal fun utf8Decode(bytes: List<UByte>): Result<UInt, UByte>? {
+    fun len(byte: UByte): Int? =
+        when {
+            byte <= 0x7Fu.toUByte() -> 1
+            (byte and 0xC0u.toUByte()) == 0x80u.toUByte() -> null
+            byte <= 0xDFu.toUByte() -> 2
+            byte <= 0xEFu.toUByte() -> 3
+            byte <= 0xF7u.toUByte() -> 4
+            else -> null
         }
-    }
+
     if (bytes.isEmpty()) {
         return null
     }
     val len2 =
-        run {
-            val matchVal = len(bytes[0])
-            when {
-                matchVal == null -> { return Result.failure(bytes[0]) }
-                matchVal != null && matchVal > bytes.size -> {
-                    val len = matchVal
-                    return Result.failure(bytes[0])
-                }
-                matchVal != null && matchVal == 1 -> { return Result.success(Char.from(bytes[0])) }
-                else -> {
-                    val len1 = matchVal
-                    len1
-                }
-            }
-        }
-    return run {
-        val matchVal1 = String.fromUtf8(bytes[0 until len2])
-        if (matchVal1.isSuccess) {
-            val s = matchVal1.getOrThrow()
-            Result.success(s.chars().next()!!)
-        } else {
-            Result.failure(bytes[0])
-        }
+        len(bytes[0]) ?: return Result.Err(bytes[0])
+    if (len2 > bytes.size) {
+        return Result.Err(bytes[0])
+    }
+    if (len2 == 1) {
+        return Result.Ok(bytes[0].toUInt())
+    }
+    return when (val r = fromUtf8(bytes.subList(0, len2))) {
+        is Result.Ok -> Result.Ok(scalarAtUtf16(r.value, 0))
+        is Result.Err -> Result.Err(bytes[0])
     }
 }
