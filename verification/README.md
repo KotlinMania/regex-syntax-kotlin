@@ -11,25 +11,30 @@ reviewed public signature dependencies in a catalog bundle selected by the optio
 `project.dependencies.commonMainApiBundle` property. Existing platform-specific
 source sets and direct `api(...)` declarations remain valid.
 
-Before `verifyAndroidPublication`, set these normal Gradle properties:
+`androidPublicationBundle` stages the existing root and Android publications into
+`build/verification/android-publication.zip`. It produces an artifact; publication
+acceptance is now an explicit standalone command:
 
-- `project.publication.android.publicClasses`: comma-separated internal `.class`
-  paths for actual public API, for example `io/github/example/EntryPoint.class`.
-- `project.publication.android.apiDependencies`: comma-separated triples
-  `group:root-module:actual-Android-POM-module`. Use the published POM module;
-  some external KMP libraries legitimately select JVM artifacts.
+```sh
+../tools/java-build-tool.sh AndroidPublicationVerifier build/verification/android-publication.zip \
+  --group io.github.example --module example --version ACTUAL_VERSION \
+  --public-class io/github/example/EntryPoint.class \
+  --receipt build/reports/publication/android.json
+```
 
-The empty template has no project API. Its acceptance contract intentionally
-requires a real project class rather than accepting an empty or unrelated JAR.
-The task stages the existing root and Android publications, then checks root
-redirects, owning-root component URLs, both Android AAR variants, payload hashes,
-manifest, public bytecode and POM packaging/compile dependencies. It does not
-claim consumer resolution or device/native runtime coverage. Upload depends on
-this task. The existing Android and publish-dry-run workflows invoke it too.
+Supply actual coordinates and public JVM class paths. Repeat
+`--api-dependency group:root-module:Android-POM-module` for public signature edges. The
+optional `--profile async-trait` is a project fixture contract, not a template
+default. Metadata, bytecode and hashes do not prove consumer/runtime behavior.
+Neither publication nor the Android workflow automatically invokes this verifier.
+The Android and publish-dry-run workflows only request the bundle producer.
+
+See [standalone tool inventory and commands](../../tools/build-automation/STANDALONE_TOOLS.md)
+for publication pins, JNI/native artifacts, runtime evidence and project fixtures.
 
 ## Focused synchronization
 
-Use Java 21. Gradle compiles the helpers in buildSrc and supplies its bundled TOML parser. The workspace launcher
+Use JDK 21 or newer. The standalone launcher compiles Java directly using already installed Gradle JSON/TOML/archive libraries; it does not run Gradle. The workspace launcher
 `tools/sync_template.sh` routes to this implementation; its reviewable source is
 `verification/workspace-sync-template.sh` (install location: workspace `tools/`).
 The Java workspace diagnostic is available through `tools/shared-build-sync/run.sh diagnose`. Generic replacement remains disabled. The Android planner inventories hidden YAML and YML files and changes no destination workflows or pins.
@@ -90,13 +95,19 @@ After an explicit local build allocation, use the existing shared wrapper:
 The caller must supply the existing SDK location and allocated Gradle/cache paths;
 the fixture does not install an SDK or modify producer checkouts. Three named
 host tests must actually execute and pass. Selection receipts require both roots
-to select Android AARs. Raw compile and runtime AARs/JARs are scanned independently for duplicate
-bytecode; configurations are never unioned. Checks run after host tests and finalize
-executed host tests so a failed test cannot hide duplicate diagnostics. Nested AAR `libs/*.jar` payloads are included; no exclusions hide producer defects.
+to select Android AARs. Raw compile/runtime paths are recorded after host tests,
+including when an executed test fails. Invoke `AndroidClasspathVerifier` with that
+`raw-classpaths.json`, `--configurations` and an explicit `--receipt` separately.
+It checks each configuration independently, including nested AAR `libs/*.jar`.
+The fixture no longer runs that check automatically.
 An unexpected Android configuration/artifact layout fails for review. These host
 tests do not replace Android device, Android Native, Linux ARM64, or Swift gates.
 
-## Validation status
+## Historical validation status
+
+The following records predate standalone extraction and are not a new execution
+claim. The current template has no discoverable Git repository at its path.
+Current extraction validation is reported separately.
 
 The initial verifier passed eight tests against Async Trait's existing verified
 0.1.3 staging ZIP. Ten sync/classpath tests passed; a later conditional-override
@@ -113,7 +124,7 @@ repair checks configurations independently and schedules diagnostics after tests
 its targeted regression passes. The repaired fixture has not executed in Gradle.
 The slot was explicitly returned with terminal/daemon shutdown evidence for Anyhow;
 no immediate retry was performed. New Gradle execution requires fresh allocation.
-The template remains a local Git checkout without a remote; no remote was invented.
+The earlier run described a local Git checkout without a remote; no remote was invented.
 A tested source commit is distinct from tested propagation, exact-final CI, and
 verified Maven publication. Those gates must complete before any rollout/release.
 
@@ -137,8 +148,10 @@ copy against one existing project; no source synchronization or build occurs:
   --output "$PWD/template/build/reports/swift-scan.json"
 ```
 
-Paths above are workspace-relative. A new project generated from this template
-can run its own `./gradlew -p buildSrc runBuildTool --args="SwiftProblemScanner --root ."`. Do not blanket-copy build
+Paths above are workspace-relative. Invoke the workspace launcher with an explicit
+`--root` for a project generated from this template; `runBuildTool` is no longer a
+buildSrc task. The scanner's Swift 6 manifest policy still needs review for generated
+Swift 5 dependency packages. Do not blanket-copy build
 scripts or apply isolated compiler patches to satisfy the scan. Each finding has
 a stable rule ID, severity, canonical `SWIFT.md` recipe reference and next action.
 The registry records warning overrides, weaker Swift language modes, generated
@@ -203,7 +216,7 @@ publication prerequisites.
 Run the declaration scanner through the Java build tools (Java 21):
 
 ```sh
-./gradlew -p buildSrc runBuildTool --args='RustParityScanner --manifest-index tools/shared-build-sync/manifest-index.json  --kotlin-root libc-kotlin  --mapping tools/shared-build-sync/mapping.json  --output tools/shared-build-sync/cargo-parity.json --strict'
+tools/java-build-tool.sh RustParityScanner --manifest-index tools/shared-build-sync/manifest-index.json --kotlin-root libc-kotlin --mapping tools/shared-build-sync/mapping.json --output tools/shared-build-sync/cargo-parity.json --strict
 ```
 
 The index pins the upstream repository and 40-character revision. Each manifest
@@ -259,10 +272,11 @@ exercise parsing and evidence integrity; they are not library runtime tests.
 ## Linux Native wrapper identity
 
 The template compiles Linux C wrappers for the requested Native target and its
-sysroot on both Linux and macOS hosts. Before cinterop consumes an archive,
-`NativeArchiveVerifier.java` reads its actual ELF relocatable members and rejects
-x64/ARM64 mismatches, malformed archives and a compiled object absent from the
-archive. It writes `native-archive-verification.json` beside the target archive.
+sysroot on both Linux and macOS hosts. Archive inspection is now an explicit
+`tools/java-build-tool.sh NativeArchiveVerifier ARCHIVE --target linux_arm64
+--report REPORT` command. It checks actual ELF relocatable members, architecture
+and archive structure; optional `--object OBJECT` also requires that object digest.
+It writes only the requested report and is no longer called by wrapper compilation.
 
 Libc's representative ARM64 cross-link is recorded under workspace
 `template/build/reports/java-native-verifiers/`;

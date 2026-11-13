@@ -1,5 +1,6 @@
 @file:OptIn(
     ExperimentalKotlinGradlePluginApi::class,
+    KotlinNativeCacheApi::class,
     org.jetbrains.kotlin.gradle.swiftexport.ExperimentalSwiftExportDsl::class,
 )
 
@@ -33,6 +34,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.AbstractExecutable
+import org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeCacheApi
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.swiftexport.SwiftExportedModuleMetadata
@@ -181,6 +184,7 @@ val swiftExportSettings =
         .getOrElse(emptyMap())
 val swiftExportFreeCompilerArgs = csvProperty("project.swiftExport.freeCompilerArgs")
 val swiftExportLinkFreeCompilerArgs = csvProperty("project.swiftExport.linkTask.freeCompilerArgs")
+val nativeReleaseLinkFreeCompilerArgs = csvProperty("project.native.releaseLinkTask.freeCompilerArgs")
 val swiftExportExportApiBundle = boolProperty("project.swiftExport.exportApiBundle", false)
 val swiftExportHiddenDependencies = csvProperty("project.swiftExport.hidden")
 val appleFrameworkStatic = boolProperty("project.apple.framework.static", false)
@@ -571,6 +575,9 @@ kotlin {
             if (swiftExportLinkFreeCompilerArgs.isNotEmpty()) {
                 toolOptions.freeCompilerArgs.addAll(swiftExportLinkFreeCompilerArgs)
             }
+            if ((optimized || name.contains("Release", ignoreCase = true)) && nativeReleaseLinkFreeCompilerArgs.isNotEmpty()) {
+                toolOptions.freeCompilerArgs.addAll(nativeReleaseLinkFreeCompilerArgs)
+            }
         }
         swiftExportModuleExports
             .filter { it.visibility == SwiftExportModuleVisibility.EXPOSED }
@@ -596,6 +603,34 @@ kotlin {
             // allWarningsAsErrors = true for all source compilations and all other bridge diagnostics.
             compilerOptions.freeCompilerArgs.add("-Xwarning-level=UNCHECKED_CAST:disabled")
         }
+
+    targets.withType<KotlinNativeTarget>().configureEach {
+        if (konanTarget.family.isAppleFamily) {
+            binaries.configureEach {
+                val isStaticArchive =
+                    this is org.jetbrains.kotlin.gradle.plugin.mpp.StaticLibrary ||
+                        (this is org.jetbrains.kotlin.gradle.plugin.mpp.Framework && isStatic)
+                if (buildType == org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType.DEBUG && !isStaticArchive) {
+                    // Kotlin/Native 2.4.21's stdlib-per-file-cache archives emit Mach-O N_AST stabs
+                    // ('...a(...a.o)') under Xcode 26 ld, causing dsymutil 'could not open' warnings
+                    // on every Debug link while retaining full DWARF symbols when cache is disabled.
+                    disableNativeCache(
+                        version = DisableCacheInKotlinVersion.`2_4_21`,
+                        reason = "Prevent Xcode 26 dsymutil N_AST 'could not open' warnings from stdlib-per-file-cache",
+                    )
+                }
+            }
+        }
+    }
+
+    if (nativeReleaseLinkFreeCompilerArgs.isNotEmpty()) {
+        tasks
+            .withType<org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink>()
+            .matching { it.optimized && !it.name.startsWith("linkSwiftExportBinary") }
+            .configureEach {
+                toolOptions.freeCompilerArgs.addAll(nativeReleaseLinkFreeCompilerArgs)
+            }
+    }
 
     // Native FFI — Kotlin/Native cinterop + per-target static wrapper library
     if (nativeFfiEnabled) {
@@ -1084,20 +1119,11 @@ listOf("js", "wasmJs", "wasmWasi").forEach { targetPrefix ->
 // ============================================================================
 // JNI & N-API FFI Tasks
 // ============================================================================
+FfiBuildSupport.configureHostTestDependencyNatives(project, jvmFfiEnabled, ffiName)
+
 if (jvmFfiEnabled) {
     val packageFfiJni = FfiBuildSupport.registerJniTasks(project, ffiName, ffiNameLower, projectNamespace)
     kotlin.sourceSets.named("jvmMain") { resources.srcDir(packageFfiJni) }
-
-    tasks.withType<Test>().matching { it.name == "jvmTest" || it.name == "testAndroidHostTest" }.configureEach {
-        dependsOn("compile${ffiName}Jni")
-        systemProperty(
-            "java.library.path",
-            layout.buildDirectory
-                .dir("natives")
-                .get()
-                .asFile.absolutePath,
-        )
-    }
 
     val packagedJniTest =
         tasks.register<Test>("packagedJniTest") {
@@ -1758,16 +1784,23 @@ val wasmWasiTestPreopens =
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 
-if (wasmWasiTestPreopens.isNotEmpty()) {
-    tasks.named("wasmWasiNodeTest") {
-        val driverDir = layout.buildDirectory.dir("compileSync/wasmWasi/test/testDevelopmentExecutable/kotlin")
-        val hostRoot = layout.buildDirectory.dir("tmp/wasmWasiTestPreopens")
-        doFirst {
+tasks.matching { it.name == "wasmWasiNodeTest" }.configureEach {
+    val driverDir = layout.buildDirectory.dir("compileSync/wasmWasi/test/testDevelopmentExecutable/kotlin")
+    val wasmNodeModulesDir = rootProject.layout.buildDirectory.dir("wasm/node_modules")
+    val workspaceRootDir = rootProject.projectDir.parentFile ?: rootProject.projectDir
+    val hostRoot = layout.buildDirectory.dir("tmp/wasmWasiTestPreopens")
+    doFirst {
+        if (wasmWasiTestPreopens.isNotEmpty()) {
             VerificationSupport.patchWasmWasiTestPreopens(
                 driverDir.get().asFile,
                 hostRoot.get().asFile,
                 wasmWasiTestPreopens,
             )
         }
+        VerificationSupport.patchWasmWasiTestFfiImports(
+            driverDir.get().asFile,
+            wasmNodeModulesDir.get().asFile,
+            workspaceRootDir,
+        )
     }
 }
