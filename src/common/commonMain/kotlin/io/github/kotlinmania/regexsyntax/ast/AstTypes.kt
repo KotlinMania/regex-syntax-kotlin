@@ -1,5 +1,16 @@
 package io.github.kotlinmania.regexsyntax.ast
 
+import io.github.kotlinmania.regexsyntax.ast.Alternation as AstAlternation
+import io.github.kotlinmania.regexsyntax.ast.Assertion as AstAssertion
+import io.github.kotlinmania.regexsyntax.ast.CaptureName as AstCaptureName
+import io.github.kotlinmania.regexsyntax.ast.ClassBracketed as AstClassBracketed
+import io.github.kotlinmania.regexsyntax.ast.ClassPerl as AstClassPerl
+import io.github.kotlinmania.regexsyntax.ast.ClassUnicode as AstClassUnicode
+import io.github.kotlinmania.regexsyntax.ast.Concat as AstConcat
+import io.github.kotlinmania.regexsyntax.ast.Flag as AstFlag
+import io.github.kotlinmania.regexsyntax.ast.Group as AstGroup
+import io.github.kotlinmania.regexsyntax.ast.Literal as AstLiteral
+import io.github.kotlinmania.regexsyntax.ast.Repetition as AstRepetition
 import io.github.kotlinmania.regexsyntax.ast.print.Printer
 
 /**
@@ -276,7 +287,7 @@ public sealed class Ast {
     /**
      * A single character literal, which includes escape sequences.
      */
-    public data class Literal(public var value: Literal) : Ast()
+    public data class Literal(public var value: AstLiteral) : Ast()
     /**
      * The "any character" class.
      */
@@ -284,37 +295,37 @@ public sealed class Ast {
     /**
      * A single zero-width assertion.
      */
-    public data class Assertion(public var value: Assertion) : Ast()
+    public data class Assertion(public var value: AstAssertion) : Ast()
     /**
      * A single Unicode character class, e.g., `\pL` or `\p{Greek}`.
      */
-    public data class ClassUnicode(public var value: ClassUnicode) : Ast()
+    public data class ClassUnicode(public var value: AstClassUnicode) : Ast()
     /**
      * A single perl character class, e.g., `\d` or `\W`.
      */
-    public data class ClassPerl(public var value: ClassPerl) : Ast()
+    public data class ClassPerl(public var value: AstClassPerl) : Ast()
     /**
      * A single bracketed character class set, which may contain zero or more
      * character ranges and/or zero or more nested classes. e.g.,
      * `[a-zA-Z\pL]`.
      */
-    public data class ClassBracketed(public var value: ClassBracketed) : Ast()
+    public data class ClassBracketed(public var value: AstClassBracketed) : Ast()
     /**
      * A repetition operator applied to an arbitrary regular expression.
      */
-    public data class Repetition(public var value: Repetition) : Ast()
+    public data class Repetition(public var value: AstRepetition) : Ast()
     /**
      * A grouped regular expression.
      */
-    public data class Group(public var value: Group) : Ast()
+    public data class Group(public var value: AstGroup) : Ast()
     /**
      * An alternation of regular expressions.
      */
-    public data class Alternation(public var value: Alternation) : Ast()
+    public data class Alternation(public var value: AstAlternation) : Ast()
     /**
      * A concatenation of regular expressions.
      */
-    public data class Concat(public var value: Concat) : Ast()
+    public data class Concat(public var value: AstConcat) : Ast()
 
     public fun rustEquals(other: Ast): Boolean = this == other
 
@@ -416,70 +427,53 @@ public sealed class Ast {
         Printer.new().print(this, f)
     }
 
+    override fun toString(): String = buildString { fmt(this) }
+
     /**
      * A custom `Drop` impl is used for `Ast` such that it uses constant stack
      * space but heap space proportional to the depth of the `Ast`.
      */
     public open fun drop() {
-        when {
-            this is Ast.Empty -> { return }
-            this is Ast.Flags -> { return }
-            this is Ast.Literal -> { return }
-            this is Ast.Dot -> { return }
-            this is Ast.Assertion -> { return }
-            this is Ast.ClassUnicode -> { return }
-            this is Ast.ClassPerl -> { return }
-            this is Ast.ClassBracketed -> { return }
-            this is Ast.Repetition && !(this as Ast.Repetition).value.ast.hasSubexprs() -> {
-                val (x) = this as Ast.Repetition
-                return
-            }
-            this is Ast.Group && !(this as Ast.Group).value.ast.hasSubexprs() -> {
-                val (x1) = this as Ast.Group
-                return
-            }
-            this is Ast.Alternation && (this as Ast.Alternation).value.asts.isEmpty() -> {
-                val (x2) = this as Ast.Alternation
-                return
-            }
-            this is Ast.Concat && (this as Ast.Concat).value.asts.isEmpty() -> {
-                val (x3) = this as Ast.Concat
-                return
-            }
-            else -> {}
+        when (this) {
+            is Ast.Empty,
+            is Ast.Flags,
+            is Ast.Literal,
+            is Ast.Dot,
+            is Ast.Assertion,
+            is Ast.ClassUnicode,
+            is Ast.ClassPerl,
+            is Ast.ClassBracketed -> return
+            is Ast.Repetition -> if (!this.value.ast.hasSubexprs()) return
+            is Ast.Group -> if (!this.value.ast.hasSubexprs()) return
+            is Ast.Alternation -> if (this.value.asts.isEmpty()) return
+            is Ast.Concat -> if (this.value.asts.isEmpty()) return
         }
-        val emptySpan = { Span.splat(Position.new(0, 0, 0)) }
-        val emptyAst = { Ast.empty(emptySpan()) }
-        val stack = mutableListOf(mem.replace(this, emptyAst()))
-        while (true) {
-            val matchVal = stack.removeLastOrNull()
-            if (matchVal == null) break
-            val ast = matchVal
-            when (ast) {
-                is Ast.Empty -> {}
-                is Ast.Flags -> {}
-                is Ast.Literal -> {}
-                is Ast.Dot -> {}
-                is Ast.Assertion -> {}
-                is Ast.ClassUnicode -> {}
-                is Ast.ClassPerl -> {}
-                is Ast.ClassBracketed -> {}
+        val emptySpan = Span.splat(Position.new(0, 0, 0))
+        val emptyAst: () -> Ast = { Ast.empty(emptySpan) }
+        val stack = mutableListOf<Ast>(this)
+        while (stack.isNotEmpty()) {
+            when (val ast = stack.removeLast()) {
                 is Ast.Repetition -> {
-                    val (x4) = ast
-                    stack.add(mem.replace(x4.ast, emptyAst()))
+                    val child = ast.value.ast
+                    ast.value.ast = emptyAst()
+                    stack.add(child)
                 }
                 is Ast.Group -> {
-                    val (x5) = ast
-                    stack.add(mem.replace(x5.ast, emptyAst()))
+                    val child = ast.value.ast
+                    ast.value.ast = emptyAst()
+                    stack.add(child)
                 }
                 is Ast.Alternation -> {
-                    val (x6) = ast
-                    stack.extend(x6.asts.drain(0 until 0))
+                    val children = ast.value.mutableAsts.toList()
+                    ast.value.mutableAsts.clear()
+                    stack.addAll(children)
                 }
                 is Ast.Concat -> {
-                    val (x7) = ast
-                    stack.extend(x7.asts.drain(0 until 0))
+                    val children = ast.value.mutableAsts.toList()
+                    ast.value.mutableAsts.clear()
+                    stack.addAll(children)
                 }
+                else -> {}
             }
         }
     }
@@ -790,7 +784,7 @@ public sealed class ClassUnicodeKind {
     /**
      * A one letter abbreviated class, e.g., `\pN`.
      */
-    public data class OneLetter(public var value: Char) : ClassUnicodeKind()
+    public data class OneLetter(public var value: UInt) : ClassUnicodeKind()
     /**
      * A binary property, general category or script. The string may be
      * empty.
@@ -886,66 +880,48 @@ public sealed class ClassSet {
     public open fun drop() {
         when (this) {
             is ClassSet.Item -> {
-                val (item) = this
-                when (item) {
-                    is ClassSetItem.Empty -> { return }
-                    is ClassSetItem.Literal -> { return }
-                    is ClassSetItem.Range -> { return }
-                    is ClassSetItem.Ascii -> { return }
-                    is ClassSetItem.Unicode -> { return }
-                    is ClassSetItem.Perl -> { return }
-                    is ClassSetItem.Bracketed -> {
-                        val (x) = item
-                        if (x.kind.isEmpty()) {
-                            return
-                        }
-                    }
-                    is ClassSetItem.Union -> {
-                        val (x1) = item
-                        if (x1.items.isEmpty()) {
-                            return
-                        }
-                    }
+                when (val item = this.value) {
+                    is ClassSetItem.Empty,
+                    is ClassSetItem.Literal,
+                    is ClassSetItem.Range,
+                    is ClassSetItem.Ascii,
+                    is ClassSetItem.Unicode,
+                    is ClassSetItem.Perl -> return
+                    is ClassSetItem.Bracketed -> if (item.value.kind.isEmpty()) return
+                    is ClassSetItem.Union -> if (item.value.items.isEmpty()) return
                 }
             }
             is ClassSet.BinaryOp -> {
-                val (op) = this
-                if (op.lhs.isEmpty() && op.rhs.isEmpty()) {
-                    return
-                }
+                if (this.value.lhs.isEmpty() && this.value.rhs.isEmpty()) return
             }
         }
-        val emptySpan = { Span.splat(Position.new(0, 0, 0)) }
-        val emptySet = { ClassSet.Item(ClassSetItem.Empty(emptySpan())) }
-        val stack = mutableListOf(mem.replace(this, emptySet()))
-        while (true) {
-            val matchVal = stack.removeLastOrNull()
-            if (matchVal == null) break
-            val set = matchVal
-            when (set) {
+        val emptySpan = Span.splat(Position.new(0, 0, 0))
+        val emptySet: () -> ClassSet = { ClassSet.Item(ClassSetItem.Empty(emptySpan)) }
+        val stack = mutableListOf<ClassSet>(this)
+        while (stack.isNotEmpty()) {
+            when (val set = stack.removeLast()) {
                 is ClassSet.Item -> {
-                    val (item1) = set
-                    when (item1) {
-                        is ClassSetItem.Empty -> {}
-                        is ClassSetItem.Literal -> {}
-                        is ClassSetItem.Range -> {}
-                        is ClassSetItem.Ascii -> {}
-                        is ClassSetItem.Unicode -> {}
-                        is ClassSetItem.Perl -> {}
+                    when (val item = set.value) {
                         is ClassSetItem.Bracketed -> {
-                            val (x2) = item1
-                            stack.add(mem.replace(x2.kind, emptySet()))
+                            val child = item.value.kind
+                            item.value.kind = emptySet()
+                            stack.add(child)
                         }
                         is ClassSetItem.Union -> {
-                            val (x3) = item1
-                            stack.extend(x3.items.drain(0 until 0).map({ ClassSet.Item(it) }))
+                            val children = item.value.mutableItems.map { ClassSet.Item(it) }
+                            item.value.mutableItems.clear()
+                            stack.addAll(children)
                         }
+                        else -> {}
                     }
                 }
                 is ClassSet.BinaryOp -> {
-                    val (op1) = set
-                    stack.add(mem.replace(op1.lhs, emptySet()))
-                    stack.add(mem.replace(op1.rhs, emptySet()))
+                    val lhs = set.value.lhs
+                    val rhs = set.value.rhs
+                    set.value.lhs = emptySet()
+                    set.value.rhs = emptySet()
+                    stack.add(lhs)
+                    stack.add(rhs)
                 }
             }
         }
@@ -974,7 +950,7 @@ public sealed class ClassSetItem {
     /**
      * A single literal.
      */
-    public data class Literal(public var value: Literal) : ClassSetItem()
+    public data class Literal(public var value: AstLiteral) : ClassSetItem()
     /**
      * A range between two literals.
      */
@@ -1196,7 +1172,7 @@ public sealed class GroupKind {
     /**
      * `(?<name> a)` or `(? P<name> a)`
      */
-    public data class CaptureName(public var startsWithP: Boolean, public var name: CaptureName) : GroupKind()
+    public data class CaptureName(public var startsWithP: Boolean, public var name: AstCaptureName) : GroupKind()
     /**
      * `(?: a)` and `(? i: a)`
      */
@@ -1217,7 +1193,7 @@ public sealed class FlagsItemKind {
     /**
      * A single flag in a group.
      */
-    public data class Flag(public var value: Flag) : FlagsItemKind()
+    public data class Flag(public var value: AstFlag) : FlagsItemKind()
 
     public fun rustEquals(other: FlagsItemKind): Boolean = this == other
 

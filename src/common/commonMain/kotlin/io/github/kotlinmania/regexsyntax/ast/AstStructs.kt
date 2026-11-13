@@ -1,6 +1,7 @@
 package io.github.kotlinmania.regexsyntax.ast
 
-import io.github.kotlinmania.regexsyntax.from
+import io.github.kotlinmania.regexsyntax.error.fromFormatterErrorKind
+import io.github.kotlinmania.rustlang.core.cmp.Ordering
 import io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts
 import io.github.kotlinmania.rustlang.core.mem.TypeLayout
 
@@ -13,7 +14,7 @@ import io.github.kotlinmania.rustlang.core.mem.TypeLayout
  * valid Unicode property name. That particular error is reported when
  * translating an AST to the high-level intermediate representation (`HIR`).
  */
-public open class Error(
+public data class Error(
     /**
      * The kind of error.
      */
@@ -27,23 +28,23 @@ public open class Error(
      * The span of this error.
      */
     public var span: Span,
-) : Error {
+) {
     /**
      * Return the type of this error.
      */
-    public open fun kind(): ErrorKind = this.kind
+    public fun kind(): ErrorKind = this.kind
 
     /**
      * The original pattern string in which this error occurred.
      *
      * Every span reported by this error is reported in terms of this string.
      */
-    public open fun pattern(): String = this.pattern
+    public fun pattern(): String = this.pattern
 
     /**
      * Return the span at which this error occurred.
      */
-    public open fun span(): Span = this.span
+    public fun span(): Span = this.span
 
     /**
      * Return an auxiliary span. This span exists only for some errors that
@@ -52,26 +53,19 @@ public open class Error(
      * main error position set to the duplicate occurrence while its
      * auxiliary span will be set to the initial occurrence.
      */
-    public open fun auxiliarySpan(): Span? =
+    public fun auxiliarySpan(): Span? =
         when (val matchVal = this.kind) {
-            is FlagDuplicate -> {
-                val original = matchVal.original
-                original
-            }
-            is FlagRepeatedNegation -> {
-                val original1 = matchVal.original
-                original1
-            }
-            is GroupNameDuplicate -> {
-                val original2 = matchVal.original
-                original2
-            }
+            is ErrorKind.FlagDuplicate -> matchVal.original
+            is ErrorKind.FlagRepeatedNegation -> matchVal.original
+            is ErrorKind.GroupNameDuplicate -> matchVal.original
             else -> null
         }
 
-    public open fun fmt(f: StringBuilder) {
-        from(this).fmt(f)
+    public fun fmt(f: StringBuilder) {
+        fromFormatterErrorKind(this).fmt(f)
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 }
 
 /**
@@ -80,7 +74,7 @@ public open class Error(
  * All span positions are absolute byte offsets that can be used on the
  * original regular expression that was parsed.
  */
-public open class Span(
+public data class Span(
     /**
      * The start byte offset.
      */
@@ -89,37 +83,44 @@ public open class Span(
      * The end byte offset.
      */
     public var end: Position,
-) {
-    public open fun fmt(f: StringBuilder) {
+) : Comparable<Span> {
+    public fun fmt(f: StringBuilder) {
         f.append("Span(${this.start}, ${this.end})")
     }
 
-    public open fun cmp(other: Span): Ordering = Pair(this.start, this.end).cmp(Pair(other.start, other.end))
+    override fun toString(): String = buildString { fmt(this) }
 
-    public open fun partialCmp(other: Span): Ordering? = this.cmp(other)
+    override fun compareTo(other: Span): Int {
+        val startCmp = this.start.compareTo(other.start)
+        return if (startCmp != 0) startCmp else this.end.compareTo(other.end)
+    }
+
+    public fun cmp(other: Span): Ordering = Ordering.fromCompareResult(this.compareTo(other))
+
+    public fun partialCmp(other: Span): Ordering? = this.cmp(other)
 
     /**
      * Create a new span by replacing the starting the position with the one
      * given.
      */
-    public open fun withStart(pos: Position): Span = this.copy(start = pos)
+    public fun withStart(pos: Position): Span = this.copy(start = pos)
 
     /**
      * Create a new span by replacing the ending the position with the one
      * given.
      */
-    public open fun withEnd(pos: Position): Span = this.copy(end = pos)
+    public fun withEnd(pos: Position): Span = this.copy(end = pos)
 
     /**
      * Returns true if and only if this span occurs on a single line.
      */
-    public open fun isOneLine(): Boolean = this.start.line == this.end.line
+    public fun isOneLine(): Boolean = this.start.line == this.end.line
 
     /**
      * Returns true if and only if this span is empty. That is, it points to
      * a single position in the concrete syntax of a regular expression.
      */
-    public open fun isEmpty(): Boolean = this.start.offset == this.end.offset
+    public fun isEmpty(): Boolean = this.start.offset == this.end.offset
 
     public companion object {
         public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<Span> =
@@ -155,7 +156,7 @@ public open class Span(
  * A position encodes one half of a span, and include the byte offset, line
  * number and column number.
  */
-public open class Position(
+public data class Position(
     /**
      * The absolute offset of this position, starting at `0` from the
      * beginning of the regular expression pattern string.
@@ -169,14 +170,18 @@ public open class Position(
      * The approximate column number, starting at `1`.
      */
     public var column: Int,
-) {
-    public open fun fmt(f: StringBuilder) {
+) : Comparable<Position> {
+    public fun fmt(f: StringBuilder) {
         f.append("Position(o: ${this.offset}, l: ${this.line}, c: ${this.column})")
     }
 
-    public open fun cmp(other: Position): Ordering = this.offset.cmp(other.offset)
+    override fun toString(): String = buildString { fmt(this) }
 
-    public open fun partialCmp(other: Position): Ordering? = this.cmp(other)
+    override fun compareTo(other: Position): Int = this.offset.compareTo(other.offset)
+
+    public fun cmp(other: Position): Ordering = Ordering.fromCompareResult(this.compareTo(other))
+
+    public fun partialCmp(other: Position): Ordering? = this.cmp(other)
 
     public companion object {
         public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<Position> =
@@ -218,7 +223,7 @@ public open class Position(
  * comment contains a span of precisely where it occurred in the original
  * regular expression.
  */
-public open class WithComments(
+public data class WithComments(
     /**
      * The actual ast.
      */
@@ -235,7 +240,7 @@ public open class WithComments(
  * A regular expression can only contain comments when the `x` flag is
  * enabled.
  */
-public open class Comment(
+public data class Comment(
     /**
      * The span of this comment, including the beginning `#` and ending `\n`.
      */
@@ -250,7 +255,7 @@ public open class Comment(
 /**
  * An alternation of regular expressions.
  */
-public open class Alternation(
+public class Alternation(
     /**
      * The span of this alternation.
      */
@@ -258,8 +263,32 @@ public open class Alternation(
     /**
      * The alternate regular expressions.
      */
-    public var asts: List<Ast>,
+    asts: List<Ast>,
 ) {
+    internal val mutableAsts: MutableList<Ast> = asts.toMutableList()
+
+    /**
+     * The alternate regular expressions.
+     */
+    public var asts: List<Ast>
+        get() = this.mutableAsts
+        set(value) {
+            this.mutableAsts.clear()
+            this.mutableAsts.addAll(value)
+        }
+
+    public fun copy(
+        span: Span = this.span,
+        asts: List<Ast> = this.asts.toList(),
+    ): Alternation = Alternation(span = span, asts = asts)
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is Alternation && this.span == other.span && this.asts == other.asts)
+
+    override fun hashCode(): Int = 31 * this.span.hashCode() + this.asts.hashCode()
+
+    override fun toString(): String = "Alternation(span=${this.span}, asts=${this.asts})"
+
     /**
      * Return this alternation as an AST.
      *
@@ -267,10 +296,10 @@ public open class Alternation(
      * If this alternation contains exactly 1 AST, then the corresponding AST
      * is returned. Otherwise, `Ast.alternation` is returned.
      */
-    public open fun intoAst(): Ast =
-        when (this.asts.size) {
+    public fun intoAst(): Ast =
+        when (this.mutableAsts.size) {
             0 -> Ast.empty(this.span)
-            1 -> this.asts.removeLastOrNull()!!
+            1 -> this.mutableAsts.removeLast()
             else -> Ast.Alternation(this)
         }
 }
@@ -278,7 +307,7 @@ public open class Alternation(
 /**
  * A concatenation of regular expressions.
  */
-public open class Concat(
+public class Concat(
     /**
      * The span of this concatenation.
      */
@@ -286,8 +315,32 @@ public open class Concat(
     /**
      * The concatenation regular expressions.
      */
-    public var asts: List<Ast>,
+    asts: List<Ast>,
 ) {
+    internal val mutableAsts: MutableList<Ast> = asts.toMutableList()
+
+    /**
+     * The concatenation regular expressions.
+     */
+    public var asts: List<Ast>
+        get() = this.mutableAsts
+        set(value) {
+            this.mutableAsts.clear()
+            this.mutableAsts.addAll(value)
+        }
+
+    public fun copy(
+        span: Span = this.span,
+        asts: List<Ast> = this.asts.toList(),
+    ): Concat = Concat(span = span, asts = asts)
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is Concat && this.span == other.span && this.asts == other.asts)
+
+    override fun hashCode(): Int = 31 * this.span.hashCode() + this.asts.hashCode()
+
+    override fun toString(): String = "Concat(span=${this.span}, asts=${this.asts})"
+
     /**
      * Return this concatenation as an AST.
      *
@@ -295,10 +348,10 @@ public open class Concat(
      * If this alternation contains exactly 1 AST, then the corresponding AST
      * is returned. Otherwise, `Ast.concat` is returned.
      */
-    public open fun intoAst(): Ast =
-        when (this.asts.size) {
+    public fun intoAst(): Ast =
+        when (this.mutableAsts.size) {
             0 -> Ast.empty(this.span)
-            1 -> this.asts.removeLastOrNull()!!
+            1 -> this.mutableAsts.removeLast()
             else -> Ast.Concat(this)
         }
 }
@@ -310,7 +363,7 @@ public open class Concat(
  * represented in their literal form, e.g., `a` or in their escaped form,
  * e.g., `\x61`.
  */
-public open class Literal(
+public data class Literal(
     /**
      * The span of this literal.
      */
@@ -322,28 +375,26 @@ public open class Literal(
     /**
      * The Unicode scalar value corresponding to this literal.
      */
-    public var c: Char,
+    public var c: UInt,
 ) {
     /**
      * If this literal was written as a `\x` hex escape, then this returns
      * the corresponding byte value. Otherwise, this returns `None`.
      */
-    public open fun byte(): UByte? =
-        run {
-            val matchVal = this.kind
-            when {
-                matchVal is LiteralKind.HexFixed && matchVal.value == HexLiteralKind.X -> {
-                    UByte.tryFrom(this.c).ok()
-                }
-                else -> null
-            }
+    public fun byte(): UByte? {
+        val matchVal = this.kind
+        return when {
+            matchVal is LiteralKind.HexFixed && matchVal.value == HexLiteralKind.X && this.c <= 0xFFu ->
+                this.c.toUByte()
+            else -> null
         }
+    }
 }
 
 /**
  * A Perl character class.
  */
-public open class ClassPerl(
+public data class ClassPerl(
     /**
      * The span of this class.
      */
@@ -362,7 +413,7 @@ public open class ClassPerl(
 /**
  * An ASCII character class.
  */
-public open class ClassAscii(
+public data class ClassAscii(
     /**
      * The span of this class.
      */
@@ -381,7 +432,7 @@ public open class ClassAscii(
 /**
  * A Unicode character class.
  */
-public open class ClassUnicode(
+public data class ClassUnicode(
     /**
      * The span of this class.
      */
@@ -409,20 +460,19 @@ public open class ClassUnicode(
      * Note that this takes the Unicode op into account, if it's present.
      * e.g., `isNegated` for `\P{scx!=Katakana}` will return `false`.
      */
-    public open fun isNegated(): Boolean =
-        run {
-            val matchVal = this.kind
-            when {
-                matchVal is ClassUnicodeKind.NamedValue && matchVal.op == ClassUnicodeOpKind.NotEqual -> !this.negated
-                else -> this.negated
-            }
+    public fun isNegated(): Boolean {
+        val matchVal = this.kind
+        return when {
+            matchVal is ClassUnicodeKind.NamedValue && matchVal.op == ClassUnicodeOpKind.NotEqual -> !this.negated
+            else -> this.negated
         }
+    }
 }
 
 /**
  * A bracketed character class, e.g., `[a - z0 - 9]`.
  */
-public open class ClassBracketed(
+public data class ClassBracketed(
     /**
      * The span of this class.
      */
@@ -442,7 +492,7 @@ public open class ClassBracketed(
 /**
  * A single character class range in a set.
  */
-public open class ClassSetRange(
+public data class ClassSetRange(
     /**
      * The span of this range.
      */
@@ -462,13 +512,13 @@ public open class ClassSetRange(
      * The only case where a range is invalid is if its start is greater than
      * its end.
      */
-    public open fun isValid(): Boolean = this.start.c <= this.end.c
+    public fun isValid(): Boolean = this.start.c <= this.end.c
 }
 
 /**
  * A union of items inside a character class set.
  */
-public open class ClassSetUnion(
+public class ClassSetUnion(
     /**
      * The span of the items in this operation. e.g., the `a - z0 - 9` in
      * `[^ a - z0 - 9]`
@@ -477,8 +527,32 @@ public open class ClassSetUnion(
     /**
      * The sequence of items that make up this union.
      */
-    public var items: List<ClassSetItem>,
+    items: List<ClassSetItem>,
 ) {
+    internal val mutableItems: MutableList<ClassSetItem> = items.toMutableList()
+
+    /**
+     * The sequence of items that make up this union.
+     */
+    public var items: List<ClassSetItem>
+        get() = this.mutableItems
+        set(value) {
+            this.mutableItems.clear()
+            this.mutableItems.addAll(value)
+        }
+
+    public fun copy(
+        span: Span = this.span,
+        items: List<ClassSetItem> = this.items.toList(),
+    ): ClassSetUnion = ClassSetUnion(span = span, items = items)
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is ClassSetUnion && this.span == other.span && this.items == other.items)
+
+    override fun hashCode(): Int = 31 * this.span.hashCode() + this.items.hashCode()
+
+    override fun toString(): String = "ClassSetUnion(span=${this.span}, items=${this.items})"
+
     /**
      * Push a new item in this union.
      *
@@ -491,12 +565,12 @@ public open class ClassSetUnion(
      * and you set the spans on each item correctly, then you should never
      * need to adjust the span of the union directly.
      */
-    public open fun push(item: ClassSetItem) {
-        if (this.items.isEmpty()) {
+    public fun push(item: ClassSetItem) {
+        if (this.mutableItems.isEmpty()) {
             this.span.start = item.span().start
         }
         this.span.end = item.span().end
-        this.items.add(item)
+        this.mutableItems.add(item)
     }
 
     /**
@@ -507,10 +581,10 @@ public open class ClassSetUnion(
      * corresponding item is returned. Otherwise, ClassSetItem.Union is
      * returned.
      */
-    public open fun intoItem(): ClassSetItem =
-        when (this.items.size) {
+    public fun intoItem(): ClassSetItem =
+        when (this.mutableItems.size) {
             0 -> ClassSetItem.Empty(this.span)
-            1 -> this.items.removeLastOrNull()!!
+            1 -> this.mutableItems.removeLast()
             else -> ClassSetItem.Union(this)
         }
 }
@@ -518,7 +592,7 @@ public open class ClassSetUnion(
 /**
  * A Unicode character class set operation.
  */
-public open class ClassSetBinaryOp(
+public data class ClassSetBinaryOp(
     /**
      * The span of this operation. e.g., the `a - z - - [h - p]` in `[a - z - - h - p]`.
      */
@@ -540,7 +614,7 @@ public open class ClassSetBinaryOp(
 /**
  * A single zero-width assertion.
  */
-public open class Assertion(
+public data class Assertion(
     /**
      * The span of this assertion.
      */
@@ -554,7 +628,7 @@ public open class Assertion(
 /**
  * A repetition operation applied to a regular expression.
  */
-public open class Repetition(
+public data class Repetition(
     /**
      * The span of this operation.
      */
@@ -576,7 +650,7 @@ public open class Repetition(
 /**
  * The repetition operator itself.
  */
-public open class RepetitionOp(
+public data class RepetitionOp(
     /**
      * The span of this operator. This includes things like `+`, `* ?` and
      * `{ m, n }`.
@@ -596,7 +670,7 @@ public open class RepetitionOp(
  * contains a sub-expression, e.g., `(a)`, `(? P<name> a)`, `(?: a)` and
  * `(? is: a)`.
  */
-public open class Group(
+public data class Group(
     /**
      * The span of this group.
      */
@@ -614,7 +688,7 @@ public open class Group(
      * If this group is non-capturing, then this returns the (possibly empty)
      * set of flags. Otherwise, `None` is returned.
      */
-    public open fun flags(): Flags? =
+    public fun flags(): Flags? =
         when (val matchVal = this.kind) {
             is GroupKind.NonCapturing -> {
                 val (flags) = matchVal
@@ -626,8 +700,8 @@ public open class Group(
     /**
      * Returns true if and only if this group is capturing.
      */
-    public open fun isCapturing(): Boolean =
-        when (val matchVal = this.kind) {
+    public fun isCapturing(): Boolean =
+        when (this.kind) {
             is GroupKind.CaptureIndex -> true
             is GroupKind.CaptureName -> true
             is GroupKind.NonCapturing -> false
@@ -638,7 +712,7 @@ public open class Group(
      *
      * This returns a capture index precisely when `isCapturing` is `true`.
      */
-    public open fun captureIndex(): UInt? =
+    public fun captureIndex(): UInt? =
         when (val matchVal = this.kind) {
             is GroupKind.CaptureIndex -> {
                 val (i) = matchVal
@@ -658,7 +732,7 @@ public open class Group(
  * This corresponds to the name itself between the angle brackets in, e.g.,
  * `(? P<foo> expr)`.
  */
-public open class CaptureName(
+public data class CaptureName(
     /**
      * The span of this capture name.
      */
@@ -676,7 +750,7 @@ public open class CaptureName(
 /**
  * A group of flags that is not applied to a particular regular expression.
  */
-public open class SetFlags(
+public data class SetFlags(
     /**
      * The span of these flags, including the grouping parentheses.
      */
@@ -692,7 +766,7 @@ public open class SetFlags(
  *
  * This corresponds only to the sequence of flags themselves, e.g., `is - u`.
  */
-public open class Flags(
+public class Flags(
     /**
      * The span of this group of flags.
      */
@@ -701,8 +775,33 @@ public open class Flags(
      * A sequence of flag items. Each item is either a flag or a negation
      * operator.
      */
-    public var items: List<FlagsItem>,
+    items: List<FlagsItem>,
 ) {
+    internal val mutableItems: MutableList<FlagsItem> = items.toMutableList()
+
+    /**
+     * A sequence of flag items. Each item is either a flag or a negation
+     * operator.
+     */
+    public var items: List<FlagsItem>
+        get() = this.mutableItems
+        set(value) {
+            this.mutableItems.clear()
+            this.mutableItems.addAll(value)
+        }
+
+    public fun copy(
+        span: Span = this.span,
+        items: List<FlagsItem> = this.items.toList(),
+    ): Flags = Flags(span = span, items = items)
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is Flags && this.span == other.span && this.items == other.items)
+
+    override fun hashCode(): Int = 31 * this.span.hashCode() + this.items.hashCode()
+
+    override fun toString(): String = "Flags(span=${this.span}, items=${this.items})"
+
     /**
      * Add the given item to this sequence of flags.
      *
@@ -710,13 +809,13 @@ public open class Flags(
      * given item is a duplicate, then `Some(i)` is returned, where
      * `items[i].kind == item.kind`.
      */
-    public open fun addItem(item: FlagsItem): Int? {
-        for ((i, x) in this.items.enumerate()) {
+    public fun addItem(item: FlagsItem): Int? {
+        for ((i, x) in this.mutableItems.withIndex()) {
             if (x.kind == item.kind) {
                 return i
             }
         }
-        this.items.add(item)
+        this.mutableItems.add(item)
         return null
     }
 
@@ -731,21 +830,18 @@ public open class Flags(
      *
      * Otherwise, `None` is returned.
      */
-    public open fun flagState(flag: Flag): Boolean? {
+    public fun flagState(flag: Flag): Boolean? {
         var negated = false
-        for (x in this.items) {
-            run {
-                val matchVal = x.kind
-                when {
-                    matchVal == FlagsItemKind.Negation -> {
-                        negated = true
-                    }
-                    matchVal is FlagsItemKind.Flag && (matchVal as FlagsItemKind.Flag).value == flag -> {
-                        val (xflag) = matchVal
-                        return !negated
-                    }
-                    else -> {}
+        for (x in this.mutableItems) {
+            val matchVal = x.kind
+            when {
+                matchVal == FlagsItemKind.Negation -> {
+                    negated = true
                 }
+                matchVal is FlagsItemKind.Flag && matchVal.value == flag -> {
+                    return !negated
+                }
+                else -> {}
             }
         }
         return null
@@ -755,7 +851,7 @@ public open class Flags(
 /**
  * A single item in a group of flags.
  */
-public open class FlagsItem(
+public data class FlagsItem(
     /**
      * The span of this item.
      */

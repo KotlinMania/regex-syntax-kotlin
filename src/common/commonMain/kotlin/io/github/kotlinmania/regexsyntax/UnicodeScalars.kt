@@ -2,7 +2,11 @@
 
 package io.github.kotlinmania.regexsyntax
 
+import io.github.kotlinmania.regexsyntax.unicodetables.generalcategory.NUMBER
+import io.github.kotlinmania.regexsyntax.unicodetables.propertybool.ALPHABETIC
 import io.github.kotlinmania.regexsyntax.unicodetables.propertybool.WHITE_SPACE
+import io.github.kotlinmania.rustlang.core.cell.RefCell
+import io.github.kotlinmania.rustlang.core.cell.RefMut
 
 internal const val UNICODE_MAX: UInt = 0x10FFFFu
 
@@ -135,6 +139,79 @@ internal fun formatHexLower(v: UInt): String =
 
 internal fun formatHexUpper(v: UInt): String =
     v.toString(16).uppercase()
+
+internal fun formatHexUpperPadded(v: UInt, width: Int): String =
+    v.toString(16).uppercase().padStart(width, '0')
+
+internal fun formatOctal(v: UInt): String =
+    v.toString(8)
+
+internal fun scalarIsAlphabetic(cp: UInt): Boolean =
+    binarySearchRanges(ALPHABETIC, cp)
+
+internal fun scalarIsNumeric(cp: UInt): Boolean =
+    binarySearchRanges(NUMBER, cp)
+
+internal fun scalarIsAlphanumeric(cp: UInt): Boolean =
+    scalarIsAlphabetic(cp) || scalarIsNumeric(cp)
+
+internal fun scalarIsAsciiDigit(cp: UInt): Boolean =
+    cp in 0x30u..0x39u
+
+internal fun scalarIsAsciiHexDigit(cp: UInt): Boolean =
+    cp in 0x30u..0x39u || cp in 0x41u..0x46u || cp in 0x61u..0x66u
+
+internal fun decodeUtf8ScalarAt(bytes: ByteArray, index: Int): UInt {
+    val b0 = bytes[index].toInt() and 0xFF
+    return when {
+        b0 < 0x80 -> b0.toUInt()
+        (b0 and 0xE0) == 0xC0 -> {
+            val b1 = bytes[index + 1].toInt() and 0x3F
+            (((b0 and 0x1F) shl 6) or b1).toUInt()
+        }
+        (b0 and 0xF0) == 0xE0 -> {
+            val b1 = bytes[index + 1].toInt() and 0x3F
+            val b2 = bytes[index + 2].toInt() and 0x3F
+            (((b0 and 0x0F) shl 12) or (b1 shl 6) or b2).toUInt()
+        }
+        else -> {
+            val b1 = bytes[index + 1].toInt() and 0x3F
+            val b2 = bytes[index + 2].toInt() and 0x3F
+            val b3 = bytes[index + 3].toInt() and 0x3F
+            (((b0 and 0x07) shl 18) or (b1 shl 12) or (b2 shl 6) or b3).toUInt()
+        }
+    }
+}
+
+internal fun utf8ByteStartsWith(bytes: ByteArray, offset: Int, prefix: String): Boolean {
+    val prefixBytes = prefix.encodeToByteArray()
+    if (offset < 0 || offset + prefixBytes.size > bytes.size) return false
+    for (i in prefixBytes.indices) {
+        if (bytes[offset + i] != prefixBytes[i]) return false
+    }
+    return true
+}
+
+internal fun parseUIntRadix(s: String, radix: Int): UInt? =
+    s.toUIntOrNull(radix)
+
+internal inline fun <T, R> RefCell<T>.withBorrow(block: (T) -> R): R {
+    val guard = this.borrow()
+    return try {
+        block(guard.value)
+    } finally {
+        guard.release()
+    }
+}
+
+internal inline fun <T, R> RefCell<T>.withBorrowMut(block: (RefMut<T>) -> R): R {
+    val guard = this.borrowMut()
+    return try {
+        block(guard)
+    } finally {
+        guard.release()
+    }
+}
 
 internal fun asciiEscapeDefault(byte: UByte): List<UByte> {
     val b = byte.toInt() and 0xFF

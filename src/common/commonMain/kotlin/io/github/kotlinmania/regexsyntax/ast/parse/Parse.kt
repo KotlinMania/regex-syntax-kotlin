@@ -1,8 +1,8 @@
 // port-lint: source ast/parse.rs
 package io.github.kotlinmania.regexsyntax.ast.parse
 
-import io.github.kotlinmania.regexsyntax.ast.Alternation
-import io.github.kotlinmania.regexsyntax.ast.Assertion
+import io.github.kotlinmania.regexsyntax.ast.Alternation as AstAlternation
+import io.github.kotlinmania.regexsyntax.ast.Assertion as AstAssertion
 import io.github.kotlinmania.regexsyntax.ast.AssertionKind
 import io.github.kotlinmania.regexsyntax.ast.Ast
 import io.github.kotlinmania.regexsyntax.ast.CaptureName
@@ -28,10 +28,10 @@ import io.github.kotlinmania.regexsyntax.ast.Flag
 import io.github.kotlinmania.regexsyntax.ast.Flags
 import io.github.kotlinmania.regexsyntax.ast.FlagsItem
 import io.github.kotlinmania.regexsyntax.ast.FlagsItemKind
-import io.github.kotlinmania.regexsyntax.ast.Group
+import io.github.kotlinmania.regexsyntax.ast.Group as AstGroup
 import io.github.kotlinmania.regexsyntax.ast.GroupKind
 import io.github.kotlinmania.regexsyntax.ast.HexLiteralKind
-import io.github.kotlinmania.regexsyntax.ast.Literal
+import io.github.kotlinmania.regexsyntax.ast.Literal as AstLiteral
 import io.github.kotlinmania.regexsyntax.ast.LiteralKind
 import io.github.kotlinmania.regexsyntax.ast.Position
 import io.github.kotlinmania.regexsyntax.ast.Repetition
@@ -41,23 +41,37 @@ import io.github.kotlinmania.regexsyntax.ast.RepetitionRange
 import io.github.kotlinmania.regexsyntax.ast.SetFlags
 import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.ast.SpecialLiteralKind
-import io.github.kotlinmania.regexsyntax.ast.Visitor
 import io.github.kotlinmania.regexsyntax.ast.WithComments
-import io.github.kotlinmania.regexsyntax.ast.visit
+import io.github.kotlinmania.regexsyntax.ast.visitor.Visitor
+import io.github.kotlinmania.regexsyntax.ast.visitor.visit
+import io.github.kotlinmania.regexsyntax.appendScalar
+import io.github.kotlinmania.regexsyntax.decodeUtf8ScalarAt
 import io.github.kotlinmania.regexsyntax.either.Either
 import io.github.kotlinmania.regexsyntax.isEscapeableCharacter
 import io.github.kotlinmania.regexsyntax.isMetaCharacter
-import io.github.kotlinmania.regexsyntax.unicodetables.graphemeclusterbreak.T
+import io.github.kotlinmania.regexsyntax.parseUIntRadix
+import io.github.kotlinmania.regexsyntax.scalarFromU32
+import io.github.kotlinmania.regexsyntax.scalarIsAlphabetic
+import io.github.kotlinmania.regexsyntax.scalarIsAlphanumeric
+import io.github.kotlinmania.regexsyntax.scalarIsAsciiDigit
+import io.github.kotlinmania.regexsyntax.scalarIsAsciiHexDigit
+import io.github.kotlinmania.regexsyntax.scalarIsWhitespace
+import io.github.kotlinmania.regexsyntax.scalarLenUtf8
+import io.github.kotlinmania.regexsyntax.unicodeScalars
+import io.github.kotlinmania.regexsyntax.utf8ByteStartsWith
+import io.github.kotlinmania.regexsyntax.withBorrow
+import io.github.kotlinmania.regexsyntax.withBorrowMut
+import io.github.kotlinmania.rustlang.core.cell.Cell
+import io.github.kotlinmania.rustlang.core.cell.RefCell
 import io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts
 import io.github.kotlinmania.rustlang.core.mem.TypeLayout
+import io.github.kotlinmania.rustlang.core.result.Result
 
 // This module provides a regular expression parser.
 
-public typealias Output = Unit
+internal typealias ParseResult<T> = Result<T, Error>
 
-public typealias Err = Error
-
-public typealias Result<T> = kotlin.Result<T>
+private inline fun ch(c: Char): UInt = c.code.toUInt()
 
 /**
  * A primitive is an expression with no sub-expressions. This includes
@@ -67,67 +81,37 @@ public typealias Result<T> = kotlin.Result<T>
  * This does not include ASCII character classes, since they can only appear
  * within a set character class.
  */
-public sealed class Primitive {
-    public data class Literal(public var value: Literal) : Primitive()
-    public data class Assertion(public var value: Assertion) : Primitive()
-    public data class Dot(public var value: Span) : Primitive()
-    public data class Perl(public var value: ClassPerl) : Primitive()
-    public data class Unicode(public var value: ClassUnicode) : Primitive()
+internal sealed class Primitive {
+    internal data class Literal(internal var value: AstLiteral) : Primitive()
+    internal data class Assertion(internal var value: AstAssertion) : Primitive()
+    internal data class Dot(internal var value: Span) : Primitive()
+    internal data class Perl(internal var value: ClassPerl) : Primitive()
+    internal data class Unicode(internal var value: ClassUnicode) : Primitive()
 
-    public fun rustEquals(other: Primitive): Boolean = this == other
+    internal fun rustEquals(other: Primitive): Boolean = this == other
 
     /**
      * Return the span of this primitive.
      */
-    public open fun span(): Span =
+    internal fun span(): Span =
         when (this) {
-            is Primitive.Literal -> {
-                val (x) = this
-                x.span
-            }
-            is Primitive.Assertion -> {
-                val (x1) = this
-                x1.span
-            }
-            is Primitive.Dot -> {
-                val (span) = this
-                span
-            }
-            is Primitive.Perl -> {
-                val (x2) = this
-                x2.span
-            }
-            is Primitive.Unicode -> {
-                val (x3) = this
-                x3.span
-            }
+            is Primitive.Literal -> this.value.span
+            is Primitive.Assertion -> this.value.span
+            is Primitive.Dot -> this.value
+            is Primitive.Perl -> this.value.span
+            is Primitive.Unicode -> this.value.span
         }
 
     /**
      * Convert this primitive into a proper AST.
      */
-    public open fun intoAst(): Ast =
+    internal fun intoAst(): Ast =
         when (this) {
-            is Primitive.Literal -> {
-                val (lit) = this
-                Ast.literal(lit)
-            }
-            is Primitive.Assertion -> {
-                val (assert) = this
-                Ast.assertion(assert)
-            }
-            is Primitive.Dot -> {
-                val (span) = this
-                Ast.dot(span)
-            }
-            is Primitive.Perl -> {
-                val (cls) = this
-                Ast.classPerl(cls)
-            }
-            is Primitive.Unicode -> {
-                val (cls1) = this
-                Ast.classUnicode(cls1)
-            }
+            is Primitive.Literal -> Ast.literal(this.value)
+            is Primitive.Assertion -> Ast.assertion(this.value)
+            is Primitive.Dot -> Ast.dot(this.value)
+            is Primitive.Perl -> Ast.classPerl(this.value)
+            is Primitive.Unicode -> Ast.classUnicode(this.value)
         }
 
     /**
@@ -136,24 +120,12 @@ public sealed class Primitive {
      * If this primitive is not a legal item (i.e., an assertion or a dot),
      * then return an error.
      */
-    public open fun <P : Borrow<Parser>> intoClassSetItem(p: ParserI<P>): Result<ClassSetItem> =
+    internal fun intoClassSetItem(p: ParserI): ParseResult<ClassSetItem> =
         when (this) {
-            is Literal -> {
-                val (lit) = this
-                Result.success(ClassSetItem.Literal(lit))
-            }
-            is Perl -> {
-                val (cls) = this
-                Result.success(ClassSetItem.Perl(cls))
-            }
-            is Unicode -> {
-                val (cls1) = this
-                Result.success(ClassSetItem.Unicode(cls1))
-            }
-            else -> {
-                val x = this
-                Err(p.error(x.span(), ErrorKind.ClassEscapeInvalid))
-            }
+            is Primitive.Literal -> Result.Ok(ClassSetItem.Literal(this.value))
+            is Primitive.Perl -> Result.Ok(ClassSetItem.Perl(this.value))
+            is Primitive.Unicode -> Result.Ok(ClassSetItem.Unicode(this.value))
+            else -> Result.Err(p.error(this.span(), ErrorKind.ClassEscapeInvalid))
         }
 
     /**
@@ -164,23 +136,17 @@ public sealed class Primitive {
      * If this primitive is not a legal item (i.e., a class, assertion or a
      * dot), then return an error.
      */
-    public open fun <P : Borrow<Parser>> intoClassLiteral(p: ParserI<P>): Result<Literal> =
+    internal fun intoClassLiteral(p: ParserI): ParseResult<AstLiteral> =
         when (this) {
-            is Literal -> {
-                val (lit) = this
-                Result.success(lit)
-            }
-            else -> {
-                val x = this
-                Err(p.error(x.span(), ErrorKind.ClassRangeLiteral))
-            }
+            is Primitive.Literal -> Result.Ok(this.value)
+            else -> Result.Err(p.error(this.span(), ErrorKind.ClassRangeLiteral))
         }
 }
 
 /**
  * Returns true if the given character is a hexadecimal digit.
  */
-public fun isHex(c: Char): Boolean = ('0' <= c && c <= '9') || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F')
+internal fun isHex(c: UInt): Boolean = scalarIsAsciiHexDigit(c)
 
 /**
  * Returns true if the given character is a valid in a capture group name.
@@ -188,11 +154,11 @@ public fun isHex(c: Char): Boolean = ('0' <= c && c <= '9') || ('a' <= c && c <=
  * If `first` is true, then `c` is treated as the first character in the
  * group name (which must be alphabetic or underscore).
  */
-public fun isCaptureChar(c: Char, first: Boolean): Boolean =
+internal fun isCaptureChar(c: UInt, first: Boolean): Boolean =
     if (first) {
-        c == '_' || c.isAlphabetic()
+        c == ch('_') || scalarIsAlphabetic(c)
     } else {
-        c == '_' || c == '.' || c == '[' || c == ']' || c.isAlphanumeric()
+        c == ch('_') || c == ch('.') || c == ch('[') || c == ch(']') || scalarIsAlphanumeric(c)
     }
 
 /**
@@ -200,16 +166,29 @@ public fun isCaptureChar(c: Char, first: Boolean): Boolean =
  *
  * This builder permits modifying configuration options for the parser.
  */
-public open class ParserBuilder(
-    public var ignoreWhitespace: Boolean,
-    public var nestLimit: UInt,
-    public var octal: Boolean,
-    public var emptyMinRange: Boolean,
+public class ParserBuilder internal constructor(
+    internal var ignoreWhitespace: Boolean,
+    internal var nestLimit: UInt,
+    internal var octal: Boolean,
+    internal var emptyMinRange: Boolean,
 ) {
     /**
      * Build a parser from this configuration with the given pattern.
      */
-    public open fun build(): Parser = Parser(pos = Cell.new(Position(offset = 0, line = 1, column = 1)), captureIndex = Cell.new(0), nestLimit = this.nestLimit, octal = this.octal, emptyMinRange = this.emptyMinRange, initialIgnoreWhitespace = this.ignoreWhitespace, ignoreWhitespace = Cell.new(this.ignoreWhitespace), comments = RefCell.new(mutableListOf()), stackGroup = RefCell.new(mutableListOf()), stackClass = RefCell.new(mutableListOf()), captureNames = RefCell.new(mutableListOf()), scratch = RefCell.new(String.new()))
+    public fun build(): Parser = Parser(
+        posCtorArg = Cell.new(Position(offset = 0, line = 1, column = 1)),
+        captureIndexCtorArg = Cell.new(0u),
+        nestLimit = this.nestLimit,
+        octal = this.octal,
+        emptyMinRange = this.emptyMinRange,
+        initialIgnoreWhitespace = this.ignoreWhitespace,
+        ignoreWhitespaceCtorArg = Cell.new(this.ignoreWhitespace),
+        commentsCtorArg = RefCell.new(mutableListOf()),
+        stackGroupCtorArg = RefCell.new(mutableListOf()),
+        stackClassCtorArg = RefCell.new(mutableListOf()),
+        captureNamesCtorArg = RefCell.new(mutableListOf()),
+        scratchCtorArg = RefCell.new(StringBuilder()),
+    )
 
     /**
      * Set the nesting limit for this parser.
@@ -238,7 +217,7 @@ public open class ParserBuilder(
      * in an obvious way in the concrete syntax, therefore, it should not be
      * used in a granular way.
      */
-    public open fun nestLimit(limit: UInt): ParserBuilder {
+    public fun nestLimit(limit: UInt): ParserBuilder {
         this.nestLimit = limit
         return this
     }
@@ -260,7 +239,7 @@ public open class ParserBuilder(
      *
      * Octal syntax is disabled by default.
      */
-    public open fun octal(yes: Boolean): ParserBuilder {
+    public fun octal(yes: Boolean): ParserBuilder {
         this.octal = yes
         return this
     }
@@ -275,7 +254,7 @@ public open class ParserBuilder(
      * By default, this is disabled. It may be selectively enabled in the
      * regular expression by using the `x` flag regardless of this setting.
      */
-    public open fun ignoreWhitespace(yes: Boolean): ParserBuilder {
+    public fun ignoreWhitespace(yes: Boolean): ParserBuilder {
         this.ignoreWhitespace = yes
         return this
     }
@@ -289,7 +268,7 @@ public open class ParserBuilder(
      *
      * This is disabled by default.
      */
-    public open fun emptyMinRange(yes: Boolean): ParserBuilder {
+    public fun emptyMinRange(yes: Boolean): ParserBuilder {
         this.emptyMinRange = yes
         return this
     }
@@ -332,99 +311,92 @@ public open class ParserBuilder(
  *
  * A `Parser` can be configured in more detail via a [ParserBuilder].
  */
-public open class Parser internal constructor(
+public class Parser internal constructor(
     posCtorArg: Cell<Position>,
     captureIndexCtorArg: Cell<UInt>,
     /**
      * The maximum number of open parens/brackets allowed. If the parser
      * exceeds this number, then an error is returned.
      */
-    public var nestLimit: UInt,
+    internal var nestLimit: UInt,
     /**
      * Whether to support octal syntax or not. When `false`, the parser will
      * return an error helpfully pointing out that backreferences are not
      * supported.
      */
-    public var octal: Boolean,
+    internal var octal: Boolean,
     /**
      * The initial setting for `ignoreWhitespace` as provided by
      * `ParserBuilder`. It is used when resetting the parser's state.
      */
-    public var initialIgnoreWhitespace: Boolean,
+    internal var initialIgnoreWhitespace: Boolean,
     /**
      * Whether the parser supports `{ , n }` repetitions as an equivalent to
      * `{ 0, n }.`
      */
-    public var emptyMinRange: Boolean,
+    internal var emptyMinRange: Boolean,
     ignoreWhitespaceCtorArg: Cell<Boolean>,
-    commentsCtorArg: RefCell<List<Comment>>,
-    stackGroupCtorArg: RefCell<List<GroupState>>,
-    stackClassCtorArg: RefCell<List<ClassState>>,
-    captureNamesCtorArg: RefCell<List<CaptureName>>,
-    scratchCtorArg: RefCell<String>,
+    commentsCtorArg: RefCell<MutableList<Comment>>,
+    stackGroupCtorArg: RefCell<MutableList<GroupState>>,
+    stackClassCtorArg: RefCell<MutableList<ClassState>>,
+    captureNamesCtorArg: RefCell<MutableList<CaptureName>>,
+    scratchCtorArg: RefCell<StringBuilder>,
 ) {
     /**
      * The current position of the parser.
      */
-    public var pos: Cell<Position> = posCtorArg
-        internal set
+    internal var pos: Cell<Position> = posCtorArg
 
     /**
      * The current capture index.
      */
-    public var captureIndex: Cell<UInt> = captureIndexCtorArg
-        internal set
+    internal var captureIndex: Cell<UInt> = captureIndexCtorArg
 
     /**
      * Whether whitespace should be ignored. When enabled, comments are
      * also permitted.
      */
-    public var ignoreWhitespace: Cell<Boolean> = ignoreWhitespaceCtorArg
-        internal set
+    internal var ignoreWhitespace: Cell<Boolean> = ignoreWhitespaceCtorArg
 
     /**
      * A list of comments, in order of appearance.
      */
-    public var comments: RefCell<List<Comment>> = commentsCtorArg
-        internal set
+    internal var comments: RefCell<MutableList<Comment>> = commentsCtorArg
 
     /**
      * A stack of grouped sub-expressions, including alternations.
      */
-    public var stackGroup: RefCell<List<GroupState>> = stackGroupCtorArg
-        internal set
+    internal var stackGroup: RefCell<MutableList<GroupState>> = stackGroupCtorArg
 
     /**
      * A stack of nested character classes. This is only non-empty when
      * parsing a class.
      */
-    public var stackClass: RefCell<List<ClassState>> = stackClassCtorArg
-        internal set
+    internal var stackClass: RefCell<MutableList<ClassState>> = stackClassCtorArg
 
     /**
      * A sorted sequence of capture names. This is used to detect duplicate
      * capture names and report an error if one is detected.
      */
-    public var captureNames: RefCell<List<CaptureName>> = captureNamesCtorArg
-        internal set
+    internal var captureNames: RefCell<MutableList<CaptureName>> = captureNamesCtorArg
 
     /**
      * A scratch buffer used in various places. Mostly this is used to
      * accumulate relevant characters from parts of a pattern.
      */
-    public var scratch: RefCell<String> = scratchCtorArg
-        internal set
+    internal var scratch: RefCell<StringBuilder> = scratchCtorArg
 
     /**
      * Parse the regular expression into an abstract syntax tree.
      */
-    public open fun parse(pattern: String): Result<Ast> = ParserI.new(this, pattern).parse()
+    public fun parse(pattern: String): Result<Ast, Error> = ParserI.new(this, pattern).parse()
 
     /**
      * Parse the regular expression and return an abstract syntax tree with
      * all of the comments found in the pattern.
      */
-    public open fun parseWithComments(pattern: String): Result<WithComments> = ParserI.new(this, pattern).parseWithComments()
+    public fun parseWithComments(pattern: String): Result<WithComments, Error> =
+        ParserI.new(this, pattern).parseWithComments()
 
     /**
      * Reset the internal state of a parser.
@@ -433,45 +405,17 @@ public open class Parser internal constructor(
      * parser from running with inconsistent state (say, if a previous
      * invocation returned an error and the parser is reused).
      */
-    public open fun reset() {
+    internal fun reset() {
         // These settings should be in line with the construction
         // in `ParserBuilder.build`.
         this.pos.set(Position(offset = 0, line = 1, column = 1))
         this.ignoreWhitespace.set(this.initialIgnoreWhitespace)
-        this.comments.borrowMut().clear()
-        this.stackGroup.borrowMut().clear()
-        this.stackClass.borrowMut().clear()
+        this.comments.withBorrowMut { it.value.clear() }
+        this.stackGroup.withBorrowMut { it.value.clear() }
+        this.stackClass.withBorrowMut { it.value.clear() }
     }
 
     public companion object {
-        public operator fun invoke(
-            pos: Cell<Position>,
-            captureIndex: Cell<UInt>,
-            nestLimit: UInt,
-            octal: Boolean,
-            initialIgnoreWhitespace: Boolean,
-            emptyMinRange: Boolean,
-            ignoreWhitespace: Cell<Boolean>,
-            comments: RefCell<List<Comment>>,
-            stackGroup: RefCell<List<GroupState>>,
-            stackClass: RefCell<List<ClassState>>,
-            captureNames: RefCell<List<CaptureName>>,
-            scratch: RefCell<String>,
-        ): Parser = Parser(
-            posCtorArg = pos,
-            captureIndexCtorArg = captureIndex,
-            nestLimit = nestLimit,
-            octal = octal,
-            initialIgnoreWhitespace = initialIgnoreWhitespace,
-            emptyMinRange = emptyMinRange,
-            ignoreWhitespaceCtorArg = ignoreWhitespace,
-            commentsCtorArg = comments,
-            stackGroupCtorArg = stackGroup,
-            stackClassCtorArg = stackClass,
-            captureNamesCtorArg = captureNames,
-            scratchCtorArg = scratch,
-        )
-
         /**
          * Create a new parser with a default configuration.
          *
@@ -490,35 +434,34 @@ public open class Parser internal constructor(
  * We use this separate type so that we can carry the provided pattern string
  * along with us. In particular, a `Parser` internal state is not tied to any
  * one pattern, but `ParserI` is.
- *
- * This type also lets us use `ParserI<Parser>` in production code while
- * retaining the convenience of `ParserI<Parser>` for tests, which sometimes
- * work against the internal interface of the parser.
  */
-public open class ParserI<P>(
+internal class ParserI(
     /**
      * The parser state/configuration.
      */
-    public var parser: P,
+    internal var parserRef: Parser,
     /**
      * The full regular expression provided by the user.
      */
-    public var pattern: String,
+    internal var patternStr: String,
 ) {
+    internal val utf8Bytes: ByteArray = this.patternStr.encodeToByteArray()
+
     /**
      * Return a reference to the parser state.
      */
-    public open fun parser(): Parser = this.parser.borrow()
+    internal fun parser(): Parser = this.parserRef
 
     /**
      * Return a reference to the pattern being parsed.
      */
-    public open fun pattern(): String = this.pattern
+    internal fun pattern(): String = this.patternStr
 
     /**
      * Create a new error with the given span and error type.
      */
-    public open fun error(span: Span, kind: ErrorKind): Error = Error(kind = kind, pattern = this.pattern().toString(), span = span)
+    internal fun error(span: Span, kind: ErrorKind): Error =
+        Error(kind = kind, pattern = this.pattern(), span = span)
 
     /**
      * Return the current offset of the parser.
@@ -526,21 +469,21 @@ public open class ParserI<P>(
      * The offset starts at `0` from the beginning of the regular expression
      * pattern string.
      */
-    public open fun offset(): Int = this.parser().pos.get().offset
+    internal fun offset(): Int = this.parser().pos.get().offset
 
     /**
      * Return the current line number of the parser.
      *
      * The line number starts at `1`.
      */
-    public open fun line(): Int = this.parser().pos.get().line
+    internal fun line(): Int = this.parser().pos.get().line
 
     /**
      * Return the current column of the parser.
      *
      * The column number starts at `1` and is reset whenever a `\n` is seen.
      */
-    public open fun column(): Int = this.parser().pos.get().column
+    internal fun column(): Int = this.parser().pos.get().column
 
     /**
      * Return the next capturing index. Each subsequent call increments the
@@ -551,76 +494,79 @@ public open class ParserI<P>(
      *
      * If the capture limit is exceeded, then an error is returned.
      */
-    public open fun nextCaptureIndex(span: Span): Result<UInt> {
+    internal fun nextCaptureIndex(span: Span): ParseResult<UInt> {
         val current = this.parser().captureIndex.get()
-        val i =
-            ((current).toLong() + (1).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt().okOrElse({
-                this.error(span, ErrorKind.CaptureLimitExceeded)
-            }).getOrElse { return Result.failure(it) }
+        if (current == UInt.MAX_VALUE) {
+            return Result.Err(this.error(span, ErrorKind.CaptureLimitExceeded))
+        }
+        val i = current + 1u
         this.parser().captureIndex.set(i)
-        return Result.success(i)
+        return Result.Ok(i)
     }
 
     /**
      * Adds the given capture name to this parser. If this capture name has
      * already been used, then an error is returned.
      */
-    public open fun addCaptureName(cap: CaptureName): Result<Unit> {
-        val names = this.parser().captureNames.borrowMut()
-        return when (val matchVal = names.binarySearchByKey(cap.name.asStr(), { c -> c.name.asStr() })) {
-            is Err -> {
-                val (i) = matchVal
-                names.insert(i, cap.clone())
-                Result.success(Unit)
-            }
-            is Ok -> {
-                val (i1) = matchVal
-                Err(this.error(cap.span, ErrorKind.GroupNameDuplicate(original = names[i1].span)))
+    internal fun addCaptureName(cap: CaptureName): ParseResult<Unit> =
+        this.parser().captureNames.withBorrowMut { guard ->
+            val names = guard.value
+            val idx = names.binarySearch { it.name.compareTo(cap.name) }
+            if (idx < 0) {
+                val ins = -idx - 1
+                names.add(ins, cap.copy())
+                Result.Ok(Unit)
+            } else {
+                Result.Err(this.error(cap.span, ErrorKind.GroupNameDuplicate(original = names[idx].span)))
             }
         }
-    }
 
     /**
      * Return whether the parser should ignore whitespace or not.
      */
-    public open fun ignoreWhitespace(): Boolean = this.parser().ignoreWhitespace.get()
+    internal fun ignoreWhitespace(): Boolean = this.parser().ignoreWhitespace.get()
 
     /**
      * Return the character at the current position of the parser.
      *
      * This panics if the current position does not point to a valid char.
      */
-    public open fun char(): Char = this.charAt(this.offset())
+    internal fun char(): UInt = this.charAt(this.offset())
 
     /**
      * Return the character at the given position.
      *
      * This panics if the given position does not point to a valid char.
      */
-    public open fun charAt(i: Int): Char = (this.pattern()[i until this.pattern().size].chars().next() ?: error("expected char at offset $i"))
+    internal fun charAt(i: Int): UInt {
+        if (i < 0 || i >= this.utf8Bytes.size) {
+            error("expected char at offset $i")
+        }
+        return decodeUtf8ScalarAt(this.utf8Bytes, i)
+    }
 
     /**
      * Bump the parser to the next Unicode scalar value.
      *
      * If the end of the input has been reached, then `false` is returned.
      */
-    public open fun bump(): Boolean {
+    internal fun bump(): Boolean {
         if (this.isEof()) {
             return false
         }
         val structVal = this.pos()
-        var offset = structVal.offset
         var line = structVal.line
         var column = structVal.column
-        if (this.char() == '\n') {
-            line = (((line).toLong() + (1).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt())!!
+        val current = this.char()
+        if (current == ch('\n')) {
+            line += 1
             column = 1
         } else {
-            column = (((column).toLong() + (1).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt())!!
+            column += 1
         }
-        offset += this.char().lenUtf8()
+        val offset = structVal.offset + scalarLenUtf8(current)
         this.parser().pos.set(Position(offset = offset, line = line, column = column))
-        return this.pattern()[this.offset() until this.pattern().size].chars().next() != null
+        return offset < this.utf8Bytes.size
     }
 
     /**
@@ -629,9 +575,9 @@ public open class ParserI<P>(
      * following the prefix and return true. Otherwise, don't bump the parser
      * and return false.
      */
-    public open fun bumpIf(prefix: String): Boolean =
-        if (this.pattern()[this.offset() until this.pattern().size].startsWith(prefix)) {
-            for (unused in 0 until prefix.chars().count()) {
+    internal fun bumpIf(prefix: String): Boolean =
+        if (utf8ByteStartsWith(this.utf8Bytes, this.offset(), prefix)) {
+            for (unused in prefix.unicodeScalars()) {
                 this.bump()
             }
             true
@@ -648,14 +594,15 @@ public open class ParserI<P>(
      * This should only be called immediately after parsing the opening of
      * a group or a set of flags.
      */
-    public open fun isLookaroundPrefix(): Boolean = this.bumpIf("?=") || this.bumpIf("?!") || this.bumpIf("?<=") || this.bumpIf("?<!")
+    internal fun isLookaroundPrefix(): Boolean =
+        this.bumpIf("?=") || this.bumpIf("?!") || this.bumpIf("?<=") || this.bumpIf("?<!")
 
     /**
      * Bump the parser, and if the `x` flag is enabled, bump through any
      * subsequent spaces. Return true if and only if the parser is not at
      * EOF.
      */
-    public open fun bumpAndBumpSpace(): Boolean {
+    internal fun bumpAndBumpSpace(): Boolean {
         if (!this.bump()) {
             return false
         }
@@ -674,27 +621,28 @@ public open class ParserI<P>(
      * arbitrary whitespace is permitted when the `x` flag is enabled. For
      * example, `{ 5, 6 }` is equivalent to `{ 5, 6 }`.
      */
-    public open fun bumpSpace() {
+    internal fun bumpSpace() {
         if (!this.ignoreWhitespace()) {
             return
         }
         while (!this.isEof()) {
-            if (this.char().isWhitespace()) {
+            val cur = this.char()
+            if (scalarIsWhitespace(cur)) {
                 this.bump()
-            } else if (this.char() == '#') {
+            } else if (cur == ch('#')) {
                 val start = this.pos()
-                val commentText = String.new()
+                val commentText = StringBuilder()
                 this.bump()
                 while (!this.isEof()) {
                     val c = this.char()
                     this.bump()
-                    if (c == '\n') {
+                    if (c == ch('\n')) {
                         break
                     }
-                    commentText.push(c)
+                    commentText.appendScalar(c)
                 }
-                val comment = Comment(span = Span.new(start, this.pos()), comment = commentText)
-                this.parser().comments.borrowMut().push(comment)
+                val comment = Comment(span = Span.new(start, this.pos()), comment = commentText.toString())
+                this.parser().comments.withBorrowMut { it.value.add(comment) }
             } else {
                 break
             }
@@ -706,321 +654,288 @@ public open class ParserI<P>(
      *
      * If the input has been exhausted, then this returns `None`.
      */
-    public open fun peek(): Char? {
+    internal fun peek(): UInt? {
         if (this.isEof()) {
             return null
         }
-        return this.pattern()[this.offset() + this.char().lenUtf8() until this.pattern().size].chars().next()
+        val nextOffset = this.offset() + scalarLenUtf8(this.char())
+        return if (nextOffset >= this.utf8Bytes.size) null else decodeUtf8ScalarAt(this.utf8Bytes, nextOffset)
     }
 
     /**
      * Like peek, but will ignore spaces when the parser is in whitespace
      * insensitive mode.
      */
-    public open fun peekSpace(): Char? {
+    internal fun peekSpace(): UInt? {
         if (!this.ignoreWhitespace()) {
             return this.peek()
         }
         if (this.isEof()) {
             return null
         }
-        var start = this.offset() + this.char().lenUtf8()
+        val startOffset = this.offset() + scalarLenUtf8(this.char())
         var inComment = false
-        for ((i, c) in this.pattern()[start until this.pattern().size].charIndices()) {
-            if (c.isWhitespace()) {
-                continue
-            } else if (!inComment && c == '#') {
-                inComment = true
-            } else if (inComment && c == '\n') {
-                inComment = false
-            } else {
-                start += i
-                break
+        var idx = startOffset
+        while (idx < this.utf8Bytes.size) {
+            val c = decodeUtf8ScalarAt(this.utf8Bytes, idx)
+            val step = scalarLenUtf8(c)
+            when {
+                inComment -> {
+                    if (c == ch('\n')) {
+                        inComment = false
+                    }
+                    idx += step
+                }
+                scalarIsWhitespace(c) -> idx += step
+                c == ch('#') -> {
+                    inComment = true
+                    idx += step
+                }
+                else -> return c
             }
         }
-        return this.pattern()[start until this.pattern().size].chars().next()
+        return null
     }
 
     /**
      * Returns true if the next call to `bump` would return false.
      */
-    public open fun isEof(): Boolean = this.offset() == this.pattern().len()
+    internal fun isEof(): Boolean = this.offset() == this.utf8Bytes.size
 
     /**
      * Return the current position of the parser, which includes the offset,
      * line and column.
      */
-    public open fun pos(): Position = this.parser().pos.get()
+    internal fun pos(): Position = this.parser().pos.get()
 
     /**
      * Create a span at the current position of the parser. Both the start
      * and end of the span are set.
      */
-    public open fun span(): Span = Span.splat(this.pos())
+    internal fun span(): Span = Span.splat(this.pos())
 
     /**
      * Create a span that covers the current character.
      */
-    public open fun spanChar(): Span {
-        val next = Position(offset = (((this.offset()).toLong() + (this.char().lenUtf8()).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt())!!, line = this.line(), column = (((this.column()).toLong() + (1).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt())!!)
-        if (this.char() == '\n') {
-            next.line += 1
-            next.column = 1
+    internal fun spanChar(): Span {
+        val cur = this.pos()
+        val c = this.char()
+        val nextOffset = cur.offset + scalarLenUtf8(c)
+        val next = if (c == ch('\n')) {
+            Position(offset = nextOffset, line = cur.line + 1, column = 1)
+        } else {
+            Position(offset = nextOffset, line = cur.line, column = cur.column + 1)
         }
-        return Span.new(this.pos(), next)
+        return Span.new(cur, next)
     }
 
     /**
      * Parse and push a single alternation on to the parser's internal stack.
-     * If the top of the stack already has an alternation, then add to that
-     * instead of pushing a new one.
-     *
-     * The concatenation given corresponds to a single alternation branch.
-     * The concatenation returned starts the next branch and is empty.
-     *
-     * This assumes the parser is currently positioned at `|` and will advance
-     * the parser to the character following `|`.
      */
-    public open fun pushAlternate(concat: Concat): Result<Concat> {
-        check(this.char() == '|')
+    internal fun pushAlternate(concat: Concat): ParseResult<Concat> {
+        check(this.char() == ch('|'))
         concat.span.end = this.pos()
         this.pushOrAddAlternation(concat)
         this.bump()
-        return Result.success(Concat(span = this.span(), asts = mutableListOf()))
+        return Result.Ok(Concat(span = this.span(), asts = emptyList()))
     }
 
     /**
      * Pushes or adds the given branch of an alternation to the parser's
      * internal stack of state.
      */
-    public open fun pushOrAddAlternation(concat: Concat) {
-        val stack = this.parser().stackGroup.borrowMut()
-        when (val matchVal = stack.lastMut()) {
-            is Some -> {
-                val (alts) = matchVal as Alternation
-                alts.asts.push(concat.intoAst())
+    internal fun pushOrAddAlternation(concat: Concat) {
+        this.parser().stackGroup.withBorrowMut { guard ->
+            val stack = guard.value
+            val top = stack.lastOrNull()
+            if (top is GroupState.Alternation) {
+                top.value.mutableAsts.add(concat.intoAst())
                 return
             }
-            else -> {}
+            stack.add(
+                GroupState.Alternation(
+                    AstAlternation(
+                        span = Span.new(concat.span.start, this.pos()),
+                        asts = listOf(concat.intoAst()),
+                    )
+                )
+            )
         }
-        stack.push(Alternation(Alternation(span = Span.new(concat.span.start, this.pos()), asts = mutableListOf(concat.intoAst()))))
     }
 
     /**
      * Parse and push a group AST (and its parent concatenation) on to the
-     * parser's internal stack. Return a fresh concatenation corresponding
-     * to the group's sub-AST.
-     *
-     * If a set of flags was found (with no group), then the concatenation
-     * is returned with that set of flags added.
-     *
-     * This assumes that the parser is currently positioned on the opening
-     * parenthesis. It advances the parser to the character at the start
-     * of the sub-expression (or adjoining expression).
-     *
-     * If there was a problem parsing the start of the group, then an error
-     * is returned.
+     * parser's internal stack.
      */
-    public open fun pushGroup(concat: Concat): Result<Concat> {
-        check(this.char() == '(')
-        return when (val matchVal = this.parseGroup().getOrElse { return Result.failure(it) }) {
-            is Either.Left -> {
-                val (set) = matchVal
-                val ignore = set.flags.flagState(Flag.IgnoreWhitespace)
-                if (ignore != null) {
-                    val v = ignore
-                    this.parser().ignoreWhitespace.set(v)
+    internal fun pushGroup(concat: Concat): ParseResult<Concat> {
+        check(this.char() == ch('('))
+        return when (val parsed = this.parseGroup()) {
+            is Result.Err -> parsed
+            is Result.Ok -> when (val matchVal = parsed.value) {
+                is Either.Left -> {
+                    val set = matchVal.value
+                    val ignore = set.flags.flagState(Flag.IgnoreWhitespace)
+                    if (ignore != null) {
+                        this.parser().ignoreWhitespace.set(ignore)
+                    }
+                    concat.mutableAsts.add(Ast.flags(set))
+                    Result.Ok(concat)
                 }
-                concat.asts.push(Ast.flags(set))
-                Result.success(concat)
-            }
-            is Either.Right -> {
-                val (group) = matchVal
-                val oldIgnoreWhitespace = this.ignoreWhitespace()
-                val newIgnoreWhitespace = group.flags().andThen({ f -> f.flagState(Flag.IgnoreWhitespace) }).unwrapOr(oldIgnoreWhitespace)
-                this.parser().stackGroup.borrowMut().push(GroupState.Group(concat = concat, group = group, ignoreWhitespace = oldIgnoreWhitespace))
-                this.parser().ignoreWhitespace.set(newIgnoreWhitespace)
-                Result.success(Concat(span = this.span(), asts = mutableListOf()))
+                is Either.Right -> {
+                    val group = matchVal.value
+                    val oldIgnoreWhitespace = this.ignoreWhitespace()
+                    val newIgnoreWhitespace = group.flags()?.flagState(Flag.IgnoreWhitespace) ?: oldIgnoreWhitespace
+                    this.parser().stackGroup.withBorrowMut { guard ->
+                        guard.value.add(
+                            GroupState.Group(
+                                concat = concat,
+                                group = group,
+                                ignoreWhitespace = oldIgnoreWhitespace,
+                            )
+                        )
+                    }
+                    this.parser().ignoreWhitespace.set(newIgnoreWhitespace)
+                    Result.Ok(Concat(span = this.span(), asts = emptyList()))
+                }
             }
         }
     }
 
     /**
      * Pop a group AST from the parser's internal stack and set the group's
-     * AST to the given concatenation. Return the concatenation containing
-     * the group.
-     *
-     * This assumes that the parser is currently positioned on the closing
-     * parenthesis and advances the parser to the character following the `)`.
-     *
-     * If no such group could be popped, then an unopened group error is
-     * returned.
+     * AST to the given concatenation.
      */
-    public open fun popGroup(groupConcat: Concat): Result<Concat> {
-        check(this.char() == ')')
-        val stack = this.parser().stackGroup.borrowMut()
-        var (priorConcat, group2, ignoreWhitespace2, alt1) =
-            when (val matchVal = stack.pop()) {
-                is Group -> {
-                    val concat = (matchVal as Group).concat
-                    val group = (matchVal as Group).group
-                    val ignoreWhitespace = (matchVal as Group).ignoreWhitespace
-                    listOf(concat, group, ignoreWhitespace, null)
+    internal fun popGroup(groupConcat: Concat): ParseResult<Concat> {
+        check(this.char() == ch(')'))
+        var priorConcat: Concat? = null
+        var group2: AstGroup? = null
+        var ignoreWhitespace2 = false
+        var alt1: AstAlternation? = null
+        var errorResult: ParseResult<Concat>? = null
+        this.parser().stackGroup.withBorrowMut { guard ->
+            val stack = guard.value
+            when (val top = stack.removeLastOrNull()) {
+                is GroupState.Group -> {
+                    priorConcat = top.concat
+                    group2 = top.group
+                    ignoreWhitespace2 = top.ignoreWhitespace
                 }
-                is Alternation -> {
-                    val (alt) = matchVal as Alternation
-                    when (val matchVal1 = stack.pop()) {
-                        is Group -> {
-                            val concat1 = (matchVal1 as Group).concat
-                            val group1 = (matchVal1 as Group).group
-                            val ignoreWhitespace1 = (matchVal1 as Group).ignoreWhitespace
-                            listOf(concat1, group1, ignoreWhitespace1, alt)
+                is GroupState.Alternation -> {
+                    alt1 = top.value
+                    when (val prev = stack.removeLastOrNull()) {
+                        is GroupState.Group -> {
+                            priorConcat = prev.concat
+                            group2 = prev.group
+                            ignoreWhitespace2 = prev.ignoreWhitespace
                         }
-                        null -> {
-                            return Err(this.error(this.spanChar(), ErrorKind.GroupUnopened))
-                        }
-                        is Alternation -> {
-                            return Err(this.error(this.spanChar(), ErrorKind.GroupUnopened))
+                        null, is GroupState.Alternation -> {
+                            errorResult = Result.Err(this.error(this.spanChar(), ErrorKind.GroupUnopened))
                         }
                     }
                 }
                 null -> {
-                    return Err(this.error(this.spanChar(), ErrorKind.GroupUnopened))
+                    errorResult = Result.Err(this.error(this.spanChar(), ErrorKind.GroupUnopened))
                 }
             }
+        }
+        errorResult?.let { return it }
+        val prior = priorConcat!!
+        val group = group2!!
         this.parser().ignoreWhitespace.set(ignoreWhitespace2)
         groupConcat.span.end = this.pos()
         this.bump()
-        group2.span.end = this.pos()
-        when (alt1) {
-            null -> {
-                group2.ast = groupConcat.intoAst()
-            }
-            else -> {
-                val alt2 = alt1
-                alt2.span.end = groupConcat.span.end
-                alt2.asts.push(groupConcat.intoAst())
-                group2.ast = alt2.intoAst()
-            }
+        group.span.end = this.pos()
+        val alt = alt1
+        if (alt == null) {
+            group.ast = groupConcat.intoAst()
+        } else {
+            alt.span.end = groupConcat.span.end
+            alt.mutableAsts.add(groupConcat.intoAst())
+            group.ast = alt.intoAst()
         }
-        priorConcat.asts.push(Ast.group(group2))
-        return Result.success(priorConcat)
+        prior.mutableAsts.add(Ast.group(group))
+        return Result.Ok(prior)
     }
 
     /**
      * Pop the last state from the parser's internal stack, if it exists, and
-     * add the given concatenation to it. There either must be no state or a
-     * single alternation item on the stack. Any other scenario produces an
-     * error.
-     *
-     * This assumes that the parser has advanced to the end.
+     * add the given concatenation to it.
      */
-    public open fun popGroupEnd(concat: Concat): Result<Ast> {
+    internal fun popGroupEnd(concat: Concat): ParseResult<Ast> {
         concat.span.end = this.pos()
-        val stack = this.parser().stackGroup.borrowMut()
-        val ast =
-            when (val matchVal = stack.pop()) {
-                null -> Result.success(concat.intoAst())
+        var firstResult: ParseResult<Ast>? = null
+        var secondResult: ParseResult<Ast>? = null
+        this.parser().stackGroup.withBorrowMut { guard ->
+            val stack = guard.value
+            firstResult = when (val top = stack.removeLastOrNull()) {
+                null -> Result.Ok(concat.intoAst())
                 is GroupState.Alternation -> {
-                    val (alt) = matchVal as GroupState.Alternation
+                    val alt = top.value
                     alt.span.end = this.pos()
-                    alt.asts.push(concat.intoAst())
-                    Result.success(Ast.alternation(alt))
+                    alt.mutableAsts.add(concat.intoAst())
+                    Result.Ok(Ast.alternation(alt))
                 }
                 is GroupState.Group -> {
-                    val group = (matchVal as GroupState.Group).group
-                    return Err(this.error(group.span, ErrorKind.GroupUnclosed))
+                    Result.Err(this.error(top.group.span, ErrorKind.GroupUnclosed))
                 }
             }
-        // If we try to pop again, there should be nothing.
-        return when (val matchVal1 = stack.pop()) {
-            null -> ast
-            is GroupState.Alternation -> {
-                // This unreachable is unfortunate. This case can't happen
-                // because the only way we can be here is if there were two
-                // `GroupState.Alternation`s adjacent in the parser's stack,
-                // which we guarantee to never happen because we never push a
-                // `GroupState.Alternation` if one is already at the top of
-                // the stack.
-                error("unreachable")
-            }
-            is GroupState.Group -> {
-                val group1 = (matchVal1 as GroupState.Group).group
-                Err(this.error(group1.span, ErrorKind.GroupUnclosed))
+            if (firstResult is Result.Ok) {
+                secondResult = when (val next = stack.removeLastOrNull()) {
+                    null -> firstResult
+                    is GroupState.Alternation -> error("unreachable")
+                    is GroupState.Group -> Result.Err(this.error(next.group.span, ErrorKind.GroupUnclosed))
+                }
             }
         }
+        val first = firstResult!!
+        if (first is Result.Err) return first
+        return secondResult!!
     }
 
     /**
      * Parse the opening of a character class and push the current class
-     * parsing context onto the parser's stack. This assumes that the parser
-     * is positioned at an opening `[`. The given union should correspond to
-     * the union of set items built up before seeing the `[`.
-     *
-     * If there was a problem parsing the opening of the class, then an error
-     * is returned. Otherwise, a new union of set items for the class is
-     * returned (which may be populated with either a `]` or a `-`).
+     * parsing context onto the parser's stack.
      */
-    public open fun pushClassOpen(parentUnion: ClassSetUnion): Result<ClassSetUnion> {
-        check(this.char() == '[')
-        val (nestedSet, nestedUnion) = this.parseSetClassOpen().getOrElse { return Result.failure(it) }
-        this.parser().stackClass.borrowMut().push(ClassState.Open(union = parentUnion, set = nestedSet))
-        return Result.success(nestedUnion)
+    internal fun pushClassOpen(parentUnion: ClassSetUnion): ParseResult<ClassSetUnion> {
+        check(this.char() == ch('['))
+        val (nestedSet, nestedUnion) = when (val r = this.parseSetClassOpen()) {
+            is Result.Err -> return r
+            is Result.Ok -> r.value
+        }
+        this.parser().stackClass.withBorrowMut { guard ->
+            guard.value.add(ClassState.Open(union = parentUnion, set = nestedSet))
+        }
+        return Result.Ok(nestedUnion)
     }
 
     /**
      * Parse the end of a character class set and pop the character class
-     * parser stack. The union given corresponds to the last union built
-     * before seeing the closing `]`. The union returned corresponds to the
-     * parent character class set with the nested class added to it.
-     *
-     * This assumes that the parser is positioned at a `]` and will advance
-     * the parser to the byte immediately following the `]`.
-     *
-     * If the stack is empty after popping, then this returns the final
-     * "top-level" character class AST (where a "top-level" character class
-     * is one that is not nested inside any other character class).
-     *
-     * If there is no corresponding opening bracket on the parser's stack,
-     * then an error is returned.
+     * parser stack.
      */
-    public open fun popClass(nestedUnion: ClassSetUnion): Result<Either<ClassSetUnion, ClassBracketed>> {
-        check(this.char() == ']')
+    internal fun popClass(nestedUnion: ClassSetUnion): ParseResult<Either<ClassSetUnion, ClassBracketed>> {
+        check(this.char() == ch(']'))
         val item = ClassSet.Item(nestedUnion.intoItem())
         val prevset = this.popClassOp(item)
-        val stack = this.parser().stackClass.borrowMut()
-        return when (val matchVal = stack.pop()) {
-            null -> {
-                // We can never observe an empty stack:
-                //
-                // 1) We are guaranteed to start with a non-empty stack since
-                // the character class parser is only initiated when it sees
-                // a `[`.
-                // 2) If we ever observe an empty stack while popping after
-                // seeing a `]`, then we signal the character class parser
-                // to terminate.
-                error("unexpected empty character class stack")
-            }
-            is ClassState.Op -> {
-                // This panic is unfortunate, but this case is impossible
-                // since we already popped the Op state if one exists above.
-                // Namely, every push to the class parser stack is guarded by
-                // whether an existing Op is already on the top of the stack.
-                // If it is, the existing Op is modified. That is, the stack
-                // can never have consecutive Op states.
-                error("unexpected ClassState::Op")
-            }
+        var popped: ClassState? = null
+        var isEmptyAfterPop = false
+        this.parser().stackClass.withBorrowMut { guard ->
+            popped = guard.value.removeLastOrNull()
+            isEmptyAfterPop = guard.value.isEmpty()
+        }
+        return when (val top = popped) {
+            null -> error("unexpected empty character class stack")
+            is ClassState.Op -> error("unexpected ClassState::Op")
             is ClassState.Open -> {
-                val union = (matchVal as ClassState.Open).union
-                val set = (matchVal as ClassState.Open).set
+                val union = top.union
+                val set = top.set
                 this.bump()
                 set.span.end = this.pos()
                 set.kind = prevset
-                if (stack.isEmpty()) {
-                    Result.success(Either.Right(set))
+                if (isEmptyAfterPop) {
+                    Result.Ok(Either.Right(set))
                 } else {
                     union.push(ClassSetItem.Bracketed(set))
-                    Result.success(Either.Left(union))
+                    Result.Ok(Either.Left(union))
                 }
             }
         }
@@ -1029,109 +944,137 @@ public open class ParserI<P>(
     /**
      * Return an "unclosed class" error whose span points to the most
      * recently opened class.
-     *
-     * This should only be called while parsing a character class.
      */
-    public open fun unclosedClassError(): Error {
-        for (state in this.parser().stackClass.borrow().iter().rev()) {
-            when (val matchVal = state) {
-                is ClassState.Open -> {
-                    val set = matchVal.set
-                    return this.error(set.span, ErrorKind.ClassUnclosed)
+    internal fun unclosedClassError(): Error {
+        val span = this.parser().stackClass.withBorrow { stack ->
+            var found: Span? = null
+            for (i in stack.indices.reversed()) {
+                val state = stack[i]
+                if (state is ClassState.Open) {
+                    found = state.set.span
+                    break
                 }
-                else -> {}
             }
+            found
         }
-        // We are guaranteed to have a non-empty stack with at least
-        // one open bracket, so we should never get here.
+        if (span != null) {
+            return this.error(span, ErrorKind.ClassUnclosed)
+        }
         error("no open character class found")
     }
 
     /**
      * Push the current set of class items on to the class parser's stack as
      * the left hand side of the given operator.
-     *
-     * A fresh set union is returned, which should be used to build the right
-     * hand side of this operator.
      */
-    public open fun pushClassOp(nextKind: ClassSetBinaryOpKind, nextUnion: ClassSetUnion): ClassSetUnion {
+    internal fun pushClassOp(nextKind: ClassSetBinaryOpKind, nextUnion: ClassSetUnion): ClassSetUnion {
         val item = ClassSet.Item(nextUnion.intoItem())
         val newLhs = this.popClassOp(item)
-        this.parser().stackClass.borrowMut().push(ClassState.Op(kind = nextKind, lhs = newLhs))
-        return ClassSetUnion(span = this.span(), items = mutableListOf())
+        this.parser().stackClass.withBorrowMut { guard ->
+            guard.value.add(ClassState.Op(kind = nextKind, lhs = newLhs))
+        }
+        return ClassSetUnion(span = this.span(), items = emptyList())
     }
 
     /**
-     * Pop a character class set from the character class parser stack. If the
-     * top of the stack is just an item (not an operation), then return the
-     * given set unchanged. If the top of the stack is an operation, then the
-     * given set will be used as the rhs of the operation on the top of the
-     * stack. In that case, the binary operation is returned as a set.
+     * Pop a character class set from the character class parser stack.
      */
-    public open fun popClassOp(rhs: ClassSet): ClassSet {
-        val stack = this.parser().stackClass.borrowMut()
-        val (kind1, lhs1) =
-            when (val matchVal = stack.pop()) {
-                is ClassState.Op -> {
-                    val kind = (matchVal as ClassState.Op).kind
-                    val lhs = (matchVal as ClassState.Op).lhs
-                    Pair(kind, lhs)
-                }
-                is ClassState.Open -> {
-                    val state = matchVal
-                    stack.push(state)
-                    return rhs
-                }
+    internal fun popClassOp(rhs: ClassSet): ClassSet {
+        var opState: ClassState.Op? = null
+        this.parser().stackClass.withBorrowMut { guard ->
+            val stack = guard.value
+            when (val top = stack.removeLastOrNull()) {
+                is ClassState.Op -> opState = top
+                is ClassState.Open -> stack.add(top)
                 null -> error("unreachable")
             }
-        val span = Span.new(lhs1.span().start, rhs.span().end)
-        return ClassSet.BinaryOp(ClassSetBinaryOp(span = span, kind = kind1, lhs = lhs1, rhs = rhs))
+        }
+        val op = opState ?: return rhs
+        val span = Span.new(op.lhs.span().start, rhs.span().end)
+        return ClassSet.BinaryOp(ClassSetBinaryOp(span = span, kind = op.kind, lhs = op.lhs, rhs = rhs))
     }
 
     /**
      * Parse the regular expression into an abstract syntax tree.
      */
-    public open fun parse(): Result<Ast> = this.parseWithComments().map({ astc -> astc.ast })
+    internal fun parse(): ParseResult<Ast> =
+        when (val r = this.parseWithComments()) {
+            is Result.Ok -> Result.Ok(r.value.ast)
+            is Result.Err -> r
+        }
 
     /**
      * Parse the regular expression and return an abstract syntax tree with
      * all of the comments found in the pattern.
      */
-    public open fun parseWithComments(): Result<WithComments> {
+    internal fun parseWithComments(): ParseResult<WithComments> {
         check(this.offset() == 0)
         this.parser().reset()
-        var concat = Concat(span = this.span(), asts = mutableListOf())
+        var concat = Concat(span = this.span(), asts = emptyList())
         while (true) {
             this.bumpSpace()
             if (this.isEof()) {
                 break
             }
             when (this.char()) {
-                '(' -> concat = this.pushGroup(concat).getOrElse { return Result.failure(it) }
-                ')' -> concat = this.popGroup(concat).getOrElse { return Result.failure(it) }
-                '|' -> concat = this.pushAlternate(concat).getOrElse { return Result.failure(it) }
-                '[' -> {
-                    val cls = this.parseSetClass().getOrElse { return Result.failure(it) }
-                    concat.asts.push(Ast.classBracketed(cls))
+                ch('(') -> concat = when (val r = this.pushGroup(concat)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
                 }
-                '?' -> {
-                    concat = this.parseUncountedRepetition(concat, RepetitionKind.ZeroOrOne).getOrElse { return Result.failure(it) }
+                ch(')') -> concat = when (val r = this.popGroup(concat)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
                 }
-                '*' -> {
-                    concat = this.parseUncountedRepetition(concat, RepetitionKind.ZeroOrMore).getOrElse { return Result.failure(it) }
+                ch('|') -> concat = when (val r = this.pushAlternate(concat)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
                 }
-                '+' -> {
-                    concat = this.parseUncountedRepetition(concat, RepetitionKind.OneOrMore).getOrElse { return Result.failure(it) }
+                ch('[') -> {
+                    val cls = when (val r = this.parseSetClass()) {
+                        is Result.Ok -> r.value
+                        is Result.Err -> return r
+                    }
+                    concat.mutableAsts.add(Ast.classBracketed(cls))
                 }
-                '{' -> {
-                    concat = this.parseCountedRepetition(concat).getOrElse { return Result.failure(it) }
+                ch('?') -> concat = when (val r = this.parseUncountedRepetition(concat, RepetitionKind.ZeroOrOne)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
                 }
-                else -> concat.asts.push(this.parsePrimitive().getOrElse { return Result.failure(it) }.intoAst())
+                ch('*') -> concat = when (val r = this.parseUncountedRepetition(concat, RepetitionKind.ZeroOrMore)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
+                ch('+') -> concat = when (val r = this.parseUncountedRepetition(concat, RepetitionKind.OneOrMore)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
+                ch('{') -> concat = when (val r = this.parseCountedRepetition(concat)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
+                else -> {
+                    val prim = when (val r = this.parsePrimitive()) {
+                        is Result.Ok -> r.value
+                        is Result.Err -> return r
+                    }
+                    concat.mutableAsts.add(prim.intoAst())
+                }
             }
         }
-        val ast = this.popGroupEnd(concat).getOrElse { return Result.failure(it) }
-        NestLimiter.new(this).check(ast).getOrElse { return Result.failure(it) }
-        return Result.success(WithComments(ast = ast, comments = mem.replace(this.parser().comments.borrowMut(), mutableListOf())))
+        val ast = when (val r = this.popGroupEnd(concat)) {
+            is Result.Ok -> r.value
+            is Result.Err -> return r
+        }
+        when (val r = NestLimiter.new(this).check(ast)) {
+            is Result.Err -> return r
+            is Result.Ok -> {}
+        }
+        val takenComments = this.parser().comments.withBorrowMut { guard ->
+            val list = guard.value.toList()
+            guard.value.clear()
+            list
+        }
+        return Result.Ok(WithComments(ast = ast, comments = takenComments))
     }
 
     /**
@@ -1149,35 +1092,33 @@ public open class ParserI<P>(
      * concatenation returned includes the repetition operator applied to the
      * last expression in the given concatenation.
      */
-    public open fun parseUncountedRepetition(concat: Concat, kind: RepetitionKind): Result<Concat> {
-        check(this.char() == '?' || this.char() == '*' || this.char() == '+')
+    internal fun parseUncountedRepetition(concat: Concat, kind: RepetitionKind): ParseResult<Concat> {
+        check(this.char() == ch('?') || this.char() == ch('*') || this.char() == ch('+'))
         val opStart = this.pos()
-        val ast1 =
-            when (val matchVal = concat.asts.pop()) {
-                null -> {
-                    return Err(this.error(this.span(), ErrorKind.RepetitionMissing))
-                }
-                else -> {
-                    val ast = matchVal
-                    ast
-                }
-            }
+        val ast1 = concat.mutableAsts.removeLastOrNull()
+            ?: return Result.Err(this.error(this.span(), ErrorKind.RepetitionMissing))
         when (ast1) {
-            is Ast.Empty -> {
-                return Err(this.error(this.span(), ErrorKind.RepetitionMissing))
-            }
-            is Ast.Flags -> {
-                return Err(this.error(this.span(), ErrorKind.RepetitionMissing))
+            is Ast.Empty, is Ast.Flags -> {
+                return Result.Err(this.error(this.span(), ErrorKind.RepetitionMissing))
             }
             else -> {}
         }
         var greedy = true
-        if (this.bump() && this.char() == '?') {
+        if (this.bump() && this.char() == ch('?')) {
             greedy = false
             this.bump()
         }
-        concat.asts.push(Ast.repetition(Repetition(span = ast1.span().withEnd(this.pos()), op = RepetitionOp(span = Span.new(opStart, this.pos()), kind = kind), greedy = greedy, ast = ast1)))
-        return Result.success(concat)
+        concat.mutableAsts.add(
+            Ast.repetition(
+                Repetition(
+                    span = ast1.span().withEnd(this.pos()),
+                    op = RepetitionOp(span = Span.new(opStart, this.pos()), kind = kind),
+                    greedy = greedy,
+                    ast = ast1,
+                )
+            )
+        )
+        return Result.Ok(concat)
     }
 
     /**
@@ -1194,82 +1135,88 @@ public open class ParserI<P>(
      * concatenation returned includes the repetition operator applied to the
      * last expression in the given concatenation.
      */
-    public open fun parseCountedRepetition(concat: Concat): Result<Concat> {
-        check(this.char() == '{')
+    internal fun parseCountedRepetition(concat: Concat): ParseResult<Concat> {
+        check(this.char() == ch('{'))
         val start = this.pos()
-        val ast1 =
-            when (val matchVal = concat.asts.pop()) {
-                null -> {
-                    return Err(this.error(this.span(), ErrorKind.RepetitionMissing))
-                }
-                else -> {
-                    val ast = matchVal
-                    ast
-                }
-            }
+        val ast1 = concat.mutableAsts.removeLastOrNull()
+            ?: return Result.Err(this.error(this.span(), ErrorKind.RepetitionMissing))
         when (ast1) {
-            is Ast.Empty -> {
-                return Err(this.error(this.span(), ErrorKind.RepetitionMissing))
-            }
-            is Ast.Flags -> {
-                return Err(this.error(this.span(), ErrorKind.RepetitionMissing))
+            is Ast.Empty, is Ast.Flags -> {
+                return Result.Err(this.error(this.span(), ErrorKind.RepetitionMissing))
             }
             else -> {}
         }
         if (!this.bumpAndBumpSpace()) {
-            return Err(this.error(Span.new(start, this.pos()), ErrorKind.RepetitionCountUnclosed))
+            return Result.Err(this.error(Span.new(start, this.pos()), ErrorKind.RepetitionCountUnclosed))
         }
         val countStart = specializeErr(this.parseDecimal(), ErrorKind.DecimalEmpty, ErrorKind.RepetitionCountDecimalEmpty)
         if (this.isEof()) {
-            return Err(this.error(Span.new(start, this.pos()), ErrorKind.RepetitionCountUnclosed))
+            return Result.Err(this.error(Span.new(start, this.pos()), ErrorKind.RepetitionCountUnclosed))
         }
         val range =
-            if (this.char() == ',') {
+            if (this.char() == ch(',')) {
                 if (!this.bumpAndBumpSpace()) {
-                    return Err(this.error(Span.new(start, this.pos()), ErrorKind.RepetitionCountUnclosed))
+                    return Result.Err(this.error(Span.new(start, this.pos()), ErrorKind.RepetitionCountUnclosed))
                 }
-                if (this.char() != '}') {
-                    val countStart1 =
-                        when {
-                            countStart is Ok -> {
-                                val (c) = countStart
-                                c
-                            }
-                            countStart is Err && (countStart as Err).value.kind == ErrorKind.RepetitionCountDecimalEmpty -> {
-                                val (err) = countStart
-                                if (this.parser().emptyMinRange) {
-                                    0
+                if (this.char() != ch('}')) {
+                    val countStart1: UInt =
+                        when (countStart) {
+                            is Result.Ok -> countStart.value
+                            is Result.Err -> {
+                                val err = countStart.error
+                                if (err.kind == ErrorKind.RepetitionCountDecimalEmpty) {
+                                    if (this.parser().emptyMinRange) {
+                                        0u
+                                    } else {
+                                        return countStart
+                                    }
                                 } else {
-                                    return Err(err)
+                                    return countStart
                                 }
                             }
-                            else -> {
-                                val err1 = countStart
-                                err1.getOrElse { return Result.failure(it) }
-                            }
                         }
-                    val countEnd = specializeErr(this.parseDecimal(), ErrorKind.DecimalEmpty, ErrorKind.RepetitionCountDecimalEmpty).getOrElse { return Result.failure(it) }
+                    val countEnd = when (val r = specializeErr(this.parseDecimal(), ErrorKind.DecimalEmpty, ErrorKind.RepetitionCountDecimalEmpty)) {
+                        is Result.Ok -> r.value
+                        is Result.Err -> return r
+                    }
                     RepetitionRange.Bounded(countStart1, countEnd)
                 } else {
-                    RepetitionRange.AtLeast(countStart.getOrElse { return Result.failure(it) })
+                    val c = when (countStart) {
+                        is Result.Ok -> countStart.value
+                        is Result.Err -> return countStart
+                    }
+                    RepetitionRange.AtLeast(c)
                 }
             } else {
-                RepetitionRange.Exactly(countStart.getOrElse { return Result.failure(it) })
+                val c = when (countStart) {
+                    is Result.Ok -> countStart.value
+                    is Result.Err -> return countStart
+                }
+                RepetitionRange.Exactly(c)
             }
-        if (this.isEof() || this.char() != '}') {
-            return Err(this.error(Span.new(start, this.pos()), ErrorKind.RepetitionCountUnclosed))
+        if (this.isEof() || this.char() != ch('}')) {
+            return Result.Err(this.error(Span.new(start, this.pos()), ErrorKind.RepetitionCountUnclosed))
         }
         var greedy = true
-        if (this.bumpAndBumpSpace() && this.char() == '?') {
+        if (this.bumpAndBumpSpace() && this.char() == ch('?')) {
             greedy = false
             this.bump()
         }
         val opSpan = Span.new(start, this.pos())
         if (!range.isValid()) {
-            return Err(this.error(opSpan, ErrorKind.RepetitionCountInvalid))
+            return Result.Err(this.error(opSpan, ErrorKind.RepetitionCountInvalid))
         }
-        concat.asts.push(Ast.repetition(Repetition(span = ast1.span().withEnd(this.pos()), op = RepetitionOp(span = opSpan, kind = RepetitionKind.Range(range)), greedy = greedy, ast = ast1)))
-        return Result.success(concat)
+        concat.mutableAsts.add(
+            Ast.repetition(
+                Repetition(
+                    span = ast1.span().withEnd(this.pos()),
+                    op = RepetitionOp(span = opSpan, kind = RepetitionKind.Range(range)),
+                    greedy = greedy,
+                    ast = ast1,
+                )
+            )
+        )
+        return Result.Ok(concat)
     }
 
     /**
@@ -1292,13 +1239,13 @@ public open class ParserI<P>(
      * If a capture name is given and it is incorrectly specified, then a
      * corresponding error is returned.
      */
-    public open fun parseGroup(): Result<Either<SetFlags, Group>> {
-        check(this.char() == '(')
+    internal fun parseGroup(): ParseResult<Either<SetFlags, AstGroup>> {
+        check(this.char() == ch('('))
         val openSpan = this.spanChar()
         this.bump()
         this.bumpSpace()
         if (this.isLookaroundPrefix()) {
-            return Err(this.error(Span.new(openSpan.start, this.span().end), ErrorKind.UnsupportedLookAround))
+            return Result.Err(this.error(Span.new(openSpan.start, this.span().end), ErrorKind.UnsupportedLookAround))
         }
         val innerSpan = this.span()
         var startsWithP = true
@@ -1307,30 +1254,50 @@ public open class ParserI<P>(
                 startsWithP = false
                 this.bumpIf("?<")
             }) {
-            val captureIndex = this.nextCaptureIndex(openSpan).getOrElse { return Result.failure(it) }
-            val name = this.parseCaptureName(captureIndex).getOrElse { return Result.failure(it) }
-            Result.success(Either.Right(Group(span = openSpan, kind = GroupKind.CaptureName(startsWithP = startsWithP, name = name), ast = Ast.empty(this.span()))))
+            val captureIndex = when (val r = this.nextCaptureIndex(openSpan)) {
+                is Result.Ok -> r.value
+                is Result.Err -> return r
+            }
+            val name = when (val r = this.parseCaptureName(captureIndex)) {
+                is Result.Ok -> r.value
+                is Result.Err -> return r
+            }
+            Result.Ok(
+                Either.Right(
+                    AstGroup(
+                        span = openSpan,
+                        kind = GroupKind.CaptureName(startsWithP = startsWithP, name = name),
+                        ast = Ast.empty(this.span()),
+                    )
+                )
+            )
         } else if (this.bumpIf("?")) {
             if (this.isEof()) {
-                return Err(this.error(openSpan, ErrorKind.GroupUnclosed))
+                return Result.Err(this.error(openSpan, ErrorKind.GroupUnclosed))
             }
-            val flags = this.parseFlags().getOrElse { return Result.failure(it) }
+            val flags = when (val r = this.parseFlags()) {
+                is Result.Ok -> r.value
+                is Result.Err -> return r
+            }
             val charEnd = this.char()
             this.bump()
-            if (charEnd == ')') {
+            if (charEnd == ch(')')) {
                 // We don't allow empty flags, e.g., `(?)`. We instead
                 // interpret it as a repetition operator missing its argument.
                 if (flags.items.isEmpty()) {
-                    return Err(this.error(innerSpan, ErrorKind.RepetitionMissing))
+                    return Result.Err(this.error(innerSpan, ErrorKind.RepetitionMissing))
                 }
-                Result.success(Either.Left(SetFlags(span = openSpan.copy(end = this.pos()), flags = flags)))
+                Result.Ok(Either.Left(SetFlags(span = openSpan.copy(end = this.pos()), flags = flags)))
             } else {
-                check(charEnd == ':')
-                Result.success(Either.Right(Group(span = openSpan, kind = GroupKind.NonCapturing(flags), ast = Ast.empty(this.span()))))
+                check(charEnd == ch(':'))
+                Result.Ok(Either.Right(AstGroup(span = openSpan, kind = GroupKind.NonCapturing(flags), ast = Ast.empty(this.span()))))
             }
         } else {
-            val captureIndex1 = this.nextCaptureIndex(openSpan).getOrElse { return Result.failure(it) }
-            Result.success(Either.Right(Group(span = openSpan, kind = GroupKind.CaptureIndex(captureIndex1), ast = Ast.empty(this.span()))))
+            val captureIndex1 = when (val r = this.nextCaptureIndex(openSpan)) {
+                is Result.Ok -> r.value
+                is Result.Err -> return r
+            }
+            Result.Ok(Either.Right(AstGroup(span = openSpan, kind = GroupKind.CaptureIndex(captureIndex1), ast = Ast.empty(this.span()))))
         }
     }
 
@@ -1342,17 +1309,17 @@ public open class ParserI<P>(
      *
      * The caller must provide the capture index of the group for this name.
      */
-    public open fun parseCaptureName(captureIndex: UInt): Result<CaptureName> {
+    internal fun parseCaptureName(captureIndex: UInt): ParseResult<CaptureName> {
         if (this.isEof()) {
-            return Err(this.error(this.span(), ErrorKind.GroupNameUnexpectedEof))
+            return Result.Err(this.error(this.span(), ErrorKind.GroupNameUnexpectedEof))
         }
         val start = this.pos()
         while (true) {
-            if (this.char() == '>') {
+            if (this.char() == ch('>')) {
                 break
             }
             if (!isCaptureChar(this.char(), this.pos() == start)) {
-                return Err(this.error(this.spanChar(), ErrorKind.GroupNameInvalid))
+                return Result.Err(this.error(this.spanChar(), ErrorKind.GroupNameInvalid))
             }
             if (!this.bump()) {
                 break
@@ -1360,17 +1327,20 @@ public open class ParserI<P>(
         }
         val end = this.pos()
         if (this.isEof()) {
-            return Err(this.error(this.span(), ErrorKind.GroupNameUnexpectedEof))
+            return Result.Err(this.error(this.span(), ErrorKind.GroupNameUnexpectedEof))
         }
-        check(this.char() == '>')
+        check(this.char() == ch('>'))
         this.bump()
-        val name = this.pattern()[start.offset until end.offset]
+        val name = this.utf8Bytes.decodeToString(start.offset, end.offset)
         if (name.isEmpty()) {
-            return Err(this.error(Span.new(start, start), ErrorKind.GroupNameEmpty))
+            return Result.Err(this.error(Span.new(start, start), ErrorKind.GroupNameEmpty))
         }
-        val capname = CaptureName(span = Span.new(start, end), name = name.toString(), index = captureIndex)
-        this.addCaptureName(capname).getOrElse { return Result.failure(it) }
-        return Result.success(capname)
+        val capname = CaptureName(span = Span.new(start, end), name = name, index = captureIndex)
+        when (val r = this.addCaptureName(capname)) {
+            is Result.Ok -> {}
+            is Result.Err -> return r
+        }
+        return Result.Ok(capname)
     }
 
     /**
@@ -1389,41 +1359,39 @@ public open class ParserI<P>(
      * If no flags could be found or if the negation operation is not followed
      * by any flags, then an error is returned.
      */
-    public open fun parseFlags(): Result<Flags> {
-        val flags = Flags(span = this.span(), items = mutableListOf())
-        var lastWasNegation = null
-        while (this.char() != ':' && this.char() != ')') {
-            if (this.char() == '-') {
+    internal fun parseFlags(): ParseResult<Flags> {
+        val flags = Flags(span = this.span(), items = emptyList())
+        var lastWasNegation: Span? = null
+        while (this.char() != ch(':') && this.char() != ch(')')) {
+            if (this.char() == ch('-')) {
                 lastWasNegation = this.spanChar()
                 val item = FlagsItem(span = this.spanChar(), kind = FlagsItemKind.Negation)
-                when (val matchVal = flags.addItem(item)) {
-                    null -> {}
-                    else -> {
-                        val i = matchVal
-                        return Err(this.error(this.spanChar(), ErrorKind.FlagRepeatedNegation(original = flags.items[i].span)))
-                    }
+                val duplicateIdx = flags.addItem(item)
+                if (duplicateIdx != null) {
+                    return Result.Err(this.error(this.spanChar(), ErrorKind.FlagRepeatedNegation(original = flags.items[duplicateIdx].span)))
                 }
             } else {
                 lastWasNegation = null
-                val item1 = FlagsItem(span = this.spanChar(), kind = FlagsItemKind.Flag(this.parseFlag().getOrElse { return Result.failure(it) }))
-                when (val matchVal1 = flags.addItem(item1)) {
-                    null -> {}
-                    else -> {
-                        val i1 = matchVal1
-                        return Err(this.error(this.spanChar(), ErrorKind.FlagDuplicate(original = flags.items[i1].span)))
-                    }
+                val parsedFlag = when (val r = this.parseFlag()) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
+                val item1 = FlagsItem(span = this.spanChar(), kind = FlagsItemKind.Flag(parsedFlag))
+                val duplicateIdx1 = flags.addItem(item1)
+                if (duplicateIdx1 != null) {
+                    return Result.Err(this.error(this.spanChar(), ErrorKind.FlagDuplicate(original = flags.items[duplicateIdx1].span)))
                 }
             }
             if (!this.bump()) {
-                return Err(this.error(this.span(), ErrorKind.FlagUnexpectedEof))
+                return Result.Err(this.error(this.span(), ErrorKind.FlagUnexpectedEof))
             }
         }
-        if (lastWasNegation != null) {
-            val span = lastWasNegation
-            return Err(this.error(span, ErrorKind.FlagDanglingNegation))
+        val negSpan = lastWasNegation
+        if (negSpan != null) {
+            return Result.Err(this.error(negSpan, ErrorKind.FlagDanglingNegation))
         }
         flags.span.end = this.pos()
-        return Result.success(flags)
+        return Result.Ok(flags)
     }
 
     /**
@@ -1433,18 +1401,16 @@ public open class ParserI<P>(
      *
      * If the flag is not recognized, then an error is returned.
      */
-    public open fun parseFlag(): Result<Flag> =
+    internal fun parseFlag(): ParseResult<Flag> =
         when (this.char()) {
-            'i' -> Result.success(Flag.CaseInsensitive)
-            'm' -> Result.success(Flag.MultiLine)
-            's' -> Result.success(Flag.DotMatchesNewLine)
-            'U' -> Result.success(Flag.SwapGreed)
-            'u' -> Result.success(Flag.Unicode)
-            'R' -> Result.success(Flag.CRLF)
-            'x' -> Result.success(Flag.IgnoreWhitespace)
-            else -> {
-                Err(this.error(this.spanChar(), ErrorKind.FlagUnrecognized))
-            }
+            ch('i') -> Result.Ok(Flag.CaseInsensitive)
+            ch('m') -> Result.Ok(Flag.MultiLine)
+            ch('s') -> Result.Ok(Flag.DotMatchesNewLine)
+            ch('U') -> Result.Ok(Flag.SwapGreed)
+            ch('u') -> Result.Ok(Flag.Unicode)
+            ch('R') -> Result.Ok(Flag.Crlf)
+            ch('x') -> Result.Ok(Flag.IgnoreWhitespace)
+            else -> Result.Err(this.error(this.spanChar(), ErrorKind.FlagUnrecognized))
         }
 
     /**
@@ -1459,29 +1425,28 @@ public open class ParserI<P>(
      * This advances the parser to the first character immediately following
      * the primitive.
      */
-    public open fun parsePrimitive(): Result<Primitive> =
-        when (val matchVal = this.char()) {
-            '\\' -> this.parseEscape()
-            '.' -> {
+    internal fun parsePrimitive(): ParseResult<Primitive> =
+        when (val c = this.char()) {
+            ch('\\') -> this.parseEscape()
+            ch('.') -> {
                 val ast = Primitive.Dot(this.spanChar())
                 this.bump()
-                Result.success(ast)
+                Result.Ok(ast)
             }
-            '^' -> {
-                val ast1 = Primitive.Assertion(Assertion(span = this.spanChar(), kind = AssertionKind.StartLine))
+            ch('^') -> {
+                val ast1 = Primitive.Assertion(AstAssertion(span = this.spanChar(), kind = AssertionKind.StartLine))
                 this.bump()
-                Result.success(ast1)
+                Result.Ok(ast1)
             }
-            '$' -> {
-                val ast2 = Primitive.Assertion(Assertion(span = this.spanChar(), kind = AssertionKind.EndLine))
+            ch('$') -> {
+                val ast2 = Primitive.Assertion(AstAssertion(span = this.spanChar(), kind = AssertionKind.EndLine))
                 this.bump()
-                Result.success(ast2)
+                Result.Ok(ast2)
             }
             else -> {
-                val c = matchVal
-                val ast3 = Primitive.Literal(Literal(span = this.spanChar(), kind = LiteralKind.Verbatim, c = c))
+                val ast3 = Primitive.Literal(AstLiteral(span = this.spanChar(), kind = LiteralKind.Verbatim, c = c))
                 this.bump()
-                Result.success(ast3)
+                Result.Ok(ast3)
             }
         }
 
@@ -1492,40 +1457,46 @@ public open class ParserI<P>(
      * sequence, i.e., `\`. It advances the parser to the first position
      * immediately following the escape sequence.
      */
-    public open fun parseEscape(): Result<Primitive> {
-        check(this.char() == '\\')
+    internal fun parseEscape(): ParseResult<Primitive> {
+        check(this.char() == ch('\\'))
         val start = this.pos()
         if (!this.bump()) {
-            return Err(this.error(Span.new(start, this.pos()), ErrorKind.EscapeUnexpectedEof))
+            return Result.Err(this.error(Span.new(start, this.pos()), ErrorKind.EscapeUnexpectedEof))
         }
         val c = this.char()
         // Put some of the more complicated routines into helpers.
         when {
-            c in '0'..'7' -> {
+            c in ch('0')..ch('7') -> {
                 if (!this.parser().octal) {
-                    return Err(this.error(Span.new(start, this.spanChar().end), ErrorKind.UnsupportedBackreference))
+                    return Result.Err(this.error(Span.new(start, this.spanChar().end), ErrorKind.UnsupportedBackreference))
                 }
                 val lit = this.parseOctal()
                 lit.span.start = start
-                return Result.success(Primitive.Literal(lit))
+                return Result.Ok(Primitive.Literal(lit))
             }
-            c in '8'..'9' && !this.parser().octal -> {
-                return Err(this.error(Span.new(start, this.spanChar().end), ErrorKind.UnsupportedBackreference))
+            c in ch('8')..ch('9') && !this.parser().octal -> {
+                return Result.Err(this.error(Span.new(start, this.spanChar().end), ErrorKind.UnsupportedBackreference))
             }
-            c == 'x' || c == 'u' || c == 'U' -> {
-                val lit1 = this.parseHex().getOrElse { return Result.failure(it) }
+            c == ch('x') || c == ch('u') || c == ch('U') -> {
+                val lit1 = when (val r = this.parseHex()) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
                 lit1.span.start = start
-                return Result.success(Primitive.Literal(lit1))
+                return Result.Ok(Primitive.Literal(lit1))
             }
-            c == 'p' || c == 'P' -> {
-                val cls = this.parseUnicodeClass().getOrElse { return Result.failure(it) }
+            c == ch('p') || c == ch('P') -> {
+                val cls = when (val r = this.parseUnicodeClass()) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
                 cls.span.start = start
-                return Result.success(Primitive.Unicode(cls))
+                return Result.Ok(Primitive.Unicode(cls))
             }
-            c == 'd' || c == 's' || c == 'w' || c == 'D' || c == 'S' || c == 'W' -> {
+            c == ch('d') || c == ch('s') || c == ch('w') || c == ch('D') || c == ch('S') || c == ch('W') -> {
                 val cls1 = this.parsePerlClass()
                 cls1.span.start = start
-                return Result.success(Primitive.Perl(cls1))
+                return Result.Ok(Primitive.Perl(cls1))
             }
             else -> {}
         }
@@ -1533,44 +1504,44 @@ public open class ParserI<P>(
         this.bump()
         val span = Span.new(start, this.pos())
         if (isMetaCharacter(c)) {
-            return Result.success(Primitive.Literal(Literal(span = span, kind = LiteralKind.Meta, c = c)))
+            return Result.Ok(Primitive.Literal(AstLiteral(span = span, kind = LiteralKind.Meta, c = c)))
         }
         if (isEscapeableCharacter(c)) {
-            return Result.success(Primitive.Literal(Literal(span = span, kind = LiteralKind.Superfluous, c = c)))
+            return Result.Ok(Primitive.Literal(AstLiteral(span = span, kind = LiteralKind.Superfluous, c = c)))
         }
-        val special =
-            { kind, c1 ->
-                Result.success(Primitive.Literal(Literal(span = span, kind = LiteralKind.Special(kind), c = c1)))
-            }
+        fun special(kind: SpecialLiteralKind, c1: UInt): ParseResult<Primitive> =
+            Result.Ok(Primitive.Literal(AstLiteral(span = span, kind = LiteralKind.Special(kind), c = c1)))
         return when (c) {
-            'a' -> special(SpecialLiteralKind.Bell, '\u0007')
-            'f' -> special(SpecialLiteralKind.FormFeed, '\u000c')
-            't' -> special(SpecialLiteralKind.Tab, '\t')
-            'n' -> special(SpecialLiteralKind.LineFeed, '\n')
-            'r' -> special(SpecialLiteralKind.CarriageReturn, '\r')
-            'v' -> special(SpecialLiteralKind.VerticalTab, '\u000b')
-            'A' -> Result.success(Primitive.Assertion(Assertion(span = span, kind = AssertionKind.StartText)))
-            'z' -> Result.success(Primitive.Assertion(Assertion(span = span, kind = AssertionKind.EndText)))
-            'b' -> {
-                val wb = Assertion(span = span, kind = AssertionKind.WordBoundary)
+            ch('a') -> special(SpecialLiteralKind.Bell, 0x07u)
+            ch('f') -> special(SpecialLiteralKind.FormFeed, 0x0Cu)
+            ch('t') -> special(SpecialLiteralKind.Tab, ch('\t'))
+            ch('n') -> special(SpecialLiteralKind.LineFeed, ch('\n'))
+            ch('r') -> special(SpecialLiteralKind.CarriageReturn, ch('\r'))
+            ch('v') -> special(SpecialLiteralKind.VerticalTab, 0x0Bu)
+            ch('A') -> Result.Ok(Primitive.Assertion(AstAssertion(span = span, kind = AssertionKind.StartText)))
+            ch('z') -> Result.Ok(Primitive.Assertion(AstAssertion(span = span, kind = AssertionKind.EndText)))
+            ch('b') -> {
+                val wb = AstAssertion(span = span, kind = AssertionKind.WordBoundary)
                 // After a \b, we "try" to parse things like \b{start} for
                 // special word boundary assertions.
-                if (!this.isEof() && this.char() == '{') {
-                    when (val matchVal = this.maybeParseSpecialWordBoundary(start).getOrElse { return Result.failure(it) }) {
-                        null -> {}
-                        else -> {
-                            val kind = matchVal
-                            wb.kind = kind
-                            wb.span.end = this.pos()
+                if (!this.isEof() && this.char() == ch('{')) {
+                    when (val r = this.maybeParseSpecialWordBoundary(start)) {
+                        is Result.Err -> return r
+                        is Result.Ok -> {
+                            val kind = r.value
+                            if (kind != null) {
+                                wb.kind = kind
+                                wb.span.end = this.pos()
+                            }
                         }
                     }
                 }
-                Result.success(Primitive.Assertion(wb))
+                Result.Ok(Primitive.Assertion(wb))
             }
-            'B' -> Result.success(Primitive.Assertion(Assertion(span = span, kind = AssertionKind.NotWordBoundary)))
-            '<' -> Result.success(Primitive.Assertion(Assertion(span = span, kind = AssertionKind.WordBoundaryStartAngle)))
-            '>' -> Result.success(Primitive.Assertion(Assertion(span = span, kind = AssertionKind.WordBoundaryEndAngle)))
-            else -> Err(this.error(span, ErrorKind.EscapeUnrecognized))
+            ch('B') -> Result.Ok(Primitive.Assertion(AstAssertion(span = span, kind = AssertionKind.NotWordBoundary)))
+            ch('<') -> Result.Ok(Primitive.Assertion(AstAssertion(span = span, kind = AssertionKind.WordBoundaryStartAngle)))
+            ch('>') -> Result.Ok(Primitive.Assertion(AstAssertion(span = span, kind = AssertionKind.WordBoundaryEndAngle)))
+            else -> Result.Err(this.error(span, ErrorKind.EscapeUnrecognized))
         }
     }
 
@@ -1595,16 +1566,14 @@ public open class ParserI<P>(
      *
      * The position given should correspond to the start of the `\b`.
      */
-    public open fun maybeParseSpecialWordBoundary(wbStart: Position): Result<AssertionKind?> {
-        check(this.char() == '{')
-        val isValidChar =
-            { c -> when (c) {
-                in 'A'..'Z', in 'a'..'z', '-' -> true
-                else -> false
-            } }
+    internal fun maybeParseSpecialWordBoundary(wbStart: Position): ParseResult<AssertionKind?> {
+        check(this.char() == ch('{'))
+        val isValidChar: (UInt) -> Boolean = { c ->
+            c in ch('A')..ch('Z') || c in ch('a')..ch('z') || c == ch('-')
+        }
         val start = this.pos()
         if (!this.bumpAndBumpSpace()) {
-            return Err(this.error(Span.new(wbStart, this.pos()), ErrorKind.SpecialWordOrRepetitionUnexpectedEof))
+            return Result.Err(this.error(Span.new(wbStart, this.pos()), ErrorKind.SpecialWordOrRepetitionUnexpectedEof))
         }
         val startContents = this.pos()
         // This is one of the critical bits: if the first non-whitespace
@@ -1613,31 +1582,33 @@ public open class ParserI<P>(
         // with this.
         if (!isValidChar(this.char())) {
             this.parser().pos.set(start)
-            return Result.success(null)
+            return Result.Ok(null)
         }
         // Now collect up our chars until we see a '}'.
-        val scratch = this.parser().scratch.borrowMut()
-        scratch.clear()
-        while (!this.isEof() && isValidChar(this.char())) {
-            scratch.push(this.char())
-            this.bumpAndBumpSpace()
-        }
-        if (this.isEof() || this.char() != '}') {
-            return Err(this.error(Span.new(start, this.pos()), ErrorKind.SpecialWordBoundaryUnclosed))
-        }
-        val end = this.pos()
-        this.bump()
-        val kind =
-            when (scratch.asStr()) {
-                "start" -> AssertionKind.WordBoundaryStart
-                "end" -> AssertionKind.WordBoundaryEnd
-                "start-half" -> AssertionKind.WordBoundaryStartHalf
-                "end-half" -> AssertionKind.WordBoundaryEndHalf
-                else -> {
-                    return Err(this.error(Span.new(startContents, end), ErrorKind.SpecialWordBoundaryUnrecognized))
-                }
+        return this.parser().scratch.withBorrowMut { guard ->
+            val scratch = guard.value
+            scratch.clear()
+            while (!this.isEof() && isValidChar(this.char())) {
+                scratch.appendScalar(this.char())
+                this.bumpAndBumpSpace()
             }
-        return Result.success(kind)
+            if (this.isEof() || this.char() != ch('}')) {
+                return Result.Err(this.error(Span.new(start, this.pos()), ErrorKind.SpecialWordBoundaryUnclosed))
+            }
+            val end = this.pos()
+            this.bump()
+            val kind =
+                when (scratch.toString()) {
+                    "start" -> AssertionKind.WordBoundaryStart
+                    "end" -> AssertionKind.WordBoundaryEnd
+                    "start-half" -> AssertionKind.WordBoundaryStartHalf
+                    "end-half" -> AssertionKind.WordBoundaryEndHalf
+                    else -> {
+                        return Result.Err(this.error(Span.new(startContents, end), ErrorKind.SpecialWordBoundaryUnrecognized))
+                    }
+                }
+            Result.Ok(kind)
+        }
     }
 
     /**
@@ -1649,21 +1620,21 @@ public open class ParserI<P>(
      *
      * Assuming the preconditions are met, this routine can never fail.
      */
-    public open fun parseOctal(): Literal {
+    internal fun parseOctal(): AstLiteral {
         check(this.parser().octal)
-        check('0' <= this.char() && this.char() <= '7')
+        check(this.char() in ch('0')..ch('7'))
         val start = this.pos()
         // Parse up to two more digits.
-        while (this.bump() && '0' <= this.char() && this.char() <= '7' && this.pos().offset - start.offset <= 2) {}
+        while (this.bump() && this.char() in ch('0')..ch('7') && this.pos().offset - start.offset <= 2) {}
         val end = this.pos()
-        val octal = this.pattern()[start.offset until end.offset]
+        val octal = this.utf8Bytes.decodeToString(start.offset, end.offset)
         // Parsing the octal should never fail since the above guarantees a
         // valid number.
-        val codepoint = UInt.fromStrRadix(octal, 8).expect("valid octal number")
+        val codepoint = parseUIntRadix(octal, 8) ?: error("valid octal number")
         // The max value for 3 digit octal is 0777 = 511 and [0, 511] has no
         // invalid Unicode scalar values.
-        val c = Char.fromU32(codepoint).expect("Unicode scalar value")
-        return Literal(span = Span.new(start, end), kind = LiteralKind.Octal, c = c)
+        val c = scalarFromU32(codepoint) ?: error("Unicode scalar value")
+        return AstLiteral(span = Span.new(start, end), kind = LiteralKind.Octal, c = c)
     }
 
     /**
@@ -1672,18 +1643,18 @@ public open class ParserI<P>(
      * be positioned at the `x`, `u` or `U` prefix. The parser is advanced to
      * the first character immediately following the hexadecimal literal.
      */
-    public open fun parseHex(): Result<Literal> {
-        check(this.char() == 'x' || this.char() == 'u' || this.char() == 'U')
+    internal fun parseHex(): ParseResult<AstLiteral> {
+        check(this.char() == ch('x') || this.char() == ch('u') || this.char() == ch('U'))
         val hexKind =
             when (this.char()) {
-                'x' -> HexLiteralKind.X
-                'u' -> HexLiteralKind.UnicodeShort
+                ch('x') -> HexLiteralKind.X
+                ch('u') -> HexLiteralKind.UnicodeShort
                 else -> HexLiteralKind.UnicodeLong
             }
         if (!this.bumpAndBumpSpace()) {
-            return Err(this.error(this.span(), ErrorKind.EscapeUnexpectedEof))
+            return Result.Err(this.error(this.span(), ErrorKind.EscapeUnexpectedEof))
         }
-        return if (this.char() == '{') {
+        return if (this.char() == ch('{')) {
             this.parseHexBrace(hexKind)
         } else {
             this.parseHexDigits(hexKind)
@@ -1699,29 +1670,28 @@ public open class ParserI<P>(
      * The number of digits given must be 2 (for `\xNN`), 4 (for `\uNNNN`)
      * or 8 (for `\UNNNNNNNN`).
      */
-    public open fun parseHexDigits(kind: HexLiteralKind): Result<Literal> {
-        val scratch = this.parser().scratch.borrowMut()
-        scratch.clear()
-        val start = this.pos()
-        for (i in 0 until kind.digits()) {
-            if (i > 0 && !this.bumpAndBumpSpace()) {
-                return Err(this.error(this.span(), ErrorKind.EscapeUnexpectedEof))
+    internal fun parseHexDigits(kind: HexLiteralKind): ParseResult<AstLiteral> {
+        return this.parser().scratch.withBorrowMut { guard ->
+            val scratch = guard.value
+            scratch.clear()
+            val start = this.pos()
+            for (i in 0 until kind.digits().toInt()) {
+                if (i > 0 && !this.bumpAndBumpSpace()) {
+                    return Result.Err(this.error(this.span(), ErrorKind.EscapeUnexpectedEof))
+                }
+                if (!isHex(this.char())) {
+                    return Result.Err(this.error(this.spanChar(), ErrorKind.EscapeHexInvalidDigit))
+                }
+                scratch.appendScalar(this.char())
             }
-            if (!isHex(this.char())) {
-                return Err(this.error(this.spanChar(), ErrorKind.EscapeHexInvalidDigit))
-            }
-            scratch.push(this.char())
-        }
-        // The final bump just moves the parser past the literal, which may
-        // be EOF.
-        this.bumpAndBumpSpace()
-        val end = this.pos()
-        val hex = scratch.asStr()
-        return when (val matchVal = UInt.fromStrRadix(hex, 16).ok().andThen(Char::fromU32)) {
-            null -> Err(this.error(Span.new(start, end), ErrorKind.EscapeHexInvalid))
-            else -> {
-                val c = matchVal
-                Result.success(Literal(span = Span.new(start, end), kind = LiteralKind.HexFixed(kind), c = c))
+            // The final bump just moves the parser past the literal, which may
+            // be EOF.
+            this.bumpAndBumpSpace()
+            val end = this.pos()
+            val hex = scratch.toString()
+            when (val c = parseUIntRadix(hex, 16)?.let(::scalarFromU32)) {
+                null -> Result.Err(this.error(Span.new(start, end), ErrorKind.EscapeHexInvalid))
+                else -> Result.Ok(AstLiteral(span = Span.new(start, end), kind = LiteralKind.HexFixed(kind), c = c))
             }
         }
     }
@@ -1731,32 +1701,31 @@ public open class ParserI<P>(
      * the parser to be positioned at the opening brace `{` and will advance
      * the parser to the first character following the closing brace `}`.
      */
-    public open fun parseHexBrace(kind: HexLiteralKind): Result<Literal> {
-        val scratch = this.parser().scratch.borrowMut()
-        scratch.clear()
-        val bracePos = this.pos()
-        val start = this.spanChar().end
-        while (this.bumpAndBumpSpace() && this.char() != '}') {
-            if (!isHex(this.char())) {
-                return Err(this.error(this.spanChar(), ErrorKind.EscapeHexInvalidDigit))
+    internal fun parseHexBrace(kind: HexLiteralKind): ParseResult<AstLiteral> {
+        return this.parser().scratch.withBorrowMut { guard ->
+            val scratch = guard.value
+            scratch.clear()
+            val bracePos = this.pos()
+            val start = this.spanChar().end
+            while (this.bumpAndBumpSpace() && this.char() != ch('}')) {
+                if (!isHex(this.char())) {
+                    return Result.Err(this.error(this.spanChar(), ErrorKind.EscapeHexInvalidDigit))
+                }
+                scratch.appendScalar(this.char())
             }
-            scratch.push(this.char())
-        }
-        if (this.isEof()) {
-            return Err(this.error(Span.new(bracePos, this.pos()), ErrorKind.EscapeUnexpectedEof))
-        }
-        val end = this.pos()
-        val hex = scratch.asStr()
-        check(this.char() == '}')
-        this.bumpAndBumpSpace()
-        if (hex.isEmpty()) {
-            return Err(this.error(Span.new(bracePos, this.pos()), ErrorKind.EscapeHexEmpty))
-        }
-        return when (val matchVal = UInt.fromStrRadix(hex, 16).ok().andThen(Char::fromU32)) {
-            null -> Err(this.error(Span.new(start, end), ErrorKind.EscapeHexInvalid))
-            else -> {
-                val c = matchVal
-                Result.success(Literal(span = Span.new(start, this.pos()), kind = LiteralKind.HexBrace(kind), c = c))
+            if (this.isEof()) {
+                return Result.Err(this.error(Span.new(bracePos, this.pos()), ErrorKind.EscapeUnexpectedEof))
+            }
+            val end = this.pos()
+            val hex = scratch.toString()
+            check(this.char() == ch('}'))
+            this.bumpAndBumpSpace()
+            if (hex.isEmpty()) {
+                return Result.Err(this.error(Span.new(bracePos, this.pos()), ErrorKind.EscapeHexEmpty))
+            }
+            when (val c = parseUIntRadix(hex, 16)?.let(::scalarFromU32)) {
+                null -> Result.Err(this.error(Span.new(start, end), ErrorKind.EscapeHexInvalid))
+                else -> Result.Ok(AstLiteral(span = Span.new(start, this.pos()), kind = LiteralKind.HexBrace(kind), c = c))
             }
         }
     }
@@ -1772,30 +1741,29 @@ public open class ParserI<P>(
      * If no decimal digit could be found or if there was a problem parsing
      * the complete set of digits into a u32, then an error is returned.
      */
-    public open fun parseDecimal(): Result<UInt> {
-        val scratch = this.parser().scratch.borrowMut()
-        scratch.clear()
-        while (!this.isEof() && this.char().isWhitespace()) {
-            this.bump()
-        }
-        val start = this.pos()
-        while (!this.isEof() && '0' <= this.char() && this.char() <= '9') {
-            scratch.push(this.char())
-            this.bumpAndBumpSpace()
-        }
-        val span = Span.new(start, this.pos())
-        while (!this.isEof() && this.char().isWhitespace()) {
-            this.bumpAndBumpSpace()
-        }
-        val digits = scratch.asStr()
-        if (digits.isEmpty()) {
-            return Err(this.error(span, ErrorKind.DecimalEmpty))
-        }
-        return when (val matchVal = UInt.fromStrRadix(digits, 10).ok()) {
-            null -> Err(this.error(span, ErrorKind.DecimalInvalid))
-            else -> {
-                val n = matchVal
-                Result.success(n)
+    internal fun parseDecimal(): ParseResult<UInt> {
+        return this.parser().scratch.withBorrowMut { guard ->
+            val scratch = guard.value
+            scratch.clear()
+            while (!this.isEof() && scalarIsWhitespace(this.char())) {
+                this.bump()
+            }
+            val start = this.pos()
+            while (!this.isEof() && this.char() in ch('0')..ch('9')) {
+                scratch.appendScalar(this.char())
+                this.bumpAndBumpSpace()
+            }
+            val span = Span.new(start, this.pos())
+            while (!this.isEof() && scalarIsWhitespace(this.char())) {
+                this.bumpAndBumpSpace()
+            }
+            val digits = scratch.toString()
+            if (digits.isEmpty()) {
+                return Result.Err(this.error(span, ErrorKind.DecimalEmpty))
+            }
+            when (val n = parseUIntRadix(digits, 10)) {
+                null -> Result.Err(this.error(span, ErrorKind.DecimalInvalid))
+                else -> Result.Ok(n)
             }
         }
     }
@@ -1809,59 +1777,58 @@ public open class ParserI<P>(
      * is successful, then the parser is advanced to the position immediately
      * following the closing `]`.
      */
-    public open fun parseSetClass(): Result<ClassBracketed> {
-        check(this.char() == '[')
-        var union = ClassSetUnion(span = this.span(), items = mutableListOf())
+    internal fun parseSetClass(): ParseResult<ClassBracketed> {
+        check(this.char() == ch('['))
+        var union = ClassSetUnion(span = this.span(), items = emptyList())
         while (true) {
             this.bumpSpace()
             if (this.isEof()) {
-                return Err(this.unclosedClassError())
+                return Result.Err(this.unclosedClassError())
             }
-            run {
-                val matchVal = this.char()
-                when {
-                    matchVal == '[' -> {
-                        // If we've already parsed the opening bracket, then
-                        // attempt to treat this as the beginning of an ASCII
-                        // class. If ASCII class parsing fails, then the parser
-                        // backs up to `[`.
-                        if (!this.parser().stackClass.borrow().isEmpty()) {
-                            when (val matchVal1 = this.maybeParseAsciiClass()) {
-                                null -> {}
-                                else -> {
-                                    val cls = matchVal1
-                                    union.push(ClassSetItem.Ascii(cls))
-                                    continue
-                                }
-                            }
-                        }
-                        union = this.pushClassOpen(union).getOrElse { return Result.failure(it) }
-                    }
-                    matchVal == ']' -> when (val matchVal2 = this.popClass(union).getOrElse { return Result.failure(it) }) {
-                        is Either.Left -> {
-                            val (nestedUnion) = matchVal2
-                            union = nestedUnion
-                        }
-                        is Either.Right -> {
-                            val (cls) = matchVal2
-                            return Result.success(cls)
+            val c = this.char()
+            when {
+                c == ch('[') -> {
+                    // If we've already parsed the opening bracket, then
+                    // attempt to treat this as the beginning of an ASCII
+                    // class. If ASCII class parsing fails, then the parser
+                    // backs up to `[`.
+                    if (this.parser().stackClass.withBorrow { it.isNotEmpty() }) {
+                        val cls = this.maybeParseAsciiClass()
+                        if (cls != null) {
+                            union.push(ClassSetItem.Ascii(cls))
+                            continue
                         }
                     }
-                    matchVal == '&' && this.peek() == '&' -> {
-                        check(this.bumpIf("&&"))
-                        union = this.pushClassOp(ClassSetBinaryOpKind.Intersection, union)
+                    union = when (val r = this.pushClassOpen(union)) {
+                        is Result.Ok -> r.value
+                        is Result.Err -> return r
                     }
-                    matchVal == '-' && this.peek() == '-' -> {
-                        check(this.bumpIf("--"))
-                        union = this.pushClassOp(ClassSetBinaryOpKind.Difference, union)
+                }
+                c == ch(']') -> when (val popped = when (val r = this.popClass(union)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }) {
+                    is Either.Left -> union = popped.value
+                    is Either.Right -> return Result.Ok(popped.value)
+                }
+                c == ch('&') && this.peek() == ch('&') -> {
+                    check(this.bumpIf("&&"))
+                    union = this.pushClassOp(ClassSetBinaryOpKind.Intersection, union)
+                }
+                c == ch('-') && this.peek() == ch('-') -> {
+                    check(this.bumpIf("--"))
+                    union = this.pushClassOp(ClassSetBinaryOpKind.Difference, union)
+                }
+                c == ch('~') && this.peek() == ch('~') -> {
+                    check(this.bumpIf("~~"))
+                    union = this.pushClassOp(ClassSetBinaryOpKind.SymmetricDifference, union)
+                }
+                else -> {
+                    val item = when (val r = this.parseSetClassRange()) {
+                        is Result.Ok -> r.value
+                        is Result.Err -> return r
                     }
-                    matchVal == '~' && this.peek() == '~' -> {
-                        check(this.bumpIf("~~"))
-                        union = this.pushClassOp(ClassSetBinaryOpKind.SymmetricDifference, union)
-                    }
-                    else -> {
-                        union.push(this.parseSetClassRange().getOrElse { return Result.failure(it) })
-                    }
+                    union.push(item)
                 }
             }
         }
@@ -1877,31 +1844,45 @@ public open class ParserI<P>(
      * a simple literal is expected (e.g., in a range), then an error is
      * returned.
      */
-    public open fun parseSetClassRange(): Result<ClassSetItem> {
-        val prim1 = this.parseSetClassItem().getOrElse { return Result.failure(it) }
+    internal fun parseSetClassRange(): ParseResult<ClassSetItem> {
+        val prim1 = when (val r = this.parseSetClassItem()) {
+            is Result.Ok -> r.value
+            is Result.Err -> return r
+        }
         this.bumpSpace()
         if (this.isEof()) {
-            return Err(this.unclosedClassError())
+            return Result.Err(this.unclosedClassError())
         }
         // If the next char isn't a `-`, then we don't have a range.
         // There are two exceptions. If the char after a `-` is a `]`, then
         // `-` is interpreted as a literal `-`. Alternatively, if the char
         // after a `-` is a `-`, then `- -` corresponds to a "difference"
         // operation.
-        if (this.char() != '-' || this.peekSpace() == ']' || this.peekSpace() == '-') {
+        if (this.char() != ch('-') || this.peekSpace() == ch(']') || this.peekSpace() == ch('-')) {
             return prim1.intoClassSetItem(this)
         }
         // OK, now we're parsing a range, so bump past the `-` and parse the
         // second half of the range.
         if (!this.bumpAndBumpSpace()) {
-            return Err(this.unclosedClassError())
+            return Result.Err(this.unclosedClassError())
         }
-        val prim2 = this.parseSetClassItem().getOrElse { return Result.failure(it) }
-        val range = ClassSetRange(span = Span.new(prim1.span().start, prim2.span().end), start = prim1.intoClassLiteral(this).getOrElse { return Result.failure(it) }, end = prim2.intoClassLiteral(this).getOrElse { return Result.failure(it) })
+        val prim2 = when (val r = this.parseSetClassItem()) {
+            is Result.Ok -> r.value
+            is Result.Err -> return r
+        }
+        val startLit = when (val r = prim1.intoClassLiteral(this)) {
+            is Result.Ok -> r.value
+            is Result.Err -> return r
+        }
+        val endLit = when (val r = prim2.intoClassLiteral(this)) {
+            is Result.Ok -> r.value
+            is Result.Err -> return r
+        }
+        val range = ClassSetRange(span = Span.new(prim1.span().start, prim2.span().end), start = startLit, end = endLit)
         if (!range.isValid()) {
-            return Err(this.error(range.span, ErrorKind.ClassRangeInvalid))
+            return Result.Err(this.error(range.span, ErrorKind.ClassRangeInvalid))
         }
-        return Result.success(ClassSetItem.Range(range))
+        return Result.Ok(ClassSetItem.Range(range))
     }
 
     /**
@@ -1916,13 +1897,13 @@ public open class ParserI<P>(
      * Note that it is the caller's responsibility to report an error if an
      * illegal primitive was parsed.
      */
-    public open fun parseSetClassItem(): Result<Primitive> =
-        if (this.char() == '\\') {
+    internal fun parseSetClassItem(): ParseResult<Primitive> =
+        if (this.char() == ch('\\')) {
             this.parseEscape()
         } else {
-            val x = Primitive.Literal(Literal(span = this.spanChar(), kind = LiteralKind.Verbatim, c = this.char()))
+            val x = Primitive.Literal(AstLiteral(span = this.spanChar(), kind = LiteralKind.Verbatim, c = this.char()))
             this.bump()
-            Result.success(x)
+            Result.Ok(x)
         }
 
     /**
@@ -1943,39 +1924,39 @@ public open class ParserI<P>(
      *
      * An error is returned if EOF is found.
      */
-    public open fun parseSetClassOpen(): Result<Pair<ClassBracketed, ClassSetUnion>> {
-        check(this.char() == '[')
+    internal fun parseSetClassOpen(): ParseResult<Pair<ClassBracketed, ClassSetUnion>> {
+        check(this.char() == ch('['))
         val start = this.pos()
         if (!this.bumpAndBumpSpace()) {
-            return Err(this.error(Span.new(start, this.pos()), ErrorKind.ClassUnclosed))
+            return Result.Err(this.error(Span.new(start, this.pos()), ErrorKind.ClassUnclosed))
         }
         val negated =
-            if (this.char() != '^') {
+            if (this.char() != ch('^')) {
                 false
             } else {
                 if (!this.bumpAndBumpSpace()) {
-                    return Err(this.error(Span.new(start, this.pos()), ErrorKind.ClassUnclosed))
+                    return Result.Err(this.error(Span.new(start, this.pos()), ErrorKind.ClassUnclosed))
                 }
                 true
             }
         // Accept any number of `-` as literal `-`.
-        val union = ClassSetUnion(span = this.span(), items = mutableListOf())
-        while (this.char() == '-') {
-            union.push(ClassSetItem.Literal(Literal(span = this.spanChar(), kind = LiteralKind.Verbatim, c = '-')))
+        val union = ClassSetUnion(span = this.span(), items = emptyList())
+        while (this.char() == ch('-')) {
+            union.push(ClassSetItem.Literal(AstLiteral(span = this.spanChar(), kind = LiteralKind.Verbatim, c = ch('-'))))
             if (!this.bumpAndBumpSpace()) {
-                return Err(this.error(Span.new(start, start), ErrorKind.ClassUnclosed))
+                return Result.Err(this.error(Span.new(start, start), ErrorKind.ClassUnclosed))
             }
         }
         // If `]` is the *first* char in a set, then interpret it as a literal
         // `]`. That is, an empty class is impossible to write.
-        if (union.items.isEmpty() && this.char() == ']') {
-            union.push(ClassSetItem.Literal(Literal(span = this.spanChar(), kind = LiteralKind.Verbatim, c = ']')))
+        if (union.items.isEmpty() && this.char() == ch(']')) {
+            union.push(ClassSetItem.Literal(AstLiteral(span = this.spanChar(), kind = LiteralKind.Verbatim, c = ch(']'))))
             if (!this.bumpAndBumpSpace()) {
-                return Err(this.error(Span.new(start, this.pos()), ErrorKind.ClassUnclosed))
+                return Result.Err(this.error(Span.new(start, this.pos()), ErrorKind.ClassUnclosed))
             }
         }
-        val set = ClassBracketed(span = Span.new(start, this.pos()), negated = negated, kind = ClassSet.union(ClassSetUnion(span = Span.new(union.span.start, union.span.start), items = mutableListOf())))
-        return Result.success(Pair(set, union))
+        val set = ClassBracketed(span = Span.new(start, this.pos()), negated = negated, kind = ClassSet.union(ClassSetUnion(span = Span.new(union.span.start, union.span.start), items = emptyList())))
+        return Result.Ok(Pair(set, union))
     }
 
     /**
@@ -1988,7 +1969,7 @@ public open class ParserI<P>(
      * advanced to the first byte following the closing `]` and the
      * corresponding ASCII class is returned.
      */
-    public open fun maybeParseAsciiClass(): ClassAscii? {
+    internal fun maybeParseAsciiClass(): ClassAscii? {
         // ASCII character classes are interesting from a parsing perspective
         // because parsing cannot fail with any interesting error. For example,
         // in order to use an ASCII character class, it must be enclosed in
@@ -2008,11 +1989,11 @@ public open class ParserI<P>(
         // Reasonable people can probably disagree over this, but for better
         // or worse, we implement semantics that never fails at the expense
         // of better failure modes.
-        check(this.char() == '[')
+        check(this.char() == ch('['))
         // If parsing fails, then we back up the parser to this starting point.
         val start = this.pos()
         var negated = false
-        if (!this.bump() || this.char() != ':') {
+        if (!this.bump() || this.char() != ch(':')) {
             this.parser().pos.set(start)
             return null
         }
@@ -2020,7 +2001,7 @@ public open class ParserI<P>(
             this.parser().pos.set(start)
             return null
         }
-        if (this.char() == '^') {
+        if (this.char() == ch('^')) {
             negated = true
             if (!this.bump()) {
                 this.parser().pos.set(start)
@@ -2028,26 +2009,20 @@ public open class ParserI<P>(
             }
         }
         val nameStart = this.offset()
-        while (this.char() != ':' && this.bump()) {}
+        while (this.char() != ch(':') && this.bump()) {}
         if (this.isEof()) {
             this.parser().pos.set(start)
             return null
         }
-        val name = this.pattern()[nameStart until this.offset()]
+        val name = this.utf8Bytes.decodeToString(nameStart, this.offset())
         if (!this.bumpIf(":]")) {
             this.parser().pos.set(start)
             return null
         }
-        val kind1 =
-            when (val matchVal = ClassAsciiKind.fromName(name)) {
-                null -> {
-                    this.parser().pos.set(start)
-                    return null
-                }
-                else -> {
-                    val kind = matchVal
-                    kind
-                }
+        val kind1 = ClassAsciiKind.fromName(name)
+            ?: run {
+                this.parser().pos.set(start)
+                return null
             }
         return ClassAscii(span = Span.new(start, this.pos()), kind = kind1, negated = negated)
     }
@@ -2060,62 +2035,74 @@ public open class ParserI<P>(
      *
      * Note that this does not check whether the class name is valid or not.
      */
-    public open fun parseUnicodeClass(): Result<ClassUnicode> {
-        check(this.char() == 'p' || this.char() == 'P')
-        val scratch = this.parser().scratch.borrowMut()
-        scratch.clear()
-        val negated = this.char() == 'P'
+    internal fun parseUnicodeClass(): ParseResult<ClassUnicode> {
+        check(this.char() == ch('p') || this.char() == ch('P'))
+        val negated = this.char() == ch('P')
         if (!this.bumpAndBumpSpace()) {
-            return Err(this.error(this.span(), ErrorKind.EscapeUnexpectedEof))
+            return Result.Err(this.error(this.span(), ErrorKind.EscapeUnexpectedEof))
         }
-        val (start2, kind1) =
-            if (this.char() == '{') {
-                val start = this.spanChar().end
-                while (this.bumpAndBumpSpace() && this.char() != '}') {
-                    scratch.push(this.char())
-                }
-                if (this.isEof()) {
-                    return Err(this.error(this.span(), ErrorKind.EscapeUnexpectedEof))
-                }
-                check(this.char() == '}')
-                this.bump()
-                val name = scratch.asStr()
-                when (val matchVal2 = name.indexOf("!=").takeIf { it >= 0 }) {
-                    null -> {
-                        when (val matchVal1 = name.indexOf(':').takeIf { it >= 0 }) {
-                            null -> {
-                                when (val matchVal = name.indexOf('=').takeIf { it >= 0 }) {
-                                    null -> {
-                                        Pair(start, ClassUnicodeKind.Named(name.toString()))
-                                    }
-                                    else -> {
-                                        val i = matchVal
-                                        Pair(start, ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Equal, name = name[0 until i].toString(), value = name[i + 1 until name.size].toString()))
+        return this.parser().scratch.withBorrowMut { guard ->
+            val scratch = guard.value
+            scratch.clear()
+            val (start2, kind1) =
+                if (this.char() == ch('{')) {
+                    val start = this.spanChar().end
+                    while (this.bumpAndBumpSpace() && this.char() != ch('}')) {
+                        scratch.appendScalar(this.char())
+                    }
+                    if (this.isEof()) {
+                        return Result.Err(this.error(this.span(), ErrorKind.EscapeUnexpectedEof))
+                    }
+                    check(this.char() == ch('}'))
+                    this.bump()
+                    val name = scratch.toString()
+                    when (val i2 = name.indexOf("!=").takeIf { it >= 0 }) {
+                        null -> {
+                            when (val i1 = name.indexOf(':').takeIf { it >= 0 }) {
+                                null -> {
+                                    when (val i = name.indexOf('=').takeIf { it >= 0 }) {
+                                        null -> Pair(start, ClassUnicodeKind.Named(name))
+                                        else -> Pair(
+                                            start,
+                                            ClassUnicodeKind.NamedValue(
+                                                op = ClassUnicodeOpKind.Equal,
+                                                name = name.substring(0, i),
+                                                value = name.substring(i + 1),
+                                            ),
+                                        )
                                     }
                                 }
-                            }
-                            else -> {
-                                val i1 = matchVal1
-                                Pair(start, ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Colon, name = name[0 until i1].toString(), value = name[i1 + 1 until name.size].toString()))
+                                else -> Pair(
+                                    start,
+                                    ClassUnicodeKind.NamedValue(
+                                        op = ClassUnicodeOpKind.Colon,
+                                        name = name.substring(0, i1),
+                                        value = name.substring(i1 + 1),
+                                    ),
+                                )
                             }
                         }
+                        else -> Pair(
+                            start,
+                            ClassUnicodeKind.NamedValue(
+                                op = ClassUnicodeOpKind.NotEqual,
+                                name = name.substring(0, i2),
+                                value = name.substring(i2 + 2),
+                            ),
+                        )
                     }
-                    else -> {
-                        val i2 = matchVal2
-                        Pair(start, ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.NotEqual, name = name[0 until i2].toString(), value = name[i2 + 2 until name.size].toString()))
+                } else {
+                    val start1 = this.pos()
+                    val c = this.char()
+                    if (c == ch('\\')) {
+                        return Result.Err(this.error(this.spanChar(), ErrorKind.UnicodeClassInvalid))
                     }
+                    this.bumpAndBumpSpace()
+                    val kind = ClassUnicodeKind.OneLetter(c)
+                    Pair(start1, kind)
                 }
-            } else {
-                val start1 = this.pos()
-                val c = this.char()
-                if (c == '\\') {
-                    return Err(this.error(this.spanChar(), ErrorKind.UnicodeClassInvalid))
-                }
-                this.bumpAndBumpSpace()
-                val kind = ClassUnicodeKind.OneLetter(c)
-                Pair(start1, kind)
-            }
-        return Result.success(ClassUnicode(span = Span.new(start2, this.pos()), negated = negated, kind = kind1))
+            Result.Ok(ClassUnicode(span = Span.new(start2, this.pos()), negated = negated, kind = kind1))
+        }
     }
 
     /**
@@ -2123,31 +2110,29 @@ public open class ParserI<P>(
      * parser is currently at a valid character class name and will be
      * advanced to the character immediately following the class.
      */
-    public open fun parsePerlClass(): ClassPerl {
+    internal fun parsePerlClass(): ClassPerl {
         val c = this.char()
         val span = this.spanChar()
         this.bump()
         val (negated, kind) =
             when (c) {
-                'd' -> Pair(false, ClassPerlKind.Digit)
-                'D' -> Pair(true, ClassPerlKind.Digit)
-                's' -> Pair(false, ClassPerlKind.Space)
-                'S' -> Pair(true, ClassPerlKind.Space)
-                'w' -> Pair(false, ClassPerlKind.Word)
-                'W' -> Pair(true, ClassPerlKind.Word)
-                else -> {
-                    val c1 = c
-                    error("expected valid Perl class but got '$c'")
-                }
+                ch('d') -> Pair(false, ClassPerlKind.Digit)
+                ch('D') -> Pair(true, ClassPerlKind.Digit)
+                ch('s') -> Pair(false, ClassPerlKind.Space)
+                ch('S') -> Pair(true, ClassPerlKind.Space)
+                ch('w') -> Pair(false, ClassPerlKind.Word)
+                ch('W') -> Pair(true, ClassPerlKind.Word)
+                else -> error("expected valid Perl class but got '$c'")
             }
         return ClassPerl(span = span, kind = kind, negated = negated)
     }
 
-    public companion object {
+    internal companion object {
         /**
          * Build an internal parser from a parser configuration and a pattern.
          */
-        public fun <P> new(parser: P, pattern: String): ParserI<P> = ParserI(parser = parser, pattern = pattern)
+        internal fun new(parser: Parser, pattern: String): ParserI =
+            ParserI(parserRef = parser, patternStr = pattern)
     }
 }
 
@@ -2156,18 +2141,18 @@ public open class ParserI<P>(
  * and alternations. Each frame records the state up to an opening parenthesis
  * or a alternating bracket `|`.
  */
-public sealed class GroupState {
+internal sealed class GroupState {
     /**
      * This state is pushed whenever an opening group is found.
      */
-    public data class Group(public var concat: Concat, public var group: Group, public var ignoreWhitespace: Boolean) : GroupState()
+    internal data class Group(internal var concat: Concat, internal var group: AstGroup, internal var ignoreWhitespace: Boolean) : GroupState()
     /**
      * This state is pushed whenever a new alternation branch is found. If
      * an alternation branch is found and this state is at the top of the
      * stack, then this state should be modified to include the new
      * alternation.
      */
-    public data class Alternation(public var value: Alternation) : GroupState()
+    internal data class Alternation(internal var value: AstAlternation) : GroupState()
 }
 
 /**
@@ -2178,79 +2163,70 @@ public sealed class GroupState {
  * Note that a parser's character class stack is only non-empty when parsing
  * a character class. In all other cases, it is empty.
  */
-public sealed class ClassState {
+internal sealed class ClassState {
     /**
      * This state is pushed whenever an opening bracket is found.
      */
-    public data class Open(public var union: ClassSetUnion, public var set: ClassBracketed) : ClassState()
+    internal data class Open(internal var union: ClassSetUnion, internal var set: ClassBracketed) : ClassState()
     /**
      * This state is pushed when a operator is seen. When popped, the stored
      * set becomes the left hand side of the operator.
      */
-    public data class Op(public var kind: ClassSetBinaryOpKind, public var lhs: ClassSet) : ClassState()
+    internal data class Op(internal var kind: ClassSetBinaryOpKind, internal var lhs: ClassSet) : ClassState()
 }
 
 /**
  * A type that traverses a fully parsed Ast and checks whether its depth
  * exceeds the specified nesting limit. If it does, then an error is returned.
  */
-public open class NestLimiter<P>(
+internal open class NestLimiter(
     /**
      * The parser that is checking the nest limit.
      */
-    public var p: ParserI<P>,
+    internal var p: ParserI,
     /**
      * The current depth while walking an Ast.
      */
-    public var depth: UInt,
-) : Visitor {
-    public open fun check(ast: Ast): Result<Unit> = visit(ast, this)
+    internal var depth: UInt,
+) : Visitor<Unit, Error> {
+    internal open fun check(ast: Ast): ParseResult<Unit> = visit(ast, this)
 
-    public open fun incrementDepth(span: Span): Result<Unit> {
-        val new =
-            ((this.depth).toLong() + (1).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt().okOrElse({
-                this.p.error(span.clone(), ErrorKind.NestLimitExceeded(UInt.MAX_VALUE))
-            }).getOrElse { return Result.failure(it) }
+    internal open fun incrementDepth(span: Span): ParseResult<Unit> {
+        val next =
+            if (this.depth == UInt.MAX_VALUE) {
+                return Result.Err(this.p.error(span.copy(), ErrorKind.NestLimitExceeded(UInt.MAX_VALUE)))
+            } else {
+                this.depth + 1u
+            }
         val limit = this.p.parser().nestLimit
-        if (new > limit) {
-            return Err(this.p.error(span.clone(), ErrorKind.NestLimitExceeded(limit)))
+        if (next > limit) {
+            return Result.Err(this.p.error(span.copy(), ErrorKind.NestLimitExceeded(limit)))
         }
-        this.depth = new
-        return Result.success(Unit)
+        this.depth = next
+        return Result.Ok(Unit)
     }
 
-    public open fun decrementDepth() {
+    internal open fun decrementDepth() {
         // Assuming the correctness of the visitor, this should never drop
         // below 0.
-        this.depth = (((this.depth).toLong() - (1).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt())!!
+        check(this.depth > 0u) { "nest depth underflow" }
+        this.depth -= 1u
     }
 
-    public open fun finish(): Result<Unit> = Result.success(Unit)
+    override fun finish(): ParseResult<Unit> = Result.Ok(Unit)
 
-    public open fun visitPre(ast: Ast): Result<Unit> {
+    override fun visitPre(ast: Ast): ParseResult<Unit> {
         val span =
             when (ast) {
-                is Ast.Empty -> {
+                is Ast.Empty,
+                is Ast.Flags,
+                is Ast.Literal,
+                is Ast.Dot,
+                is Ast.Assertion,
+                is Ast.ClassUnicode,
+                is Ast.ClassPerl, -> {
                     // These are all base cases, so we don't increment depth.
-                    return Result.success(Unit)
-                }
-                is Ast.Flags -> {
-                    return Result.success(Unit)
-                }
-                is Ast.Literal -> {
-                    return Result.success(Unit)
-                }
-                is Ast.Dot -> {
-                    return Result.success(Unit)
-                }
-                is Ast.Assertion -> {
-                    return Result.success(Unit)
-                }
-                is Ast.ClassUnicode -> {
-                    return Result.success(Unit)
-                }
-                is Ast.ClassPerl -> {
-                    return Result.success(Unit)
+                    return Result.Ok(Unit)
                 }
                 is Ast.ClassBracketed -> {
                     val (x) = ast
@@ -2276,73 +2252,39 @@ public open class NestLimiter<P>(
         return this.incrementDepth(span)
     }
 
-    public open fun visitPost(ast: Ast): Result<Unit> =
+    override fun visitPost(ast: Ast): ParseResult<Unit> =
         when (ast) {
-            is Ast.Empty -> {
+            is Ast.Empty,
+            is Ast.Flags,
+            is Ast.Literal,
+            is Ast.Dot,
+            is Ast.Assertion,
+            is Ast.ClassUnicode,
+            is Ast.ClassPerl, -> {
                 // These are all base cases, so we don't decrement depth.
-                Result.success(Unit)
+                Result.Ok(Unit)
             }
-            is Ast.Flags -> {
-                Result.success(Unit)
-            }
-            is Ast.Literal -> {
-                Result.success(Unit)
-            }
-            is Ast.Dot -> {
-                Result.success(Unit)
-            }
-            is Ast.Assertion -> {
-                Result.success(Unit)
-            }
-            is Ast.ClassUnicode -> {
-                Result.success(Unit)
-            }
-            is Ast.ClassPerl -> {
-                Result.success(Unit)
-            }
-            is Ast.ClassBracketed -> {
+            is Ast.ClassBracketed,
+            is Ast.Repetition,
+            is Ast.Group,
+            is Ast.Alternation,
+            is Ast.Concat, -> {
                 this.decrementDepth()
-                Result.success(Unit)
-            }
-            is Ast.Repetition -> {
-                this.decrementDepth()
-                Result.success(Unit)
-            }
-            is Ast.Group -> {
-                this.decrementDepth()
-                Result.success(Unit)
-            }
-            is Ast.Alternation -> {
-                this.decrementDepth()
-                Result.success(Unit)
-            }
-            is Ast.Concat -> {
-                this.decrementDepth()
-                Result.success(Unit)
+                Result.Ok(Unit)
             }
         }
 
-    public open fun visitClassSetItemPre(ast: ClassSetItem): Result<Unit> {
+    override fun visitClassSetItemPre(ast: ClassSetItem): ParseResult<Unit> {
         val span =
             when (ast) {
-                is ClassSetItem.Empty -> {
+                is ClassSetItem.Empty,
+                is ClassSetItem.Literal,
+                is ClassSetItem.Range,
+                is ClassSetItem.Ascii,
+                is ClassSetItem.Unicode,
+                is ClassSetItem.Perl, -> {
                     // These are all base cases, so we don't increment depth.
-                    return Result.success(Unit)
-                }
-                is ClassSetItem.Literal -> {
-                    return Result.success(Unit)
-                }
-                is ClassSetItem.Range -> {
-                    return Result.success(Unit)
-                }
-                is ClassSetItem.Ascii -> {
-                    return Result.success(Unit)
-                }
-                is ClassSetItem.Unicode -> {
-                    return Result.success(Unit)
-                }
-                is ClassSetItem.Perl -> {
-                    return Result.success(Unit)
+                    return Result.Ok(Unit)
                 }
                 is ClassSetItem.Bracketed -> {
                     val (x) = ast
@@ -2356,46 +2298,34 @@ public open class NestLimiter<P>(
         return this.incrementDepth(span)
     }
 
-    public open fun visitClassSetItemPost(ast: ClassSetItem): Result<Unit> =
+    override fun visitClassSetItemPost(ast: ClassSetItem): ParseResult<Unit> =
         when (ast) {
-            is ClassSetItem.Empty -> {
+            is ClassSetItem.Empty,
+            is ClassSetItem.Literal,
+            is ClassSetItem.Range,
+            is ClassSetItem.Ascii,
+            is ClassSetItem.Unicode,
+            is ClassSetItem.Perl, -> {
                 // These are all base cases, so we don't decrement depth.
-                Result.success(Unit)
+                Result.Ok(Unit)
             }
-            is ClassSetItem.Literal -> {
-                Result.success(Unit)
-            }
-            is ClassSetItem.Range -> {
-                Result.success(Unit)
-            }
-            is ClassSetItem.Ascii -> {
-                Result.success(Unit)
-            }
-            is ClassSetItem.Unicode -> {
-                Result.success(Unit)
-            }
-            is ClassSetItem.Perl -> {
-                Result.success(Unit)
-            }
-            is ClassSetItem.Bracketed -> {
+            is ClassSetItem.Bracketed,
+            is ClassSetItem.Union, -> {
                 this.decrementDepth()
-                Result.success(Unit)
-            }
-            is ClassSetItem.Union -> {
-                this.decrementDepth()
-                Result.success(Unit)
+                Result.Ok(Unit)
             }
         }
 
-    public open fun visitClassSetBinaryOpPre(ast: ClassSetBinaryOp): Result<Unit> = this.incrementDepth(ast.span)
+    override fun visitClassSetBinaryOpPre(ast: ClassSetBinaryOp): ParseResult<Unit> =
+        this.incrementDepth(ast.span)
 
-    public open fun visitClassSetBinaryOpPost(ast: ClassSetBinaryOp): Result<Unit> {
+    override fun visitClassSetBinaryOpPost(ast: ClassSetBinaryOp): ParseResult<Unit> {
         this.decrementDepth()
-        return Result.success(Unit)
+        return Result.Ok(Unit)
     }
 
-    public companion object {
-        public fun <P> new(p: ParserI<P>): NestLimiter<P> = NestLimiter(p = p, depth = 0u)
+    internal companion object {
+        internal fun new(p: ParserI): NestLimiter = NestLimiter(p = p, depth = 0u)
     }
 }
 
@@ -2404,14 +2334,15 @@ public open class NestLimiter<P>(
  * Result into another one. This function is used to return clearer error
  * messages when possible.
  */
-public fun <T> specializeErr(result: Result<T>, from: ErrorKind, to: ErrorKind): Result<T> =
-    if (result is Err) {
-        val (e) = result
-        if (e.kind == from) {
-            Err(Error(kind = to, pattern = e.pattern, span = e.span))
-        } else {
-            Err(e)
+internal fun <T> specializeErr(result: ParseResult<T>, from: ErrorKind, to: ErrorKind): ParseResult<T> =
+    when (result) {
+        is Result.Err -> {
+            val e = result.error
+            if (e.kind == from) {
+                Result.Err(Error(kind = to, pattern = e.pattern, span = e.span))
+            } else {
+                result
+            }
         }
-    } else {
-        result
+        is Result.Ok -> result
     }

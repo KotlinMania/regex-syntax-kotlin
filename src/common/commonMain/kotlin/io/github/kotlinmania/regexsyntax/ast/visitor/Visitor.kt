@@ -7,8 +7,9 @@ import io.github.kotlinmania.regexsyntax.ast.ClassSet
 import io.github.kotlinmania.regexsyntax.ast.ClassSetBinaryOp
 import io.github.kotlinmania.regexsyntax.ast.ClassSetBinaryOpKind
 import io.github.kotlinmania.regexsyntax.ast.ClassSetItem
-import io.github.kotlinmania.regexsyntax.ast.Group
-import io.github.kotlinmania.regexsyntax.ast.Repetition
+import io.github.kotlinmania.regexsyntax.ast.Group as AstGroup
+import io.github.kotlinmania.regexsyntax.ast.Repetition as AstRepetition
+import io.github.kotlinmania.rustlang.core.result.Result
 
 /**
  * A trait for visiting an abstract syntax tree (AST) in depth first order.
@@ -32,7 +33,7 @@ public interface Visitor<Output, Err> {
      * All implementors of `Visitor` must provide a `finish` method, which
      * yields the result of visiting the AST or an error.
      */
-    public fun finish(): Result<Output>
+    public fun finish(): Result<Output, Err>
 
     /**
      * This method is called before beginning traversal of the AST.
@@ -43,56 +44,56 @@ public interface Visitor<Output, Err> {
      * This method is called on an `Ast` before descending into child `Ast`
      * nodes.
      */
-    public fun visitPre(ast: Ast): Result<Unit> = Result.success(Unit)
+    public fun visitPre(ast: Ast): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called on an `Ast` after descending all of its child
      * `Ast` nodes.
      */
-    public fun visitPost(ast: Ast): Result<Unit> = Result.success(Unit)
+    public fun visitPost(ast: Ast): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called between child nodes of an
      * [`Alternation`](ast.Alternation).
      */
-    public fun visitAlternationIn(): Result<Unit> = Result.success(Unit)
+    public fun visitAlternationIn(): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called between child nodes of a concatenation.
      */
-    public fun visitConcatIn(): Result<Unit> = Result.success(Unit)
+    public fun visitConcatIn(): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called on every [`ClassSetItem`](ast.ClassSetItem)
      * before descending into child nodes.
      */
-    public fun visitClassSetItemPre(ast: ClassSetItem): Result<Unit> = Result.success(Unit)
+    public fun visitClassSetItemPre(ast: ClassSetItem): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called on every [`ClassSetItem`](ast.ClassSetItem)
      * after descending into child nodes.
      */
-    public fun visitClassSetItemPost(ast: ClassSetItem): Result<Unit> = Result.success(Unit)
+    public fun visitClassSetItemPost(ast: ClassSetItem): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called on every
      * [`ClassSetBinaryOp`](ast.ClassSetBinaryOp) before descending into
      * child nodes.
      */
-    public fun visitClassSetBinaryOpPre(ast: ClassSetBinaryOp): Result<Unit> = Result.success(Unit)
+    public fun visitClassSetBinaryOpPre(ast: ClassSetBinaryOp): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called on every
      * [`ClassSetBinaryOp`](ast.ClassSetBinaryOp) after descending into child
      * nodes.
      */
-    public fun visitClassSetBinaryOpPost(ast: ClassSetBinaryOp): Result<Unit> = Result.success(Unit)
+    public fun visitClassSetBinaryOpPost(ast: ClassSetBinaryOp): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called between the left hand and right hand child nodes
      * of a [`ClassSetBinaryOp`](ast.ClassSetBinaryOp).
      */
-    public fun visitClassSetBinaryOpIn(ast: ClassSetBinaryOp): Result<Unit> = Result.success(Unit)
+    public fun visitClassSetBinaryOpIn(ast: ClassSetBinaryOp): Result<Unit, Err> = Result.Ok(Unit)
 }
 
 /**
@@ -111,80 +112,89 @@ public interface Visitor<Output, Err> {
  * If the visitor returns an error at any point, then visiting is stopped and
  * the error is returned.
  */
-public fun <Output, Err, V : Visitor> visit(ast: Ast, visitor: V): Result<Output> = HeapVisitor.new().visit(ast, visitor)
+public fun <Output, Err, V : Visitor<Output, Err>> visit(ast: Ast, visitor: V): Result<Output, Err> =
+    HeapVisitor.new().visit(ast, visitor)
 
 /**
  * HeapVisitor visits every item in an `Ast` recursively using constant stack
  * size and a heap size proportional to the size of the `Ast`.
  */
-public open class HeapVisitor(
+internal class HeapVisitor(
     /**
      * A stack of `Ast` nodes. This is roughly analogous to the call stack
      * used in a typical recursive visitor.
      */
-    public var stack: MutableList<Pair<Ast, Frame>>,
+    internal var stack: MutableList<Pair<Ast, Frame>>,
     /**
      * Similar to the `Ast` stack above, but is used only for character
      * classes. In particular, character classes embed their own mini
      * recursive syntax.
      */
-    public var stackClass: MutableList<Pair<ClassInduct, ClassFrame>>,
+    internal var stackClass: MutableList<Pair<ClassInduct, ClassFrame>>,
 ) {
-    public open fun <Output, Err, V : Visitor> visit(ast: Ast, visitor: V): Result<Output> {
+    internal fun <Output, Err, V : Visitor<Output, Err>> visit(ast: Ast, visitor: V): Result<Output, Err> {
         var ast1 = ast
         this.stack.clear()
         this.stackClass.clear()
         visitor.start()
         while (true) {
-            visitor.visitPre(ast1).getOrElse { return Result.failure(it) }
-            when (val matchVal = this.induct(ast1, visitor).getOrElse { return Result.failure(it) }) {
-                null -> {}
-                else -> {
-                    val x = matchVal
-                    val child = x.child()
-                    this.stack.add(Pair(ast1, x))
-                    ast1 = child
-                    continue
-                }
+            when (val res = visitor.visitPre(ast1)) {
+                is Result.Err -> return res
+                is Result.Ok -> {}
+            }
+            val inducted = when (val res = this.induct(ast1, visitor)) {
+                is Result.Err -> return res
+                is Result.Ok -> res.value
+            }
+            if (inducted != null) {
+                val child = inducted.child()
+                this.stack.add(Pair(ast1, inducted))
+                ast1 = child
+                continue
             }
             // No induction means we have a base case, so we can post visit
             // it now.
-            visitor.visitPost(ast1).getOrElse { return Result.failure(it) }
+            when (val res = visitor.visitPost(ast1)) {
+                is Result.Err -> return res
+                is Result.Ok -> {}
+            }
             // At this point, we now try to pop our call stack until it is
             // either empty or we hit another inductive case.
             while (true) {
                 val (postAst1, frame1) =
                     when (val matchVal1 = this.stack.removeLastOrNull()) {
-                        null -> { return visitor.finish() }
-                        else -> {
-                            val postAst = matchVal1.first
-                            val frame = matchVal1.second
-                            Pair(postAst, frame)
-                        }
+                        null -> return visitor.finish()
+                        else -> matchVal1
                     }
                 // If this is a concat/alternate, then we might have additional
                 // inductive steps to process.
-                when (val matchVal2 = this.pop(frame1)) {
-                    null -> {}
-                    else -> {
-                        val x1 = matchVal2
-                        when (x1) {
-                            is Frame.Alternation -> {
-                                visitor.visitAlternationIn().getOrElse { return Result.failure(it) }
+                val nextFrame = this.pop(frame1)
+                if (nextFrame != null) {
+                    when (nextFrame) {
+                        is Frame.Alternation -> {
+                            when (val res = visitor.visitAlternationIn()) {
+                                is Result.Err -> return res
+                                is Result.Ok -> {}
                             }
-                            is Frame.Concat -> {
-                                visitor.visitConcatIn().getOrElse { return Result.failure(it) }
-                            }
-                            else -> {}
                         }
-                        ast1 = x1.child()
-                        this.stack.add(Pair(postAst1, x1))
-                        break
+                        is Frame.Concat -> {
+                            when (val res = visitor.visitConcatIn()) {
+                                is Result.Err -> return res
+                                is Result.Ok -> {}
+                            }
+                        }
+                        else -> {}
                     }
+                    ast1 = nextFrame.child()
+                    this.stack.add(Pair(postAst1, nextFrame))
+                    break
                 }
                 // Otherwise, we've finished visiting all the child nodes for
                 // this AST, so we can post visit it now.
-                visitor.visitPost(postAst1).getOrElse { return Result.failure(it) }
+                when (val res = visitor.visitPost(postAst1)) {
+                    is Result.Err -> return res
+                    is Result.Ok -> {}
+                }
             }
         }
     }
@@ -196,46 +206,35 @@ public open class HeapVisitor(
      * If this visits a class, then the underlying visitor implementation may
      * return an error which will be passed on here.
      */
-    public open fun <Output, Err, V : Visitor> induct(ast: Ast, visitor: V): Result<Frame?> {
-        return Result.success(when {
-            ast is Ast.ClassBracketed -> {
-                val (x) = ast
-                this.visitClass(x, visitor).getOrElse { return Result.failure(it) }
+    internal fun <Output, Err, V : Visitor<Output, Err>> induct(ast: Ast, visitor: V): Result<Frame?, Err> {
+        val frame: Frame? = when (ast) {
+            is Ast.ClassBracketed -> {
+                when (val res = this.visitClass(ast.value, visitor)) {
+                    is Result.Err -> return res
+                    is Result.Ok -> {}
+                }
                 null
             }
-            ast is Ast.Repetition -> {
-                val (x1) = ast
-                Frame.Repetition(x1)
+            is Ast.Repetition -> Frame.Repetition(ast.value)
+            is Ast.Group -> Frame.Group(ast.value)
+            is Ast.Concat -> {
+                val asts = ast.value.asts
+                if (asts.isEmpty()) null else Frame.Concat(head = asts[0], tail = asts.subList(1, asts.size))
             }
-            ast is Ast.Group -> {
-                val (x2) = ast
-                Frame.Group(x2)
-            }
-            ast is Ast.Concat && (ast as Ast.Concat).value.asts.isEmpty() -> {
-                val (x3) = ast
-                null
-            }
-            ast is Ast.Concat -> {
-                val (x4) = ast
-                Frame.Concat(head = x4.asts[0], tail = x4.asts[1 until x4.asts.size])
-            }
-            ast is Ast.Alternation && (ast as Ast.Alternation).value.asts.isEmpty() -> {
-                val (x5) = ast
-                null
-            }
-            ast is Ast.Alternation -> {
-                val (x6) = ast
-                Frame.Alternation(head = x6.asts[0], tail = x6.asts[1 until x6.asts.size])
+            is Ast.Alternation -> {
+                val asts = ast.value.asts
+                if (asts.isEmpty()) null else Frame.Alternation(head = asts[0], tail = asts.subList(1, asts.size))
             }
             else -> null
-        })
+        }
+        return Result.Ok(frame)
     }
 
     /**
      * Pops the given frame. If the frame has an additional inductive step,
      * then return it, otherwise return `None`.
      */
-    public open fun pop(induct: Frame): Frame? =
+    internal fun pop(induct: Frame): Frame? =
         when (induct) {
             is Frame.Repetition -> null
             is Frame.Group -> null
@@ -244,65 +243,65 @@ public open class HeapVisitor(
                 if (tail.isEmpty()) {
                     null
                 } else {
-                    Frame.Concat(head = tail[0], tail = tail[1 until tail.size])
+                    Frame.Concat(head = tail[0], tail = tail.subList(1, tail.size))
                 }
             }
             is Frame.Alternation -> {
-                val tail1 = induct.tail
-                if (tail1.isEmpty()) {
+                val tail = induct.tail
+                if (tail.isEmpty()) {
                     null
                 } else {
-                    Frame.Alternation(head = tail1[0], tail = tail1[1 until tail1.size])
+                    Frame.Alternation(head = tail[0], tail = tail.subList(1, tail.size))
                 }
             }
         }
 
-    public open fun <Output, Err, V : Visitor> visitClass(ast: ClassBracketed, visitor: V): Result<Unit> {
-        val ast1 = ast
-        var ast2 = ClassInduct.fromBracketed(ast1)
+    internal fun <Output, Err, V : Visitor<Output, Err>> visitClass(ast: ClassBracketed, visitor: V): Result<Unit, Err> {
+        var ast2 = ClassInduct.fromBracketed(ast)
         while (true) {
-            this.visitClassPre(ast2, visitor).getOrElse { return Result.failure(it) }
-            when (val matchVal = this.inductClass(ast2)) {
-                null -> {}
-                else -> {
-                    val x = matchVal
-                    val child = x.child()
-                    this.stackClass.add(Pair(ast2, x))
-                    ast2 = child
-                    continue
-                }
+            when (val res = this.visitClassPre(ast2, visitor)) {
+                is Result.Err -> return res
+                is Result.Ok -> {}
             }
-            this.visitClassPost(ast2, visitor).getOrElse { return Result.failure(it) }
+            val inducted = this.inductClass(ast2)
+            if (inducted != null) {
+                val child = inducted.child()
+                this.stackClass.add(Pair(ast2, inducted))
+                ast2 = child
+                continue
+            }
+            when (val res = this.visitClassPost(ast2, visitor)) {
+                is Result.Err -> return res
+                is Result.Ok -> {}
+            }
             // At this point, we now try to pop our call stack until it is
             // either empty or we hit another inductive case.
             while (true) {
                 val (postAst1, frame1) =
                     when (val matchVal1 = this.stackClass.removeLastOrNull()) {
-                        null -> { return Result.success(Unit) }
-                        else -> {
-                            val postAst = matchVal1.first
-                            val frame = matchVal1.second
-                            Pair(postAst, frame)
-                        }
+                        null -> return Result.Ok(Unit)
+                        else -> matchVal1
                     }
                 // If this is a union or a binary op, then we might have
                 // additional inductive steps to process.
-                when (val matchVal2 = this.popClass(frame1)) {
-                    null -> {}
-                    else -> {
-                        val x1 = matchVal2
-                        if (x1 is ClassFrame.BinaryRHS) {
-                            val op = x1.op
-                            visitor.visitClassSetBinaryOpIn(op).getOrElse { return Result.failure(it) }
+                val nextFrame = this.popClass(frame1)
+                if (nextFrame != null) {
+                    if (nextFrame is ClassFrame.BinaryRHS) {
+                        when (val res = visitor.visitClassSetBinaryOpIn(nextFrame.op)) {
+                            is Result.Err -> return res
+                            is Result.Ok -> {}
                         }
-                        ast2 = x1.child()
-                        this.stackClass.add(Pair(postAst1, x1))
-                        break
                     }
+                    ast2 = nextFrame.child()
+                    this.stackClass.add(Pair(postAst1, nextFrame))
+                    break
                 }
                 // Otherwise, we've finished visiting all the child nodes for
                 // this class node, so we can post visit it now.
-                this.visitClassPost(postAst1, visitor).getOrElse { return Result.failure(it) }
+                when (val res = this.visitClassPost(postAst1, visitor)) {
+                    is Result.Err -> return res
+                    is Result.Ok -> {}
+                }
             }
         }
     }
@@ -310,96 +309,69 @@ public open class HeapVisitor(
     /**
      * Call the appropriate `Visitor` methods given an inductive step.
      */
-    public open fun <Output, Err, V : Visitor> visitClassPre(ast: ClassInduct, visitor: V): Result<Unit> {
+    internal fun <Output, Err, V : Visitor<Output, Err>> visitClassPre(ast: ClassInduct, visitor: V): Result<Unit, Err> =
         when (ast) {
-            is ClassInduct.Item -> {
-                val (item) = ast
-                visitor.visitClassSetItemPre(item).getOrElse { return Result.failure(it) }
-            }
-            is ClassInduct.BinaryOp -> {
-                val (op) = ast
-                visitor.visitClassSetBinaryOpPre(op).getOrElse { return Result.failure(it) }
-            }
+            is ClassInduct.Item -> visitor.visitClassSetItemPre(ast.value)
+            is ClassInduct.BinaryOp -> visitor.visitClassSetBinaryOpPre(ast.value)
         }
-        return Result.success(Unit)
-    }
 
     /**
      * Call the appropriate `Visitor` methods given an inductive step.
      */
-    public open fun <Output, Err, V : Visitor> visitClassPost(ast: ClassInduct, visitor: V): Result<Unit> {
+    internal fun <Output, Err, V : Visitor<Output, Err>> visitClassPost(ast: ClassInduct, visitor: V): Result<Unit, Err> =
         when (ast) {
-            is ClassInduct.Item -> {
-                val (item) = ast
-                visitor.visitClassSetItemPost(item).getOrElse { return Result.failure(it) }
-            }
-            is ClassInduct.BinaryOp -> {
-                val (op) = ast
-                visitor.visitClassSetBinaryOpPost(op).getOrElse { return Result.failure(it) }
-            }
+            is ClassInduct.Item -> visitor.visitClassSetItemPost(ast.value)
+            is ClassInduct.BinaryOp -> visitor.visitClassSetBinaryOpPost(ast.value)
         }
-        return Result.success(Unit)
-    }
 
     /**
      * Build a stack frame for the given class node if one is needed (which
      * occurs if and only if there are child nodes). Otherwise, return None.
      */
-    public open fun inductClass(ast: ClassInduct): ClassFrame? =
-        when {
-            ast is ClassInduct.Item && ast.value is ClassSetItem.Bracketed -> {
-                val (x) = ast
-                when (val matchVal = x.kind) {
-                    is ClassSet.Item -> {
-                        val (item) = matchVal
-                        ClassFrame.Union(head = item, tail = listOf())
+    internal fun inductClass(ast: ClassInduct): ClassFrame? =
+        when (ast) {
+            is ClassInduct.Item -> {
+                when (val item = ast.value) {
+                    is ClassSetItem.Bracketed -> {
+                        when (val kind = item.value.kind) {
+                            is ClassSet.Item -> ClassFrame.Union(head = kind.value, tail = emptyList())
+                            is ClassSet.BinaryOp -> ClassFrame.Binary(op = kind.value)
+                        }
                     }
-                    is ClassSet.BinaryOp -> {
-                        val (op) = matchVal
-                        ClassFrame.Binary(op = op)
+                    is ClassSetItem.Union -> {
+                        val items = item.value.items
+                        if (items.isEmpty()) null else ClassFrame.Union(head = items[0], tail = items.subList(1, items.size))
                     }
+                    else -> null
                 }
             }
-            ast is ClassInduct.Item && ast.value is ClassSetItem.Union -> {
-                val (x1) = ast
-                if (x1.items.isEmpty()) {
-                    null
-                } else {
-                    ClassFrame.Union(head = x1.items[0], tail = x1.items[1 until x1.items.size])
-                }
+            is ClassInduct.BinaryOp -> {
+                val op = ast.value
+                ClassFrame.BinaryLHS(op = op, lhs = op.lhs, rhs = op.rhs)
             }
-            ast is ClassInduct.BinaryOp -> {
-                val (op1) = ast
-                ClassFrame.BinaryLHS(op = op1, lhs = op1.lhs, rhs = op1.rhs)
-            }
-            else -> null
         }
 
     /**
      * Pops the given frame. If the frame has an additional inductive step,
      * then return it, otherwise return `None`.
      */
-    public open fun popClass(induct: ClassFrame): ClassFrame? =
+    internal fun popClass(induct: ClassFrame): ClassFrame? =
         when (induct) {
             is ClassFrame.Union -> {
                 val tail = induct.tail
                 if (tail.isEmpty()) {
                     null
                 } else {
-                    ClassFrame.Union(head = tail[0], tail = tail[1 until tail.size])
+                    ClassFrame.Union(head = tail[0], tail = tail.subList(1, tail.size))
                 }
             }
             is ClassFrame.Binary -> null
-            is ClassFrame.BinaryLHS -> {
-                val op = induct.op
-                val rhs = induct.rhs
-                ClassFrame.BinaryRHS(op = op, rhs = rhs)
-            }
+            is ClassFrame.BinaryLHS -> ClassFrame.BinaryRHS(op = induct.op, rhs = induct.rhs)
             is ClassFrame.BinaryRHS -> null
         }
 
-    public companion object {
-        public fun new(): HeapVisitor = HeapVisitor(stack = mutableListOf(), stackClass = mutableListOf())
+    internal companion object {
+        internal fun new(): HeapVisitor = HeapVisitor(stack = mutableListOf(), stackClass = mutableListOf())
     }
 }
 
@@ -407,50 +379,38 @@ public open class HeapVisitor(
  * Represents a single stack frame while performing structural induction over
  * an `Ast`.
  */
-public sealed class Frame {
+internal sealed class Frame {
     /**
      * A stack frame allocated just before descending into a repetition
      * operator's child node.
      */
-    public data class Repetition(public var value: Repetition) : Frame()
+    internal data class Repetition(internal var value: AstRepetition) : Frame()
     /**
      * A stack frame allocated just before descending into a group's child
      * node.
      */
-    public data class Group(public var value: Group) : Frame()
+    internal data class Group(internal var value: AstGroup) : Frame()
     /**
      * The stack frame used while visiting every child node of a concatenation
      * of expressions.
      */
-    public data class Concat(public var head: Ast, public var tail: List<Ast>) : Frame()
+    internal data class Concat(internal var head: Ast, internal var tail: List<Ast>) : Frame()
     /**
      * The stack frame used while visiting every child node of an alternation
      * of expressions.
      */
-    public data class Alternation(public var head: Ast, public var tail: List<Ast>) : Frame()
+    internal data class Alternation(internal var head: Ast, internal var tail: List<Ast>) : Frame()
 
     /**
      * Perform the next inductive step on this frame and return the next
      * child AST node to visit.
      */
-    public open fun child(): Ast =
+    internal fun child(): Ast =
         when (this) {
-            is Frame.Repetition -> {
-                val (rep) = this
-                rep.ast
-            }
-            is Frame.Group -> {
-                val (group) = this
-                group.ast
-            }
-            is Frame.Concat -> {
-                val head = this.head
-                head
-            }
-            is Frame.Alternation -> {
-                val head1 = this.head
-                head1
-            }
+            is Frame.Repetition -> this.value.ast
+            is Frame.Group -> this.value.ast
+            is Frame.Concat -> this.head
+            is Frame.Alternation -> this.head
         }
 }
 
@@ -458,52 +418,40 @@ public sealed class Frame {
  * Represents a single stack frame while performing structural induction over
  * a character class.
  */
-public sealed class ClassFrame {
+internal sealed class ClassFrame {
     /**
      * The stack frame used while visiting every child node of a union of
      * character class items.
      */
-    public data class Union(public var head: ClassSetItem, public var tail: List<ClassSetItem>) : ClassFrame()
+    internal data class Union(internal var head: ClassSetItem, internal var tail: List<ClassSetItem>) : ClassFrame()
     /**
      * The stack frame used while a binary class operation.
      */
-    public data class Binary(public var op: ClassSetBinaryOp) : ClassFrame()
+    internal data class Binary(internal var op: ClassSetBinaryOp) : ClassFrame()
     /**
      * A stack frame allocated just before descending into a binary operator's
      * left hand child node.
      */
-    public data class BinaryLHS(public var op: ClassSetBinaryOp, public var lhs: ClassSet, public var rhs: ClassSet) : ClassFrame()
+    internal data class BinaryLHS(internal var op: ClassSetBinaryOp, internal var lhs: ClassSet, internal var rhs: ClassSet) : ClassFrame()
     /**
      * A stack frame allocated just before descending into a binary operator's
      * right hand child node.
      */
-    public data class BinaryRHS(public var op: ClassSetBinaryOp, public var rhs: ClassSet) : ClassFrame()
+    internal data class BinaryRHS(internal var op: ClassSetBinaryOp, internal var rhs: ClassSet) : ClassFrame()
 
     /**
      * Perform the next inductive step on this frame and return the next
      * child class node to visit.
      */
-    public open fun child(): ClassInduct =
+    internal fun child(): ClassInduct =
         when (this) {
-            is ClassFrame.Union -> {
-                val head = this.head
-                ClassInduct.Item(head)
-            }
-            is ClassFrame.Binary -> {
-                val op = this.op
-                ClassInduct.BinaryOp(op)
-            }
-            is ClassFrame.BinaryLHS -> {
-                val lhs = this.lhs
-                ClassInduct.fromSet(lhs)
-            }
-            is ClassFrame.BinaryRHS -> {
-                val rhs = this.rhs
-                ClassInduct.fromSet(rhs)
-            }
+            is ClassFrame.Union -> ClassInduct.Item(this.head)
+            is ClassFrame.Binary -> ClassInduct.BinaryOp(this.op)
+            is ClassFrame.BinaryLHS -> ClassInduct.fromSet(this.lhs)
+            is ClassFrame.BinaryRHS -> ClassInduct.fromSet(this.rhs)
         }
 
-    public open fun fmt(f: StringBuilder) {
+    internal fun fmt(f: StringBuilder) {
         val x =
             when (this) {
                 is ClassFrame.Union -> "Union"
@@ -511,7 +459,7 @@ public sealed class ClassFrame {
                 is ClassFrame.BinaryLHS -> "BinaryLHS"
                 is ClassFrame.BinaryRHS -> "BinaryRHS"
             }
-        f.append("$x")
+        f.append(x)
     }
 }
 
@@ -526,16 +474,15 @@ public sealed class ClassFrame {
  * because that would imply binary operations can be unioned in the concrete
  * syntax, which is not possible.)
  */
-public sealed class ClassInduct {
-    public data class Item(public var value: ClassSetItem) : ClassInduct()
-    public data class BinaryOp(public var value: ClassSetBinaryOp) : ClassInduct()
+internal sealed class ClassInduct {
+    internal data class Item(internal var value: ClassSetItem) : ClassInduct()
+    internal data class BinaryOp(internal var value: ClassSetBinaryOp) : ClassInduct()
 
-    public open fun fmt(f: StringBuilder) {
+    internal fun fmt(f: StringBuilder) {
         val x =
             when (this) {
                 is ClassInduct.Item -> {
-                    val (it) = this
-                    when (it) {
+                    when (this.value) {
                         is ClassSetItem.Empty -> "Item(Empty)"
                         is ClassSetItem.Literal -> "Item(Literal)"
                         is ClassSetItem.Range -> "Item(Range)"
@@ -547,36 +494,23 @@ public sealed class ClassInduct {
                     }
                 }
                 is ClassInduct.BinaryOp -> {
-                    val (it1) = this
-                    when (it1.kind) {
-                        ClassSetBinaryOpKind.Intersection -> {
-                            "BinaryOp(Intersection)"
-                        }
-                        ClassSetBinaryOpKind.Difference -> {
-                            "BinaryOp(Difference)"
-                        }
-                        ClassSetBinaryOpKind.SymmetricDifference -> {
-                            "BinaryOp(SymmetricDifference)"
-                        }
+                    when (this.value.kind) {
+                        ClassSetBinaryOpKind.Intersection -> "BinaryOp(Intersection)"
+                        ClassSetBinaryOpKind.Difference -> "BinaryOp(Difference)"
+                        ClassSetBinaryOpKind.SymmetricDifference -> "BinaryOp(SymmetricDifference)"
                     }
                 }
             }
-        f.append("$x")
+        f.append(x)
     }
 
-    public companion object {
-        public fun fromBracketed(ast: ClassBracketed): ClassInduct = ClassInduct.fromSet(ast.kind)
+    internal companion object {
+        internal fun fromBracketed(ast: ClassBracketed): ClassInduct = ClassInduct.fromSet(ast.kind)
 
-        public fun fromSet(ast: ClassSet): ClassInduct =
+        internal fun fromSet(ast: ClassSet): ClassInduct =
             when (ast) {
-                is ClassSet.Item -> {
-                    val (item) = ast
-                    ClassInduct.Item(item)
-                }
-                is ClassSet.BinaryOp -> {
-                    val (op) = ast
-                    ClassInduct.BinaryOp(op)
-                }
+                is ClassSet.Item -> ClassInduct.Item(ast.value)
+                is ClassSet.BinaryOp -> ClassInduct.BinaryOp(ast.value)
             }
     }
 }
