@@ -157,7 +157,7 @@ package io.github.kotlinmania.regexsyntax
 
 @kotlin.test.Test
 public fun escapeMeta() {
-    check(escape("\\.+*?()|[]{}^\$#&-~") == "\\\\\\.\\+\\*\\?\\(\\)\\|\\[\\]\\{\\}\\^\\\$\\#\\&\\-\\~".toString())
+    check(escape("\\.+*?()|[]{}^\$#&-~") == "\\\\\\.\\+\\*\\?\\(\\)\\|\\[\\]\\{\\}\\^\\\$\\#\\&\\-\\~")
 }
 
 @kotlin.test.Test
