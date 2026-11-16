@@ -305,3 +305,16 @@ internal fun repeatChar(c: Char, count: Int): String {
  * Error marker used by text formatting routines when appending fails.
  */
 public data object FmtError
+
+internal fun List<UByte>.normalizeUByteList(): List<UByte> {
+    if (this.isEmpty()) return this
+    val raw: List<Any?> = this
+    if (raw[0] is UByte) return this
+    return List(raw.size) { i ->
+        when (val elem = raw[i]) {
+            is UByte -> elem
+            is Number -> elem.toByte().toUByte()
+            else -> throw IllegalArgumentException("Expected UByte or Number byte element, got $elem")
+        }
+    }
+}

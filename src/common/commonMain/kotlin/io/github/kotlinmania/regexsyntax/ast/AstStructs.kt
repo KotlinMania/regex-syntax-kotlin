@@ -14,20 +14,21 @@ import io.github.kotlinmania.rustlang.core.mem.TypeLayout
  * valid Unicode property name. That particular error is reported when
  * translating an AST to the high-level intermediate representation (`HIR`).
  */
-public data class Error(
+@ConsistentCopyVisibility
+public data class Error internal constructor(
     /**
      * The kind of error.
      */
-    public var kind: ErrorKind,
+    internal var kind: ErrorKind,
     /**
      * The original pattern that the parser generated the error from. Every
      * span in an error is a valid range into this string.
      */
-    public var pattern: String,
+    internal var pattern: String,
     /**
      * The span of this error.
      */
-    public var span: Span,
+    internal var span: Span,
 ) {
     /**
      * Return the type of this error.

@@ -9,6 +9,7 @@ import io.github.kotlinmania.regexsyntax.hir.ClassUnicode
 import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.hir.HirKind
 import io.github.kotlinmania.regexsyntax.hir.Repetition
+import io.github.kotlinmania.regexsyntax.normalizeUByteList
 import io.github.kotlinmania.regexsyntax.rank.BYTE_FREQUENCIES
 import io.github.kotlinmania.regexsyntax.scalarFromU32
 import io.github.kotlinmania.rustlang.core.result.Result
@@ -913,7 +914,7 @@ public open class Seq internal constructor(
          * Returns a sequence of exact literals from the given byte strings.
          */
         public fun new(items: List<List<UByte>>): Seq =
-            fromIter(items.map { Literal.exact(it) })
+            fromIter(items.map { Literal.exact(it.normalizeUByteList()) })
 
         internal fun fromStrings(items: Iterable<String>): Seq =
             fromIter(items.map { s -> Literal.exact(s.encodeToByteArray().map { it.toUByte() }) })
@@ -1052,13 +1053,13 @@ public open class Literal internal constructor(
          * Returns a new exact literal containing the bytes given.
          */
         public fun exact(bytes: List<UByte>): Literal =
-            Literal(bytes = bytes.toMutableList(), exact = true)
+            Literal(bytes = bytes.normalizeUByteList().toMutableList(), exact = true)
 
         /**
          * Returns a new inexact literal containing the bytes given.
          */
         public fun inexact(bytes: List<UByte>): Literal =
-            Literal(bytes = bytes.toMutableList(), exact = false)
+            Literal(bytes = bytes.normalizeUByteList().toMutableList(), exact = false)
 
         internal fun exact(text: String): Literal =
             Literal(bytes = text.encodeToByteArray().mapTo(mutableListOf()) { it.toUByte() }, exact = true)

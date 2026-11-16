@@ -5,6 +5,7 @@ package io.github.kotlinmania.regexsyntax.utf8
 
 import io.github.kotlinmania.regexsyntax.encodeScalarUtf8
 import io.github.kotlinmania.regexsyntax.formatHexUpper
+import io.github.kotlinmania.regexsyntax.normalizeUByteList
 import io.github.kotlinmania.regexsyntax.scalarFromU32
 import io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts
 import io.github.kotlinmania.rustlang.core.mem.TypeLayout
@@ -200,10 +201,11 @@ public sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range>
      * of byte ranges.
      */
     public open fun matches(bytes: List<UByte>): Boolean {
-        if (bytes.size < this.len()) {
+        val norm = bytes.normalizeUByteList()
+        if (norm.size < this.len()) {
             return false
         }
-        for ((b, r) in bytes.zip(this.asSlice())) {
+        for ((b, r) in norm.zip(this.asSlice())) {
             if (!r.matches(b)) {
                 return false
             }
@@ -211,7 +213,7 @@ public sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range>
         return true
     }
 
-    public open fun intoIter(): ArrayDeque<Utf8Range> = ArrayDeque(this.asSlice())
+    public open fun intoIter(): kotlin.collections.Iterator<Utf8Range> = this.asSlice().iterator()
 
     public open fun fmt(f: StringBuilder) {
         when (this) {
@@ -244,11 +246,13 @@ public sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range>
          * This assumes that `start` and `end` have the same length.
          */
         public fun fromEncodedRange(start: List<UByte>, end: List<UByte>): Utf8Sequence {
-            check(start.size == end.size)
-            return when (val matchVal = start.size) {
-                2 -> Utf8Sequence.Two(listOf(Utf8Range.new(start[0], end[0]), Utf8Range.new(start[1], end[1])))
-                3 -> Utf8Sequence.Three(listOf(Utf8Range.new(start[0], end[0]), Utf8Range.new(start[1], end[1]), Utf8Range.new(start[2], end[2])))
-                4 -> Utf8Sequence.Four(listOf(Utf8Range.new(start[0], end[0]), Utf8Range.new(start[1], end[1]), Utf8Range.new(start[2], end[2]), Utf8Range.new(start[3], end[3])))
+            val s = start.normalizeUByteList()
+            val e = end.normalizeUByteList()
+            check(s.size == e.size)
+            return when (val matchVal = s.size) {
+                2 -> Utf8Sequence.Two(listOf(Utf8Range.new(s[0], e[0]), Utf8Range.new(s[1], e[1])))
+                3 -> Utf8Sequence.Three(listOf(Utf8Range.new(s[0], e[0]), Utf8Range.new(s[1], e[1]), Utf8Range.new(s[2], e[2])))
+                4 -> Utf8Sequence.Four(listOf(Utf8Range.new(s[0], e[0]), Utf8Range.new(s[1], e[1]), Utf8Range.new(s[2], e[2]), Utf8Range.new(s[3], e[3])))
                 else -> {
                     val n = matchVal
                     error("invalid encoded length: $n")

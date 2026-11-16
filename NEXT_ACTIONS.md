@@ -5,10 +5,10 @@ Based on AST analysis, here are the concrete next steps.
 ## Summary
 
 - **Files Present:** 27/33 (81.8%)
-- **Function parity:** 412/670 matched (target 489) — 61.5%
-- **Class/type parity:** 56/71 matched (target 110) — 78.9%
-- **Combined symbol parity:** 468/741 matched (target 599) — 63.2%
-- **Average inline-code cosine:** 0.61 (function body across 27 matched files)
+- **Function parity:** 412/670 matched (target 706) — 61.5%
+- **Class/type parity:** 58/71 matched (target 120) — 81.7%
+- **Combined symbol parity:** 470/741 matched (target 826) — 63.4%
+- **Average inline-code cosine:** 0.66 (function body across 27 matched files)
 - **Average documentation cosine:** 0.47 (doc text across 27 matched files)
 - **Cheat-zeroed Files:** 0
 - **Critical Issues:** 13 files with <0.60 function similarity
@@ -32,12 +32,12 @@ Every matched file is listed below with function and type symbol parity.
 ### 1. unicode
 
 - **Target:** `unicode.Unicode`
-- **Similarity:** 0.05
+- **Similarity:** 0.08
 - **Dependents:** 1
-- **Priority Score:** 1407709.5
-- **Functions:** 29/69 matched (target 36)
+- **Priority Score:** 1407709.1
+- **Functions:** 29/69 matched (target 44)
 - **Missing functions:** `class`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `imp`, `simple_fold_ok`, `contains_case_map`, `simple_fold_k`, `simple_fold_a`, `simple_fold_disabled`, `range_contains`, `regression_466`, `sym_normalize`, `valid_utf8_symbolic`
-- **Types:** 8/8 matched (target 16)
+- **Types:** 8/8 matched (target 17)
 - **Missing types:** _none_
 - **Tests:** 0/9 matched
 
@@ -99,62 +99,62 @@ Every matched file is listed below with function and type symbol parity.
 ### 7. hir.translate
 
 - **Target:** `translate.Translate`
-- **Similarity:** 0.12
+- **Similarity:** 0.32
 - **Dependents:** 0
-- **Priority Score:** 916008.8
-- **Functions:** 65/151 matched (target 68)
+- **Priority Score:** 906006.8
+- **Functions:** 65/151 matched
 - **Missing functions:** `eq`, `eq`, `parse`, `t`, `t_err`, `t_bytes`, `props`, `props_bytes`, `hir_lit`, `hir_blit`, `hir_capture`, `hir_capture_name`, `hir_quest`, `hir_star`, `hir_plus`, `hir_range`, `hir_alt`, `hir_cat`, `hir_uclass_query`, `hir_uclass_perl_word`, `hir_ascii_uclass`, `hir_ascii_bclass`, `hir_uclass`, `hir_bclass`, `hir_case_fold`, `hir_negate`, `uclass`, `bclass`, `class_case_fold`, `class_negate`, `hir_union`, `hir_difference`, `hir_look`, `empty`, `literal`, `literal_case_insensitive`, `dot`, `assertions`, `group`, `line_anchors`, `flags`, `escape`, `repetition`, `cat_alt`, `cat_class_flattened`, `class_ascii`, `class_ascii_multiple`, `class_perl_unicode`, `class_perl_ascii`, `class_perl_word_disabled`, `class_perl_space_disabled`, `class_perl_digit_disabled`, `class_unicode_gencat`, `class_unicode_gencat_disabled`, `class_unicode_script`, `class_unicode_script_disabled`, `class_unicode_age`, `class_unicode_any_empty`, `class_unicode_age_disabled`, `class_bracketed`, `class_bracketed_union`, `class_bracketed_nested`, `class_bracketed_intersect`, `class_bracketed_intersect_negate`, `class_bracketed_difference`, `class_bracketed_symmetric_difference`, `ignore_whitespace`, `analysis_is_utf8`, `analysis_captures_len`, `analysis_static_captures_len`, `analysis_is_all_assertions`, `analysis_look_set_prefix_any`, `analysis_is_anchored`, `analysis_is_any_anchored`, `analysis_can_empty`, `analysis_is_literal`, `analysis_is_alternation_literal`, `smart_repetition`, `smart_concat`, `smart_alternation`, `regression_alt_empty_concat`, `regression_empty_alt`, `regression_singleton_alt`, `regression_fuzz_match`, `regression_fuzz_difference1`, `regression_fuzz_char_decrement1`
-- **Types:** 5/9 matched (target 14)
-- **Missing types:** `Result`, `Output`, `Err`, `TestError`
+- **Types:** 6/9 matched (target 16)
+- **Missing types:** `Result`, `Output`, `Err`
 - **Tests:** 0/86 matched
 - **Lint issues:** 2
 
 ### 8. ast.parse
 
 - **Target:** `parse.Parse`
-- **Similarity:** 0.17
+- **Similarity:** 0.33
 - **Dependents:** 0
-- **Priority Score:** 685908.3
-- **Functions:** 85/148 matched (target 91)
+- **Priority Score:** 675906.7
+- **Functions:** 85/148 matched (target 155)
 - **Missing functions:** `eq`, `eq`, `s`, `parser`, `parser_octal`, `parser_empty_min_range`, `parser_nest_limit`, `parser_ignore_whitespace`, `nspan`, `npos`, `span`, `span_range`, `lit`, `meta_lit`, `lit_with`, `concat`, `concat_with`, `alt`, `group`, `flag_set`, `parse_nest_limit`, `parse_comments`, `parse_holistic`, `parse_ignore_whitespace`, `parse_newlines`, `parse_uncounted_repetition`, `parse_counted_repetition`, `parse_alternate`, `parse_unsupported_lookaround`, `parse_group`, `parse_capture_name`, `parse_flags`, `parse_flag`, `parse_primitive_non_escape`, `parse_escape`, `parse_unsupported_backreference`, `parse_octal`, `parse_hex_two`, `parse_hex_four`, `parse_hex_eight`, `parse_hex_brace`, `parse_decimal`, `parse_set_class`, `union`, `intersection`, `difference`, `symdifference`, `itemset`, `item_ascii`, `item_unicode`, `item_perl`, `item_bracket`, `lit`, `empty`, `range`, `alnum`, `lower`, `parse_set_class_open`, `maybe_parse_ascii_class`, `parse_unicode_class`, `parse_perl_class`, `regression_454_nest_too_big`, `regression_455_trailing_dash_ignore_whitespace`
-- **Types:** 7/11 matched (target 17)
-- **Missing types:** `Result`, `Output`, `Err`, `TestError`
+- **Types:** 8/11 matched (target 19)
+- **Missing types:** `Result`, `Output`, `Err`
 - **Tests:** 0/63 matched
 - **Lint issues:** 2
 
 ### 9. hir.literal
 
 - **Target:** `literal.Literal`
-- **Similarity:** 0.22
+- **Similarity:** 0.34
 - **Dependents:** 0
-- **Priority Score:** 321407.8
-- **Functions:** 77/108 matched (target 98)
+- **Priority Score:** 321406.6
+- **Functions:** 77/108 matched (target 131)
 - **Missing functions:** `from`, `parse`, `prefixes`, `suffixes`, `e`, `E`, `I`, `seq`, `infinite`, `inexact`, `exact`, `opt`, `literal`, `class`, `look`, `repetition`, `concat`, `alternation`, `impossible`, `anything`, `anything_small_limits`, `prefixes`, `suffixes`, `e`, `empty`, `odds_and_ends`, `holmes`, `holmes_alt`, `crazy_repeats`, `huge`, `optimize`
-- **Types:** 6/6 matched (target 9)
+- **Types:** 6/6 matched (target 10)
 - **Missing types:** _none_
 - **Tests:** 0/30 matched
 
 ### 10. hir.print
 
 - **Target:** `print.Print`
-- **Similarity:** 0.09
+- **Similarity:** 0.38
 - **Dependents:** 0
-- **Priority Score:** 153009.0
-- **Functions:** 12/25 matched (target 13)
+- **Priority Score:** 153006.2
+- **Functions:** 12/25 matched (target 26)
 - **Missing functions:** `roundtrip`, `roundtrip_bytes`, `roundtrip_with`, `print_literal`, `print_class`, `print_anchor`, `print_word_boundary`, `print_repetition`, `print_group`, `print_alternation`, `regression_repetition_concat`, `regression_repetition_alternation`, `regression_alternation_concat`
-- **Types:** 3/5 matched (target 3)
+- **Types:** 3/5 matched (target 4)
 - **Missing types:** `Output`, `Err`
 - **Tests:** 0/13 matched
 
 ### 11. ast.print
 
-- **Target:** `io.github.kotlinmania.regexsyntax.ast.print.Print`
-- **Similarity:** 0.14
+- **Target:** `commonMain.kotlin.io.github.kotlinmania.regexsyntax.ast.print.Print`
+- **Similarity:** 0.38
 - **Dependents:** 0
-- **Priority Score:** 134208.6
-- **Functions:** 26/37 matched (target 32)
+- **Priority Score:** 134206.2
+- **Functions:** 26/37 matched (target 43)
 - **Missing functions:** `roundtrip`, `roundtrip_with`, `print_literal`, `print_dot`, `print_concat`, `print_alternation`, `print_assertion`, `print_repetition`, `print_flags`, `print_group`, `print_class`
-- **Types:** 3/5 matched (target 3)
+- **Types:** 3/5 matched (target 4)
 - **Missing types:** `Output`, `Err`
 - **Tests:** 0/11 matched
 - **Lint issues:** 2
@@ -162,24 +162,24 @@ Every matched file is listed below with function and type symbol parity.
 ### 12. utf8
 
 - **Target:** `utf8.Utf8`
-- **Similarity:** 0.23
+- **Similarity:** 0.32
 - **Dependents:** 0
-- **Priority Score:** 93407.8
-- **Functions:** 21/28 matched (target 38)
+- **Priority Score:** 93406.8
+- **Functions:** 21/28 matched (target 39)
 - **Missing functions:** `rutf8`, `never_accepts_surrogate_codepoints`, `codepoints_no_surrogates`, `single_codepoint_one_sequence`, `bmp`, `reverse`, `encode_surrogate`
-- **Types:** 4/6 matched (target 8)
+- **Types:** 4/6 matched (target 9)
 - **Missing types:** `IntoIter`, `Item`
 - **Tests:** 0/7 matched
 
 ### 13. error
 
 - **Target:** `error.Error`
-- **Similarity:** 0.21
+- **Similarity:** 0.30
 - **Dependents:** 0
-- **Priority Score:** 61907.9
-- **Functions:** 10/16 matched (target 15)
+- **Priority Score:** 61907.0
+- **Functions:** 10/16 matched (target 19)
 - **Missing functions:** `from`, `from`, `repeat_char`, `assert_panic_message`, `regression_464`, `repetition_quantifier_expects_a_valid_decimal`
-- **Types:** 3/3 matched (target 5)
+- **Types:** 3/3 matched (target 6)
 - **Missing types:** _none_
 - **Tests:** 0/3 matched
 
@@ -196,7 +196,7 @@ Every matched file is listed below with function and type symbol parity.
 
 ### 15. ast.visitor
 
-- **Target:** `io.github.kotlinmania.regexsyntax.ast.visitor.Visitor`
+- **Target:** `commonMain.kotlin.io.github.kotlinmania.regexsyntax.ast.visitor.Visitor`
 - **Similarity:** 0.21
 - **Dependents:** 0
 - **Priority Score:** 3107.9

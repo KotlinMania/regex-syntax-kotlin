@@ -14,6 +14,7 @@ import io.github.kotlinmania.regexsyntax.hir.interval.ScalarBound
 import io.github.kotlinmania.regexsyntax.hir.interval.UByteBound
 import io.github.kotlinmania.regexsyntax.hir.print.Printer
 import io.github.kotlinmania.regexsyntax.isValidUtf8
+import io.github.kotlinmania.regexsyntax.normalizeUByteList
 import io.github.kotlinmania.regexsyntax.scalarFromU32
 import io.github.kotlinmania.regexsyntax.scalarIsControl
 import io.github.kotlinmania.regexsyntax.scalarIsWhitespace
@@ -172,15 +173,15 @@ public data class HirParts(
  * stack space. The implementation will also suppress some details (such as
  * the `Properties` inlined into every `Hir` value to make it less noisy).
  */
-public open class Hir(
+public open class Hir internal constructor(
     /**
      * The underlying HIR kind.
      */
-    public var kind: HirKind,
+    internal var kind: HirKind,
     /**
      * Analysis info about this HIR, computed during construction.
      */
-    public var props: Properties,
+    internal var props: Properties,
 ) {
     /**
      * Methods for accessing the underlying `HirKind` and `Properties`.
@@ -379,7 +380,7 @@ public open class Hir(
          * ```
          */
         public fun literal(lit: List<UByte>): Hir {
-            val bytes = lit
+            val bytes = lit.normalizeUByteList()
             if (bytes.isEmpty()) {
                 return Hir.empty()
             }
@@ -694,6 +695,9 @@ public open class Hir(
 public open class Literal(
     public var value: List<UByte>,
 ) {
+    init {
+        this.value = this.value.normalizeUByteList()
+    }
     internal var field0: List<UByte>
         get() = value
         set(v) {
@@ -958,9 +962,9 @@ public open class ClassUnicodeIter internal constructor(
  * The range is closed. That is, the start and end of the range are included
  * in the range.
  */
-public open class ClassUnicodeRange(
-    public var start: UInt,
-    public var end: UInt,
+public open class ClassUnicodeRange internal constructor(
+    internal var start: UInt,
+    internal var end: UInt,
 ) : Comparable<ClassUnicodeRange> {
     override fun compareTo(other: ClassUnicodeRange): Int {
         val startCmp = this.start.compareTo(other.start)
@@ -1324,9 +1328,9 @@ public open class ClassBytesIter internal constructor(
  * The range is closed. That is, the start and end of the range are included
  * in the range.
  */
-public open class ClassBytesRange(
-    public var start: UByte,
-    public var end: UByte,
+public open class ClassBytesRange internal constructor(
+    internal var start: UByte,
+    internal var end: UByte,
 ) : Comparable<ClassBytesRange> {
     override fun compareTo(other: ClassBytesRange): Int {
         val startCmp = this.start.compareTo(other.start)
@@ -2315,12 +2319,13 @@ public open class LookSet(
          * This panics if `slice.size < 4`.
          */
         public fun readRepr(slice: List<UByte>): LookSet {
-            require(slice.size >= 4) { "slice too short for LookSet.readRepr" }
+            val normalized = slice.normalizeUByteList()
+            require(normalized.size >= 4) { "slice too short for LookSet.readRepr" }
             val bits =
-                slice[0].toUInt() or
-                    (slice[1].toUInt() shl 8) or
-                    (slice[2].toUInt() shl 16) or
-                    (slice[3].toUInt() shl 24)
+                normalized[0].toUInt() or
+                    (normalized[1].toUInt() shl 8) or
+                    (normalized[2].toUInt() shl 16) or
+                    (normalized[3].toUInt() shl 24)
             return LookSet(bits = bits)
         }
     }
