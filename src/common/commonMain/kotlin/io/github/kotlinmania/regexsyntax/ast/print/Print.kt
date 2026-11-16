@@ -296,7 +296,7 @@ internal class Writer(
                     Flag.DotMatchesNewLine -> this.wtr.append("s")
                     Flag.SwapGreed -> this.wtr.append("U")
                     Flag.Unicode -> this.wtr.append("u")
-                    Flag.Crlf -> this.wtr.append("R")
+                    Flag.CRLF -> this.wtr.append("R")
                     Flag.IgnoreWhitespace -> this.wtr.append("x")
                 }
             }

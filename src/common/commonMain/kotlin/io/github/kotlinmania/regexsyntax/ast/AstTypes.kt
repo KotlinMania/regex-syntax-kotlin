@@ -1,16 +1,5 @@
 package io.github.kotlinmania.regexsyntax.ast
 
-import io.github.kotlinmania.regexsyntax.ast.Alternation as AstAlternation
-import io.github.kotlinmania.regexsyntax.ast.Assertion as AstAssertion
-import io.github.kotlinmania.regexsyntax.ast.CaptureName as AstCaptureName
-import io.github.kotlinmania.regexsyntax.ast.ClassBracketed as AstClassBracketed
-import io.github.kotlinmania.regexsyntax.ast.ClassPerl as AstClassPerl
-import io.github.kotlinmania.regexsyntax.ast.ClassUnicode as AstClassUnicode
-import io.github.kotlinmania.regexsyntax.ast.Concat as AstConcat
-import io.github.kotlinmania.regexsyntax.ast.Flag as AstFlag
-import io.github.kotlinmania.regexsyntax.ast.Group as AstGroup
-import io.github.kotlinmania.regexsyntax.ast.Literal as AstLiteral
-import io.github.kotlinmania.regexsyntax.ast.Repetition as AstRepetition
 import io.github.kotlinmania.regexsyntax.ast.print.Printer
 
 /**
@@ -287,7 +276,7 @@ public sealed class Ast {
     /**
      * A single character literal, which includes escape sequences.
      */
-    public data class Literal(public var value: AstLiteral) : Ast()
+    public data class Literal(public var value: io.github.kotlinmania.regexsyntax.ast.Literal) : Ast()
     /**
      * The "any character" class.
      */
@@ -295,37 +284,37 @@ public sealed class Ast {
     /**
      * A single zero-width assertion.
      */
-    public data class Assertion(public var value: AstAssertion) : Ast()
+    public data class Assertion(public var value: io.github.kotlinmania.regexsyntax.ast.Assertion) : Ast()
     /**
      * A single Unicode character class, e.g., `\pL` or `\p{Greek}`.
      */
-    public data class ClassUnicode(public var value: AstClassUnicode) : Ast()
+    public data class ClassUnicode(public var value: io.github.kotlinmania.regexsyntax.ast.ClassUnicode) : Ast()
     /**
      * A single perl character class, e.g., `\d` or `\W`.
      */
-    public data class ClassPerl(public var value: AstClassPerl) : Ast()
+    public data class ClassPerl(public var value: io.github.kotlinmania.regexsyntax.ast.ClassPerl) : Ast()
     /**
      * A single bracketed character class set, which may contain zero or more
      * character ranges and/or zero or more nested classes. e.g.,
      * `[a-zA-Z\pL]`.
      */
-    public data class ClassBracketed(public var value: AstClassBracketed) : Ast()
+    public data class ClassBracketed(public var value: io.github.kotlinmania.regexsyntax.ast.ClassBracketed) : Ast()
     /**
      * A repetition operator applied to an arbitrary regular expression.
      */
-    public data class Repetition(public var value: AstRepetition) : Ast()
+    public data class Repetition(public var value: io.github.kotlinmania.regexsyntax.ast.Repetition) : Ast()
     /**
      * A grouped regular expression.
      */
-    public data class Group(public var value: AstGroup) : Ast()
+    public data class Group(public var value: io.github.kotlinmania.regexsyntax.ast.Group) : Ast()
     /**
      * An alternation of regular expressions.
      */
-    public data class Alternation(public var value: AstAlternation) : Ast()
+    public data class Alternation(public var value: io.github.kotlinmania.regexsyntax.ast.Alternation) : Ast()
     /**
      * A concatenation of regular expressions.
      */
-    public data class Concat(public var value: AstConcat) : Ast()
+    public data class Concat(public var value: io.github.kotlinmania.regexsyntax.ast.Concat) : Ast()
 
     public fun rustEquals(other: Ast): Boolean = this == other
 
@@ -492,7 +481,7 @@ public sealed class Ast {
         /**
          * Create a "literal" AST item.
          */
-        public fun literal(e: Literal): Ast = Ast.Literal(e)
+        public fun literal(e: io.github.kotlinmania.regexsyntax.ast.Literal): Ast = Ast.Literal(e)
 
         /**
          * Create a "dot" AST item.
@@ -502,42 +491,42 @@ public sealed class Ast {
         /**
          * Create a "assertion" AST item.
          */
-        public fun assertion(e: Assertion): Ast = Ast.Assertion(e)
+        public fun assertion(e: io.github.kotlinmania.regexsyntax.ast.Assertion): Ast = Ast.Assertion(e)
 
         /**
          * Create a "Unicode class" AST item.
          */
-        public fun classUnicode(e: ClassUnicode): Ast = Ast.ClassUnicode(e)
+        public fun classUnicode(e: io.github.kotlinmania.regexsyntax.ast.ClassUnicode): Ast = Ast.ClassUnicode(e)
 
         /**
          * Create a "Perl class" AST item.
          */
-        public fun classPerl(e: ClassPerl): Ast = Ast.ClassPerl(e)
+        public fun classPerl(e: io.github.kotlinmania.regexsyntax.ast.ClassPerl): Ast = Ast.ClassPerl(e)
 
         /**
          * Create a "bracketed class" AST item.
          */
-        public fun classBracketed(e: ClassBracketed): Ast = Ast.ClassBracketed(e)
+        public fun classBracketed(e: io.github.kotlinmania.regexsyntax.ast.ClassBracketed): Ast = Ast.ClassBracketed(e)
 
         /**
          * Create a "repetition" AST item.
          */
-        public fun repetition(e: Repetition): Ast = Ast.Repetition(e)
+        public fun repetition(e: io.github.kotlinmania.regexsyntax.ast.Repetition): Ast = Ast.Repetition(e)
 
         /**
          * Create a "group" AST item.
          */
-        public fun group(e: Group): Ast = Ast.Group(e)
+        public fun group(e: io.github.kotlinmania.regexsyntax.ast.Group): Ast = Ast.Group(e)
 
         /**
          * Create a "alternation" AST item.
          */
-        public fun alternation(e: Alternation): Ast = Ast.Alternation(e)
+        public fun alternation(e: io.github.kotlinmania.regexsyntax.ast.Alternation): Ast = Ast.Alternation(e)
 
         /**
          * Create a "concat" AST item.
          */
-        public fun concat(e: Concat): Ast = Ast.Concat(e)
+        public fun concat(e: io.github.kotlinmania.regexsyntax.ast.Concat): Ast = Ast.Concat(e)
     }
 }
 
@@ -950,7 +939,7 @@ public sealed class ClassSetItem {
     /**
      * A single literal.
      */
-    public data class Literal(public var value: AstLiteral) : ClassSetItem()
+    public data class Literal(public var value: io.github.kotlinmania.regexsyntax.ast.Literal) : ClassSetItem()
     /**
      * A range between two literals.
      */
@@ -1172,7 +1161,7 @@ public sealed class GroupKind {
     /**
      * `(?<name> a)` or `(? P<name> a)`
      */
-    public data class CaptureName(public var startsWithP: Boolean, public var name: AstCaptureName) : GroupKind()
+    public data class CaptureName(public var startsWithP: Boolean, public var name: io.github.kotlinmania.regexsyntax.ast.CaptureName) : GroupKind()
     /**
      * `(?: a)` and `(? i: a)`
      */
@@ -1193,7 +1182,7 @@ public sealed class FlagsItemKind {
     /**
      * A single flag in a group.
      */
-    public data class Flag(public var value: AstFlag) : FlagsItemKind()
+    public data class Flag(public var value: io.github.kotlinmania.regexsyntax.ast.Flag) : FlagsItemKind()
 
     public fun rustEquals(other: FlagsItemKind): Boolean = this == other
 
@@ -1234,7 +1223,7 @@ public sealed class Flag {
     /**
      * `R`
      */
-    public data object Crlf : Flag()
+    public data object CRLF : Flag()
     /**
      * `x`
      */

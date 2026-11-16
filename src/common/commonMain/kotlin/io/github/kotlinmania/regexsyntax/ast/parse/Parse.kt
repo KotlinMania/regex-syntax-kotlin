@@ -1408,7 +1408,7 @@ internal class ParserI(
             ch('s') -> Result.Ok(Flag.DotMatchesNewLine)
             ch('U') -> Result.Ok(Flag.SwapGreed)
             ch('u') -> Result.Ok(Flag.Unicode)
-            ch('R') -> Result.Ok(Flag.Crlf)
+            ch('R') -> Result.Ok(Flag.CRLF)
             ch('x') -> Result.Ok(Flag.IgnoreWhitespace)
             else -> Result.Err(this.error(this.spanChar(), ErrorKind.FlagUnrecognized))
         }

@@ -58,7 +58,7 @@ internal fun encodeScalarUtf8List(cp: UInt): List<UByte> {
     return List(len) { buf[it] }
 }
 
-internal fun StringBuilder.appendScalar(cp: UInt) {
+internal fun Appendable.appendScalar(cp: UInt) {
     val v = cp.toInt()
     if (v <= 0xFFFF) {
         append(v.toChar())
