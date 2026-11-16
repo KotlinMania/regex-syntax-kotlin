@@ -2,7 +2,6 @@
 package io.github.kotlinmania.regexsyntax.ast.print
 
 import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder
-import io.github.kotlinmania.regexsyntax.unwrap
 
 // This module provides a regular expression printer for `Ast`.
 

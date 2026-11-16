@@ -27,8 +27,6 @@ import io.github.kotlinmania.regexsyntax.hir.Repetition
 import io.github.kotlinmania.regexsyntax.unicode.ClassQuery
 import io.github.kotlinmania.regexsyntax.unicode.cls
 import io.github.kotlinmania.regexsyntax.unicode.perlWord
-import io.github.kotlinmania.regexsyntax.unwrap
-import io.github.kotlinmania.regexsyntax.unwrapErr
 import io.github.kotlinmania.rustlang.core.result.Result
 
 // Defines a translator that converts an `Ast` to an `Hir`.

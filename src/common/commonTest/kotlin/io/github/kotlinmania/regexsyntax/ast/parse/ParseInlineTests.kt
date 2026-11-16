@@ -43,8 +43,6 @@ import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.ast.SpecialLiteralKind
 import io.github.kotlinmania.regexsyntax.scalarFromU32
 import io.github.kotlinmania.regexsyntax.scalarLenUtf8
-import io.github.kotlinmania.regexsyntax.unwrap
-import io.github.kotlinmania.regexsyntax.unwrapErr
 import io.github.kotlinmania.rustlang.core.result.Result
 
 // This module provides a regular expression parser.

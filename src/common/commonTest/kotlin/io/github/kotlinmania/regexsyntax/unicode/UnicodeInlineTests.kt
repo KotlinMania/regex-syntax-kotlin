@@ -1,8 +1,6 @@
 // port-lint: tests unicode.rs
 package io.github.kotlinmania.regexsyntax.unicode
 
-import io.github.kotlinmania.regexsyntax.unwrap
-
 public fun simpleFoldOk(c: UInt): List<UInt> = SimpleCaseFolder.new().unwrap().mapping(c)
 
 public fun containsCaseMap(start: UInt, end: UInt): Boolean =

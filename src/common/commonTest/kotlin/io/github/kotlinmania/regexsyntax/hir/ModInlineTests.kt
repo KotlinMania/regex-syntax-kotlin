@@ -36,9 +36,9 @@ public fun bclass(ranges: List<Pair<UInt, UInt>>): ClassBytes {
 public fun uranges(cls: ClassUnicode): List<Pair<UInt, UInt>> = cls.iter().map { x -> Pair(x.start(), x.end()) }
 
 public fun ucasefold(cls: ClassUnicode): ClassUnicode {
-    val cls = cls.clone()
-    cls.caseFoldSimple()
-    return cls
+    val cloned = cls.clone()
+    cloned.caseFoldSimple()
+    return cloned
 }
 
 public fun uunion(cls1: ClassUnicode, cls2: ClassUnicode): ClassUnicode {
@@ -66,17 +66,17 @@ public fun usymdifference(cls1: ClassUnicode, cls2: ClassUnicode): ClassUnicode 
 }
 
 public fun unegate(cls: ClassUnicode): ClassUnicode {
-    val cls = cls.clone()
-    cls.negate()
-    return cls
+    val cloned = cls.clone()
+    cloned.negate()
+    return cloned
 }
 
 public fun branges(cls: ClassBytes): List<Pair<UInt, UInt>> = cls.iter().map { x -> Pair(x.start().toUInt(), x.end().toUInt()) }
 
 public fun bcasefold(cls: ClassBytes): ClassBytes {
-    val cls = cls.clone()
-    cls.caseFoldSimple()
-    return cls
+    val cloned = cls.clone()
+    cloned.caseFoldSimple()
+    return cloned
 }
 
 public fun bunion(cls1: ClassBytes, cls2: ClassBytes): ClassBytes {
@@ -104,9 +104,9 @@ public fun bsymdifference(cls1: ClassBytes, cls2: ClassBytes): ClassBytes {
 }
 
 public fun bnegate(cls: ClassBytes): ClassBytes {
-    val cls = cls.clone()
-    cls.negate()
-    return cls
+    val cloned = cls.clone()
+    cloned.negate()
+    return cloned
 }
 
 public class HirModInlineTests {
@@ -554,7 +554,7 @@ public class HirModInlineTests {
     @kotlin.test.Test
     public fun noStackOverflowOnDrop() {
         var expr = Hir.empty()
-        for (unused in 0 until 100) {
+        repeat(100) {
             expr = Hir.capture(
                 Capture(
                     index = 1u,
