@@ -3,14 +3,15 @@ package io.github.kotlinmania.regexsyntax.error
 
 import io.github.kotlinmania.regexsyntax.ast.parse.Parser
 import io.github.kotlinmania.regexsyntax.unwrapErr
+import io.github.kotlinmania.rustlang.core.result.Result
 
 public fun assertPanicMessage(pattern: String, expectedMsg: String) {
-    val result = Parser.new().parse(pattern)
-    if (result.isSuccess) {
-        error("regex should not have parsed")
-    } else {
-        val err = result.exceptionOrNull()!!
-        check(err.toString() == expectedMsg.trim())
+    when (val result = Parser.new().parse(pattern)) {
+        is Result.Ok -> error("regex should not have parsed")
+        is Result.Err -> {
+            val err = result.value
+            check(err.toString() == expectedMsg.trim())
+        }
     }
 }
 

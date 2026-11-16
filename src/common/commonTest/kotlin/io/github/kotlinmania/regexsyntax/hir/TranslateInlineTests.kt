@@ -8,7 +8,6 @@ import io.github.kotlinmania.regexsyntax.ast.Concat
 import io.github.kotlinmania.regexsyntax.ast.Position
 import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder
-import io.github.kotlinmania.regexsyntax.debug.Bytes
 import io.github.kotlinmania.regexsyntax.hir.Capture
 import io.github.kotlinmania.regexsyntax.hir.Class
 import io.github.kotlinmania.regexsyntax.hir.Class.Bytes
@@ -84,7 +83,7 @@ public fun hirAlt(alts: List<Hir>): Hir = Hir.alternation(alts)
 
 public fun hirCat(exprs: List<Hir>): Hir = Hir.concat(exprs)
 
-public fun hirUclassQuery(query: ClassQuery): Hir = Hir.cls(Class.Unicode(cls(query).unwrap()))
+internal fun hirUclassQuery(query: ClassQuery): Hir = Hir.cls(Class.Unicode(cls(query).unwrap()))
 
 public fun hirUclassPerlWord(): Hir = Hir.cls(Class.Unicode(perlWord().unwrap()))
 
@@ -546,7 +545,7 @@ public fun classBracketed() {
 @kotlin.test.Test
 public fun classBracketedUnion() {
     check(t("[a-zA-Z]") == hirUclass(listOf(up('A', 'Z'), up('a', 'z'))))
-    check(t("[a\\pZb]") == hirUnion(hirUclass(listOf(Pair('a', 'b'))), hirUclassQuery(ClassQuery.Binary("separator"))))
+    check(t("[a\\pZb]") == hirUnion(hirUclass(listOf(up('a', 'b'))), hirUclassQuery(ClassQuery.Binary("separator"))))
     check(t("[\\pZ\\p{Greek}]") == hirUnion(hirUclassQuery(ClassQuery.Binary("greek")), hirUclassQuery(ClassQuery.Binary("separator"))))
     check(t("[\\p{age:3.0}\\pZ\\p{Greek}]") == hirUnion(hirUclassQuery(ClassQuery.ByValue(propertyName = "age", propertyValue = "3.0")), hirUnion(hirUclassQuery(ClassQuery.Binary("greek")), hirUclassQuery(ClassQuery.Binary("separator")))))
     check(t("[[[\\p{age:3.0}\\pZ]\\p{Greek}][\\p{Cyrillic}]]") == hirUnion(hirUclassQuery(ClassQuery.ByValue(propertyName = "age", propertyValue = "3.0")), hirUnion(hirUclassQuery(ClassQuery.Binary("cyrillic")), hirUnion(hirUclassQuery(ClassQuery.Binary("greek")), hirUclassQuery(ClassQuery.Binary("separator"))))))
@@ -627,7 +626,7 @@ public fun classBracketedIntersectNegate() {
 
 @kotlin.test.Test
 public fun classBracketedDifference() {
-    check(t("[\\pL--[:ascii:]]") == hirDifference(hirUclassQuery(ClassQuery.Binary("letter")), hirUclass(listOf(Pair('\u0000', '\u007f')))))
+    check(t("[\\pL--[:ascii:]]") == hirDifference(hirUclassQuery(ClassQuery.Binary("letter")), hirUclass(listOf(up('\u0000', '\u007f')))))
     check(t("(?-u)[[:alpha:]--[:lower:]]") == hirBclass(listOf(Pair(65u, 90u))))
 }
 

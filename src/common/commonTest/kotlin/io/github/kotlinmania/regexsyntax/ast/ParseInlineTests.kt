@@ -63,24 +63,24 @@ public fun Error.eq(other: TestError): Boolean = this.span == other.span && this
 
 public fun s(str: String): String = str
 
-public fun parser(pattern: String): ParserI = ParserI.new(Parser.new(), pattern)
+internal fun parser(pattern: String): ParserI = ParserI.new(Parser.new(), pattern)
 
-public fun parserOctal(pattern: String): ParserI {
+internal fun parserOctal(pattern: String): ParserI {
     val parser = ParserBuilder.new().octal(true).build()
     return ParserI.new(parser, pattern)
 }
 
-public fun parserEmptyMinRange(pattern: String): ParserI {
+internal fun parserEmptyMinRange(pattern: String): ParserI {
     val parser = ParserBuilder.new().emptyMinRange(true).build()
     return ParserI.new(parser, pattern)
 }
 
-public fun parserNestLimit(pattern: String, nestLimit: UInt): ParserI {
+internal fun parserNestLimit(pattern: String, nestLimit: UInt): ParserI {
     val p = ParserBuilder.new().nestLimit(nestLimit).build()
     return ParserI.new(p, pattern)
 }
 
-public fun parserIgnoreWhitespace(pattern: String): ParserI {
+internal fun parserIgnoreWhitespace(pattern: String): ParserI {
     val p = ParserBuilder.new().ignoreWhitespace(true).build()
     return ParserI.new(p, pattern)
 }
@@ -1350,7 +1350,7 @@ public fun parseCaptureName() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("(?P<a¾>)").parse(), Result.Ok(Ast.group(Group(span = Span.new(Position.new(0, 1u, 1), Position.new(9, 1, 9)), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = Span.new(Position.new(4, 1, 5), Position.new(7, 1, 7)), name = s("a¾"), index = 1u)), ast = Ast.empty(Span.new(Position.new(8, 1, 8), Position.new(8, 1, 8)))))))) {
+    when (val matchVal6 = Pair(parser("(?P<a¾>)").parse(), Result.Ok(Ast.group(Group(span = Span.new(Position.new(0, 1, 1), Position.new(9, 1, 9)), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = Span.new(Position.new(4, 1, 5), Position.new(7, 1, 7)), name = s("a¾"), index = 1u)), ast = Ast.empty(Span.new(Position.new(8, 1, 8), Position.new(8, 1, 8)))))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -1359,7 +1359,7 @@ public fun parseCaptureName() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("(?P<名字>)").parse(), Result.Ok(Ast.group(Group(span = Span.new(Position.new(0, 1u, 1), Position.new(12, 1, 9)), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = Span.new(Position.new(4, 1, 5), Position.new(10, 1, 7)), name = s("名字"), index = 1u)), ast = Ast.empty(Span.new(Position.new(11, 1, 8), Position.new(11, 1, 8)))))))) {
+    when (val matchVal7 = Pair(parser("(?P<名字>)").parse(), Result.Ok(Ast.group(Group(span = Span.new(Position.new(0, 1, 1), Position.new(12, 1, 9)), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = Span.new(Position.new(4, 1, 5), Position.new(10, 1, 7)), name = s("名字"), index = 1u)), ast = Ast.empty(Span.new(Position.new(11, 1, 8), Position.new(11, 1, 8)))))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -1773,7 +1773,7 @@ public fun parseEscape() {
     }
     val specials = listOf(Triple("\\a", '\u0007', SpecialLiteralKind.Bell), Triple("\\f", '\u000c', SpecialLiteralKind.FormFeed), Triple("\\t", '\t', SpecialLiteralKind.Tab), Triple("\\n", '\n', SpecialLiteralKind.LineFeed), Triple("\\r", '\r', SpecialLiteralKind.CarriageReturn), Triple("\\v", '\u000b', SpecialLiteralKind.VerticalTab))
     for ((pat, c, kind) in specials) {
-        when (val matchVal1 = Pair(parser(pat).parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Special(kind.clone()), c = c))))) {
+        when (val matchVal1 = Pair(parser(pat).parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Special(kind), c = c.code.toUInt()))))) {
             else -> {
                 val leftVal1 = matchVal1.first
                 val rightVal1 = matchVal1.second
@@ -1875,8 +1875,8 @@ public fun parseEscape() {
     }
     // We also support superfluous escapes in most cases now too.
     for (c1 in listOf('!', '@', '%', '"', '\'', '/', ' ')) {
-        val pat1 = "\\$c"
-        when (val matchVal12 = Pair(parser(pat1).parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Superfluous, c = c1))))) {
+        val pat1 = "\\$c1"
+        when (val matchVal12 = Pair(parser(pat1).parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Superfluous, c = c1.code.toUInt()))))) {
             else -> {
                 val leftVal12 = matchVal12.first
                 val rightVal12 = matchVal12.second

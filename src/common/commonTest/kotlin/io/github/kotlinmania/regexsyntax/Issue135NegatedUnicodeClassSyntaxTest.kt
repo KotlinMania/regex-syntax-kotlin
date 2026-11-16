@@ -2,6 +2,7 @@ package io.github.kotlinmania.regexsyntax
 
 import io.github.kotlinmania.regexsyntax.hir.Class
 import io.github.kotlinmania.regexsyntax.hir.HirKind
+import io.github.kotlinmania.regexsyntax.parser.parse
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -9,7 +10,7 @@ import kotlin.test.assertTrue
 class Issue135NegatedUnicodeClassSyntaxTest {
     @Test
     fun parsesNegatedControlCategory() {
-        val hir = parse("\\P{Cc}").getOrThrow()
+        val hir = parse("\\P{Cc}").unwrap()
         val kind = hir.kind()
         assertTrue(kind is HirKind.Class)
         val cls = kind.value
@@ -25,7 +26,7 @@ class Issue135NegatedUnicodeClassSyntaxTest {
 
     @Test
     fun parsesNegatedUnicodeClassIntersectionWithNegatedNewlines() {
-        val hir = parse("[\\P{Cc}&&[^\\r\\n]]").getOrThrow()
+        val hir = parse("[\\P{Cc}&&[^\\r\\n]]").unwrap()
         val kind = hir.kind()
         assertTrue(kind is HirKind.Class)
         val cls = kind.value
@@ -38,11 +39,11 @@ class Issue135NegatedUnicodeClassSyntaxTest {
 
     @Test
     fun parsesCyrillicScriptAndCaseInsensitiveNegatedUppercase() {
-        val cyr = parse("\\p{Cyrillic}").getOrThrow()
+        val cyr = parse("\\p{Cyrillic}").unwrap()
         assertTrue(cyr.kind() is HirKind.Class)
         assertTrue((cyr.properties().minimumLen() ?: 0) > 0)
 
-        val notUpper = parse("(?i)\\P{Lu}").getOrThrow()
+        val notUpper = parse("(?i)\\P{Lu}").unwrap()
         assertTrue(notUpper.kind() is HirKind.Class)
         assertTrue(notUpper.properties().isUtf8())
     }

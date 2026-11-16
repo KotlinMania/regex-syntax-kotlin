@@ -168,15 +168,15 @@ public fun wordByte() {
 
 @kotlin.test.Test
 public fun wordChar() {
-    check(isWordCharacter('a'.code.toUInt()).unwrap()) { "ASCII" }
-    check(isWordCharacter('\u00e0'.code.toUInt()).unwrap()) { "Latin-1" }
-    check(isWordCharacter('\u03b2'.code.toUInt()).unwrap()) { "Greek" }
-    check(isWordCharacter(0x11011u).unwrap()) { "Brahmi (Unicode 6.0)" }
-    check(isWordCharacter(0x11611u).unwrap()) { "Modi (Unicode 7.0)" }
-    check(isWordCharacter(0x11711u).unwrap()) { "Ahom (Unicode 8.0)" }
-    check(isWordCharacter(0x17828u).unwrap()) { "Tangut (Unicode 9.0)" }
-    check(isWordCharacter(0x1b1b1u).unwrap()) { "Nushu (Unicode 10.0)" }
-    check(isWordCharacter(0x16e40u).unwrap()) { "Medefaidrin (Unicode 11.0)" }
-    check(!isWordCharacter('-'.code.toUInt()).unwrap())
-    check(!isWordCharacter('\u2603'.code.toUInt()).unwrap())
+    check(isWordCharacter('a'.code.toUInt())) { "ASCII" }
+    check(isWordCharacter('\u00e0'.code.toUInt())) { "Latin-1" }
+    check(isWordCharacter('\u03b2'.code.toUInt())) { "Greek" }
+    check(isWordCharacter(0x11011u)) { "Brahmi (Unicode 6.0)" }
+    check(isWordCharacter(0x11611u)) { "Modi (Unicode 7.0)" }
+    check(isWordCharacter(0x11711u)) { "Ahom (Unicode 8.0)" }
+    check(isWordCharacter(0x17828u)) { "Tangut (Unicode 9.0)" }
+    check(isWordCharacter(0x1b1b1u)) { "Nushu (Unicode 10.0)" }
+    check(isWordCharacter(0x16e40u)) { "Medefaidrin (Unicode 11.0)" }
+    check(!isWordCharacter('-'.code.toUInt()))
+    check(!isWordCharacter('\u2603'.code.toUInt()))
 }
