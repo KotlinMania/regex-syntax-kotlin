@@ -17,160 +17,168 @@ public sealed class ErrorKind {
      * groups. That is, the nest limit can be low and it is still possible for
      * this error to occur.
      */
-    public data object CaptureLimitExceeded : ErrorKind()
+    public object CaptureLimitExceeded : ErrorKind()
     /**
      * An invalid escape sequence was found in a character class set.
      */
-    public data object ClassEscapeInvalid : ErrorKind()
+    public object ClassEscapeInvalid : ErrorKind()
     /**
      * An invalid character class range was found. An invalid range is any
      * range where the start is greater than the end.
      */
-    public data object ClassRangeInvalid : ErrorKind()
+    public object ClassRangeInvalid : ErrorKind()
     /**
      * An invalid range boundary was found in a character class. Range
      * boundaries must be a single literal codepoint, but this error indicates
      * that something else was found, such as a nested class.
      */
-    public data object ClassRangeLiteral : ErrorKind()
+    public object ClassRangeLiteral : ErrorKind()
     /**
      * An opening `[` was found with no corresponding closing `]`.
      */
-    public data object ClassUnclosed : ErrorKind()
+    public object ClassUnclosed : ErrorKind()
     /**
      * Note that this error variant is no longer used. Namely, a decimal
      * number can only appear as a repetition quantifier. When the number
      * in a repetition quantifier is empty, then it gets its own specialized
      * error, `RepetitionCountDecimalEmpty`.
      */
-    public data object DecimalEmpty : ErrorKind()
+    public object DecimalEmpty : ErrorKind()
     /**
      * An invalid decimal number was given where one was expected.
      */
-    public data object DecimalInvalid : ErrorKind()
+    public object DecimalInvalid : ErrorKind()
     /**
      * A bracketed hex literal was empty.
      */
-    public data object EscapeHexEmpty : ErrorKind()
+    public object EscapeHexEmpty : ErrorKind()
     /**
      * A bracketed hex literal did not correspond to a Unicode scalar value.
      */
-    public data object EscapeHexInvalid : ErrorKind()
+    public object EscapeHexInvalid : ErrorKind()
     /**
      * An invalid hexadecimal digit was found.
      */
-    public data object EscapeHexInvalidDigit : ErrorKind()
+    public object EscapeHexInvalidDigit : ErrorKind()
     /**
      * EOF was found before an escape sequence was completed.
      */
-    public data object EscapeUnexpectedEof : ErrorKind()
+    public object EscapeUnexpectedEof : ErrorKind()
     /**
      * An unrecognized escape sequence.
      */
-    public data object EscapeUnrecognized : ErrorKind()
+    public object EscapeUnrecognized : ErrorKind()
     /**
      * A dangling negation was used when setting flags, e.g., `i -`.
      */
-    public data object FlagDanglingNegation : ErrorKind()
+    public object FlagDanglingNegation : ErrorKind()
     /**
      * A flag was used twice, e.g., `i - i`.
      */
-    public data class FlagDuplicate(public var original: Span) : ErrorKind()
+    public data class FlagDuplicate(public var original: Span) : ErrorKind() {
+        override fun toString(): String = buildString { fmt(this) }
+    }
     /**
      * The negation operator was used twice, e.g., `- i - s`.
      */
-    public data class FlagRepeatedNegation(public var original: Span) : ErrorKind()
+    public data class FlagRepeatedNegation(public var original: Span) : ErrorKind() {
+        override fun toString(): String = buildString { fmt(this) }
+    }
     /**
      * Expected a flag but got EOF, e.g., `(?`.
      */
-    public data object FlagUnexpectedEof : ErrorKind()
+    public object FlagUnexpectedEof : ErrorKind()
     /**
      * Unrecognized flag, e.g., `a`.
      */
-    public data object FlagUnrecognized : ErrorKind()
+    public object FlagUnrecognized : ErrorKind()
     /**
      * A duplicate capture name was found.
      */
-    public data class GroupNameDuplicate(public var original: Span) : ErrorKind()
+    public data class GroupNameDuplicate(public var original: Span) : ErrorKind() {
+        override fun toString(): String = buildString { fmt(this) }
+    }
     /**
      * A capture group name is empty, e.g., `(? P<> abc)`.
      */
-    public data object GroupNameEmpty : ErrorKind()
+    public object GroupNameEmpty : ErrorKind()
     /**
      * An invalid character was seen for a capture group name. This includes
      * errors where the first character is a digit (even though subsequent
      * characters are allowed to be digits).
      */
-    public data object GroupNameInvalid : ErrorKind()
+    public object GroupNameInvalid : ErrorKind()
     /**
      * A closing `>` could not be found for a capture group name.
      */
-    public data object GroupNameUnexpectedEof : ErrorKind()
+    public object GroupNameUnexpectedEof : ErrorKind()
     /**
      * An unclosed group, e.g., `(ab`.
      *
      * The span of this error corresponds to the unclosed parenthesis.
      */
-    public data object GroupUnclosed : ErrorKind()
+    public object GroupUnclosed : ErrorKind()
     /**
      * An unopened group, e.g., `ab)`.
      */
-    public data object GroupUnopened : ErrorKind()
+    public object GroupUnopened : ErrorKind()
     /**
      * The nest limit was exceeded. The limit stored here is the limit
      * configured in the parser.
      */
-    public data class NestLimitExceeded(public var value: UInt) : ErrorKind()
+    public data class NestLimitExceeded(public var value: UInt) : ErrorKind() {
+        override fun toString(): String = buildString { fmt(this) }
+    }
     /**
      * The range provided in a counted repetition operator is invalid. The
      * range is invalid if the start is greater than the end.
      */
-    public data object RepetitionCountInvalid : ErrorKind()
+    public object RepetitionCountInvalid : ErrorKind()
     /**
      * An opening `{` was not followed by a valid decimal value.
      * For example, `x {}` or `x{]}` would fail.
      */
-    public data object RepetitionCountDecimalEmpty : ErrorKind()
+    public object RepetitionCountDecimalEmpty : ErrorKind()
     /**
      * An opening `{` was found with no corresponding closing `}`.
      */
-    public data object RepetitionCountUnclosed : ErrorKind()
+    public object RepetitionCountUnclosed : ErrorKind()
     /**
      * A repetition operator was applied to a missing sub-expression. This
      * occurs, for example, in the regex consisting of just a `*` or even
      * `(? i) *`. It is, however, possible to create a repetition operating on
      * an empty sub-expression. For example, `() *` is still considered valid.
      */
-    public data object RepetitionMissing : ErrorKind()
+    public object RepetitionMissing : ErrorKind()
     /**
      * The special word boundary syntax, `\b{something}`, was used, but
      * either EOF without `}` was seen, or an invalid character in the
      * braces was seen.
      */
-    public data object SpecialWordBoundaryUnclosed : ErrorKind()
+    public object SpecialWordBoundaryUnclosed : ErrorKind()
     /**
      * The special word boundary syntax, `\b{something}`, was used, but
      * `something` was not recognized as a valid word boundary kind.
      */
-    public data object SpecialWordBoundaryUnrecognized : ErrorKind()
+    public object SpecialWordBoundaryUnrecognized : ErrorKind()
     /**
      * The syntax `\b{` was observed, but afterwards the end of the pattern
      * was observed without being able to tell whether it was meant to be a
      * bounded repetition on the `\b` or the beginning of a special word
      * boundary assertion.
      */
-    public data object SpecialWordOrRepetitionUnexpectedEof : ErrorKind()
+    public object SpecialWordOrRepetitionUnexpectedEof : ErrorKind()
     /**
      * The Unicode class is not valid. This typically occurs when a `\p` is
      * followed by something other than a `{`.
      */
-    public data object UnicodeClassInvalid : ErrorKind()
+    public object UnicodeClassInvalid : ErrorKind()
     /**
      * When octal support is disabled, this error is produced when an octal
      * escape is used. The octal escape is assumed to be an invocation of
      * a backreference, which is the common case.
      */
-    public data object UnsupportedBackreference : ErrorKind()
+    public object UnsupportedBackreference : ErrorKind()
     /**
      * When syntax similar to PCRE's look-around is used, this error is
      * returned. Some example syntaxes that are rejected include, but are
@@ -178,7 +186,7 @@ public sealed class ErrorKind {
      * `(?<!re)`. Note that all of these syntaxes are otherwise invalid; this
      * error is used to improve the user experience.
      */
-    public data object UnsupportedLookAround : ErrorKind()
+    public object UnsupportedLookAround : ErrorKind()
 
     public fun rustEquals(other: ErrorKind): Boolean = this == other
 
@@ -253,6 +261,8 @@ public sealed class ErrorKind {
             UnsupportedLookAround -> f.append("look-around, including look-ahead and look-behind, is not supported")
         }
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 }
 
 /**

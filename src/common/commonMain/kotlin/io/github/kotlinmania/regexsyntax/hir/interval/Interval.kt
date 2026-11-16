@@ -292,11 +292,10 @@ internal class IntervalSetIter<I>(
     override fun iterator(): Iterator<I> =
         object : AbstractIterator<I>() {
             override fun computeNext() {
-                val v = this@IntervalSetIter.next()
-                if (v == null) {
-                    done()
+                if (this@IntervalSetIter.index < this@IntervalSetIter.items.size) {
+                    setNext(this@IntervalSetIter.items[this@IntervalSetIter.index++])
                 } else {
-                    setNext(v)
+                    done()
                 }
             }
         }

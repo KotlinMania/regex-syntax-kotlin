@@ -93,11 +93,21 @@ internal class Formatter<E>(
                 }
                 f.appendLine(notes.joinToString("\n"))
             }
-            f.append("error: ${this.err}")
+            f.append("error: ")
+            appendFormattedErrorKind(f)
         } else {
             f.appendLine("regex parse error:")
             f.append(spans.notate())
-            f.append("error: ${this.err}")
+            f.append("error: ")
+            appendFormattedErrorKind(f)
+        }
+    }
+
+    private fun appendFormattedErrorKind(f: StringBuilder) {
+        when (val kind = this.err) {
+            is AstErrorKind -> kind.fmt(f)
+            is HirErrorKind -> kind.fmt(f)
+            else -> f.append(kind)
         }
     }
 

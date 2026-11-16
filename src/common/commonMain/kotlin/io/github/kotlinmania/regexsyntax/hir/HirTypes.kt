@@ -16,39 +16,39 @@ public sealed class ErrorKind {
      * This error occurs when a Unicode feature is used when Unicode
      * support is disabled. For example `(?-u:\pL)` would trigger this error.
      */
-    public data object UnicodeNotAllowed : ErrorKind()
+    public object UnicodeNotAllowed : ErrorKind()
     /**
      * This error occurs when translating a pattern that could match a byte
      * sequence that isn't UTF-8 and `utf8` was enabled.
      */
-    public data object InvalidUtf8 : ErrorKind()
+    public object InvalidUtf8 : ErrorKind()
     /**
      * This error occurs when one uses a non-ASCII byte for a line terminator,
      * but where Unicode mode is enabled and UTF-8 mode is disabled.
      */
-    public data object InvalidLineTerminator : ErrorKind()
+    public object InvalidLineTerminator : ErrorKind()
     /**
      * This occurs when an unrecognized Unicode property name could not
      * be found.
      */
-    public data object UnicodePropertyNotFound : ErrorKind()
+    public object UnicodePropertyNotFound : ErrorKind()
     /**
      * This occurs when an unrecognized Unicode property value could not
      * be found.
      */
-    public data object UnicodePropertyValueNotFound : ErrorKind()
+    public object UnicodePropertyValueNotFound : ErrorKind()
     /**
      * This occurs when a Unicode-aware Perl character class (`\w`, `\s` or
      * `\d`) could not be found. This can occur when the `unicode - perl`
      * crate feature is not enabled.
      */
-    public data object UnicodePerlClassNotFound : ErrorKind()
+    public object UnicodePerlClassNotFound : ErrorKind()
     /**
      * This occurs when the Unicode simple case mapping tables are not
      * available, and the regular expression required Unicode aware case
      * insensitivity.
      */
-    public data object UnicodeCaseUnavailable : ErrorKind()
+    public object UnicodeCaseUnavailable : ErrorKind()
 
     public fun rustEquals(other: ErrorKind): Boolean = this == other
 

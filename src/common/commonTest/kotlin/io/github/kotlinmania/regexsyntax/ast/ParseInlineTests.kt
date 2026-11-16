@@ -2387,7 +2387,7 @@ public fun parseHexBrace() {
 
 @kotlin.test.Test
 public fun parseDecimal() {
-    when (val matchVal = Pair(parser("123").parseDecimal(), Result.Ok(123))) {
+    when (val matchVal = Pair(parser("123").parseDecimal(), Result.Ok(123u))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -2396,7 +2396,7 @@ public fun parseDecimal() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("0").parseDecimal(), Result.Ok(0))) {
+    when (val matchVal1 = Pair(parser("0").parseDecimal(), Result.Ok(0u))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -2405,7 +2405,7 @@ public fun parseDecimal() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("01").parseDecimal(), Result.Ok(1))) {
+    when (val matchVal2 = Pair(parser("01").parseDecimal(), Result.Ok(1u))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
