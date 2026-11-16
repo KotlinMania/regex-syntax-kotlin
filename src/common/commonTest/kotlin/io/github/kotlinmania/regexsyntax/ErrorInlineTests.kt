@@ -9,7 +9,7 @@ public fun assertPanicMessage(pattern: String, expectedMsg: String) {
     when (val result = Parser.new().parse(pattern)) {
         is Result.Ok -> error("regex should not have parsed")
         is Result.Err -> {
-            val err = result.value
+            val err = result.error
             check(err.toString() == expectedMsg.trim())
         }
     }
