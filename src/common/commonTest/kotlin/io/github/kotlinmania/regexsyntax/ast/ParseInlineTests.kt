@@ -41,6 +41,11 @@ import io.github.kotlinmania.regexsyntax.ast.RepetitionRange
 import io.github.kotlinmania.regexsyntax.ast.SetFlags
 import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.ast.SpecialLiteralKind
+import io.github.kotlinmania.regexsyntax.scalarFromU32
+import io.github.kotlinmania.regexsyntax.scalarLenUtf8
+import io.github.kotlinmania.regexsyntax.unwrap
+import io.github.kotlinmania.regexsyntax.unwrapErr
+import io.github.kotlinmania.rustlang.core.result.Result
 
 // This module provides a regular expression parser.
 
@@ -56,26 +61,26 @@ public open class TestError(
 
 public fun Error.eq(other: TestError): Boolean = this.span == other.span && this.kind == other.kind
 
-public fun s(str: String): String = str.toString()
+public fun s(str: String): String = str
 
-public fun parser(pattern: String): ParserI<Parser> = ParserI.new(Parser.new(), pattern)
+public fun parser(pattern: String): ParserI = ParserI.new(Parser.new(), pattern)
 
-public fun parserOctal(pattern: String): ParserI<Parser> {
+public fun parserOctal(pattern: String): ParserI {
     val parser = ParserBuilder.new().octal(true).build()
     return ParserI.new(parser, pattern)
 }
 
-public fun parserEmptyMinRange(pattern: String): ParserI<Parser> {
+public fun parserEmptyMinRange(pattern: String): ParserI {
     val parser = ParserBuilder.new().emptyMinRange(true).build()
     return ParserI.new(parser, pattern)
 }
 
-public fun parserNestLimit(pattern: String, nestLimit: UInt): ParserI<Parser> {
+public fun parserNestLimit(pattern: String, nestLimit: UInt): ParserI {
     val p = ParserBuilder.new().nestLimit(nestLimit).build()
     return ParserI.new(p, pattern)
 }
 
-public fun parserIgnoreWhitespace(pattern: String): ParserI<Parser> {
+public fun parserIgnoreWhitespace(pattern: String): ParserI {
     val p = ParserBuilder.new().ignoreWhitespace(true).build()
     return ParserI.new(p, pattern)
 }
@@ -88,47 +93,62 @@ public fun nspan(start: Position, end: Position): Span = Span.new(start, end)
 /**
  * Short alias for creating a new position.
  */
-public fun npos(offset: ULong, line: ULong, column: ULong): Position = Position.new(offset.toInt(), line.toInt(), column.toInt())
+public fun npos(offset: Int, line: Int, column: Int): Position = Position.new(offset, line, column)
 
 /**
  * Create a new span from the given offset range. This assumes a single
  * line and sets the columns based on the offsets. i.e., This only works
  * out of the box for ASCII, which is fine for most tests.
  */
-public fun span(range: Range<Int>): Span {
-    val start = Position.new(range.start, 1, range.start + 1)
-    val end = Position.new(range.end, 1, range.end + 1)
+public fun span(range: IntRange): Span {
+    val rStart = range.first
+    val rEnd = range.last + 1
+    val start = Position.new(rStart, 1, rStart + 1)
+    val end = Position.new(rEnd, 1, rEnd + 1)
     return Span.new(start, end)
 }
 
 /**
  * Create a new span for the corresponding byte range in the given string.
  */
-public fun spanRange(subject: String, range: Range<Int>): Span {
-    val start = Position(offset = range.start, line = 1 + subject.substring(0 until range.start).matches('\n').count(), column = 1 + subject.substring(0 until range.start).chars().rev().position({ c -> c == '\n' }).unwrapOr(subject.substring(0 until range.start).chars().count()))
-    val end = Position(offset = range.end, line = 1 + subject.substring(0 until range.end).matches('\n').count(), column = 1 + subject.substring(0 until range.end).chars().rev().position({ c -> c == '\n' }).unwrapOr(subject.substring(0 until range.end).chars().count()))
-    return Span.new(start, end)
+public fun spanRange(subject: String, range: IntRange): Span {
+    val bytes = subject.encodeToByteArray()
+    fun posAt(byteOffset: Int): Position {
+        val prefix = bytes.copyOfRange(0, byteOffset).decodeToString()
+        val line = 1 + prefix.count { it == '\n' }
+        val lastNl = prefix.lastIndexOf('\n')
+        val tail = if (lastNl >= 0) prefix.substring(lastNl + 1) else prefix
+        var col = 1
+        var idx = 0
+        while (idx < tail.length) {
+            val step = if (tail[idx].isHighSurrogate() && idx + 1 < tail.length && tail[idx + 1].isLowSurrogate()) 2 else 1
+            col += 1
+            idx += step
+        }
+        return Position(offset = byteOffset, line = line, column = col)
+    }
+    return Span.new(posAt(range.first), posAt(range.last + 1))
 }
 
 /**
  * Create a verbatim literal starting at the given position.
  */
-public fun lit(c: Char, start: Int): Ast = litWith(c, span(start until start + c.lenUtf8()))
+public fun lit(c: Char, start: Int): Ast = litWith(c, span(start until start + scalarLenUtf8(c.code.toUInt())))
 
 /**
  * Create a meta literal starting at the given position.
  */
-public fun metaLit(c: Char, span: Span): Ast = Ast.literal(Literal(span = span, kind = LiteralKind.Meta, c = c))
+public fun metaLit(c: Char, span: Span): Ast = Ast.literal(Literal(span = span, kind = LiteralKind.Meta, c = c.code.toUInt()))
 
 /**
  * Create a verbatim literal with the given span.
  */
-public fun litWith(c: Char, span: Span): Ast = Ast.literal(Literal(span = span, kind = LiteralKind.Verbatim, c = c))
+public fun litWith(c: Char, span: Span): Ast = Ast.literal(Literal(span = span, kind = LiteralKind.Verbatim, c = c.code.toUInt()))
 
 /**
  * Create a concatenation with the given range.
  */
-public fun concat(range: Range<Int>, asts: List<Ast>): Ast = concatWith(span(range), asts)
+public fun concat(range: IntRange, asts: List<Ast>): Ast = concatWith(span(range), asts)
 
 /**
  * Create a concatenation with the given span.
@@ -138,12 +158,12 @@ public fun concatWith(span: Span, asts: List<Ast>): Ast = Ast.concat(Concat(span
 /**
  * Create an alternation with the given span.
  */
-public fun alt(range: Range<ULong>, asts: List<Ast>): Ast = Ast.alternation(Alternation(span = span(range), asts = asts))
+public fun alt(range: IntRange, asts: List<Ast>): Ast = Ast.alternation(Alternation(span = span(range), asts = asts))
 
 /**
  * Create a capturing group with the given span.
  */
-public fun group(range: Range<Int>, index: UInt, ast: Ast): Ast = Ast.group(Group(span = span(range), kind = GroupKind.CaptureIndex(index), ast = ast))
+public fun group(range: IntRange, index: UInt, ast: Ast): Ast = Ast.group(Group(span = span(range), kind = GroupKind.CaptureIndex(index), ast = ast))
 
 /**
  * Create an ast.SetFlags.
@@ -154,17 +174,19 @@ public fun group(range: Range<Int>, index: UInt, ast: Ast): Ast = Ast.group(Grou
  * If negated is true, then the set is interpreted as beginning with a
  * negation.
  */
-public fun flagSet(pat: String, range: Range<Int>, flag: Flag, negated: Boolean): Ast {
-    var items = mutableListOf(FlagsItem(span = spanRange(pat, (range.end - 2) until (range.end - 1)), kind = FlagsItemKind.Flag(flag)))
+public fun flagSet(pat: String, range: IntRange, flag: Flag, negated: Boolean): Ast {
+    val rStart = range.first
+    val rEnd = range.last + 1
+    val items = mutableListOf(FlagsItem(span = spanRange(pat, (rEnd - 2) until (rEnd - 1)), kind = FlagsItemKind.Flag(flag)))
     if (negated) {
-        items.add(0, FlagsItem(span = spanRange(pat, (range.start + 2) until (range.end - 2)), kind = FlagsItemKind.Negation))
+        items.add(0, FlagsItem(span = spanRange(pat, (rStart + 2) until (rEnd - 2)), kind = FlagsItemKind.Negation))
     }
-    return Ast.flags(SetFlags(span = spanRange(pat, range.clone()), flags = Flags(span = spanRange(pat, (range.start + 2) until (range.end - 1)), items = items)))
+    return Ast.flags(SetFlags(span = spanRange(pat, range), flags = Flags(span = spanRange(pat, (rStart + 2) until (rEnd - 1)), items = items)))
 }
 
 @kotlin.test.Test
 public fun parseNestLimit() {
-    when (val matchVal = Pair(parserNestLimit("", 0).parse(), Result.success(Ast.empty(span(0 until 0))))) {
+    when (val matchVal = Pair(parserNestLimit("", 0u).parse(), Result.Ok(Ast.empty(span(0 until 0))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -173,7 +195,7 @@ public fun parseNestLimit() {
             }
         }
     }
-    when (val matchVal1 = Pair(parserNestLimit("a", 0).parse(), Result.success(lit('a', 0)))) {
+    when (val matchVal1 = Pair(parserNestLimit("a", 0u).parse(), Result.Ok(lit('a', 0)))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -182,16 +204,16 @@ public fun parseNestLimit() {
             }
         }
     }
-    when (val matchVal2 = Pair(parserNestLimit("a+", 0).parse().unwrapErr(), TestError(span = span(0 until 2), kind = ErrorKind.NestLimitExceeded(0)))) {
+    when (val matchVal2 = Pair(parserNestLimit("a+", 0u).parse().unwrapErr(), TestError(span = span(0 until 2), kind = ErrorKind.NestLimitExceeded(0u)))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
-            if (!(leftVal2 == rightVal2)) {
+            if (!leftVal2.eq(rightVal2)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal2`\nright: `$rightVal2`\n\n")
             }
         }
     }
-    when (val matchVal3 = Pair(parserNestLimit("a+", 1).parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.OneOrMore), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal3 = Pair(parserNestLimit("a+", 1u).parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.OneOrMore), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -200,25 +222,25 @@ public fun parseNestLimit() {
             }
         }
     }
-    when (val matchVal4 = Pair(parserNestLimit("(a)+", 1).parse().unwrapErr(), TestError(span = span(0 until 3), kind = ErrorKind.NestLimitExceeded(1)))) {
+    when (val matchVal4 = Pair(parserNestLimit("(a)+", 1u).parse().unwrapErr(), TestError(span = span(0 until 3), kind = ErrorKind.NestLimitExceeded(1u)))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
-            if (!(leftVal4 == rightVal4)) {
+            if (!leftVal4.eq(rightVal4)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal4`\nright: `$rightVal4`\n\n")
             }
         }
     }
-    when (val matchVal5 = Pair(parserNestLimit("a+*", 1).parse().unwrapErr(), TestError(span = span(0 until 2), kind = ErrorKind.NestLimitExceeded(1)))) {
+    when (val matchVal5 = Pair(parserNestLimit("a+*", 1u).parse().unwrapErr(), TestError(span = span(0 until 2), kind = ErrorKind.NestLimitExceeded(1u)))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
-            if (!(leftVal5 == rightVal5)) {
+            if (!leftVal5.eq(rightVal5)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal5`\nright: `$rightVal5`\n\n")
             }
         }
     }
-    when (val matchVal6 = Pair(parserNestLimit("a+*", 2).parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 3), op = RepetitionOp(span = span(2 until 3), kind = RepetitionKind.ZeroOrMore), greedy = true, ast = Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.OneOrMore), greedy = true, ast = lit('a', 0)))))))) {
+    when (val matchVal6 = Pair(parserNestLimit("a+*", 2u).parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 3), op = RepetitionOp(span = span(2 until 3), kind = RepetitionKind.ZeroOrMore), greedy = true, ast = Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.OneOrMore), greedy = true, ast = lit('a', 0)))))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -227,16 +249,16 @@ public fun parseNestLimit() {
             }
         }
     }
-    when (val matchVal7 = Pair(parserNestLimit("ab", 0).parse().unwrapErr(), TestError(span = span(0 until 2), kind = ErrorKind.NestLimitExceeded(0)))) {
+    when (val matchVal7 = Pair(parserNestLimit("ab", 0u).parse().unwrapErr(), TestError(span = span(0 until 2), kind = ErrorKind.NestLimitExceeded(0u)))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
-            if (!(leftVal7 == rightVal7)) {
+            if (!leftVal7.eq(rightVal7)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal7`\nright: `$rightVal7`\n\n")
             }
         }
     }
-    when (val matchVal8 = Pair(parserNestLimit("ab", 1).parse(), Result.success(concat(0 until 2, mutableListOf(lit('a', 0), lit('b', 1)))))) {
+    when (val matchVal8 = Pair(parserNestLimit("ab", 1u).parse(), Result.Ok(concat(0 until 2, mutableListOf(lit('a', 0), lit('b', 1)))))) {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
@@ -245,7 +267,7 @@ public fun parseNestLimit() {
             }
         }
     }
-    when (val matchVal9 = Pair(parserNestLimit("abc", 1).parse(), Result.success(concat(0 until 3, mutableListOf(lit('a', 0), lit('b', 1), lit('c', 2)))))) {
+    when (val matchVal9 = Pair(parserNestLimit("abc", 1u).parse(), Result.Ok(concat(0 until 3, mutableListOf(lit('a', 0), lit('b', 1), lit('c', 2)))))) {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
@@ -254,16 +276,16 @@ public fun parseNestLimit() {
             }
         }
     }
-    when (val matchVal10 = Pair(parserNestLimit("a|b", 0).parse().unwrapErr(), TestError(span = span(0 until 3), kind = ErrorKind.NestLimitExceeded(0)))) {
+    when (val matchVal10 = Pair(parserNestLimit("a|b", 0u).parse().unwrapErr(), TestError(span = span(0 until 3), kind = ErrorKind.NestLimitExceeded(0u)))) {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
-            if (!(leftVal10 == rightVal10)) {
+            if (!leftVal10.eq(rightVal10)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal10`\nright: `$rightVal10`\n\n")
             }
         }
     }
-    when (val matchVal11 = Pair(parserNestLimit("a|b", 1).parse(), Result.success(alt(0 until 3, mutableListOf(lit('a', 0), lit('b', 2)))))) {
+    when (val matchVal11 = Pair(parserNestLimit("a|b", 1u).parse(), Result.Ok(alt(0 until 3, mutableListOf(lit('a', 0), lit('b', 2)))))) {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
@@ -272,7 +294,7 @@ public fun parseNestLimit() {
             }
         }
     }
-    when (val matchVal12 = Pair(parserNestLimit("a|b|c", 1).parse(), Result.success(alt(0 until 5, mutableListOf(lit('a', 0), lit('b', 2), lit('c', 4)))))) {
+    when (val matchVal12 = Pair(parserNestLimit("a|b|c", 1u).parse(), Result.Ok(alt(0 until 5, mutableListOf(lit('a', 0), lit('b', 2), lit('c', 4)))))) {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
@@ -281,16 +303,16 @@ public fun parseNestLimit() {
             }
         }
     }
-    when (val matchVal13 = Pair(parserNestLimit("[a]", 0).parse().unwrapErr(), TestError(span = span(0 until 3), kind = ErrorKind.NestLimitExceeded(0)))) {
+    when (val matchVal13 = Pair(parserNestLimit("[a]", 0u).parse().unwrapErr(), TestError(span = span(0 until 3), kind = ErrorKind.NestLimitExceeded(0u)))) {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
-            if (!(leftVal13 == rightVal13)) {
+            if (!leftVal13.eq(rightVal13)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal13`\nright: `$rightVal13`\n\n")
             }
         }
     }
-    when (val matchVal14 = Pair(parserNestLimit("[a]", 1).parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 3), negated = false, kind = ClassSet.Item(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = 'a')))))))) {
+    when (val matchVal14 = Pair(parserNestLimit("[a]", 1u).parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 3), negated = false, kind = ClassSet.Item(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = 'a'.code.toUInt())))))))) {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
@@ -299,47 +321,47 @@ public fun parseNestLimit() {
             }
         }
     }
-    when (val matchVal15 = Pair(parserNestLimit("[ab]", 1).parse().unwrapErr(), TestError(span = span(1 until 3), kind = ErrorKind.NestLimitExceeded(1)))) {
+    when (val matchVal15 = Pair(parserNestLimit("[ab]", 1u).parse().unwrapErr(), TestError(span = span(1 until 3), kind = ErrorKind.NestLimitExceeded(1u)))) {
         else -> {
             val leftVal15 = matchVal15.first
             val rightVal15 = matchVal15.second
-            if (!(leftVal15 == rightVal15)) {
+            if (!leftVal15.eq(rightVal15)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal15`\nright: `$rightVal15`\n\n")
             }
         }
     }
-    when (val matchVal16 = Pair(parserNestLimit("[ab[cd]]", 2).parse().unwrapErr(), TestError(span = span(3 until 7), kind = ErrorKind.NestLimitExceeded(2)))) {
+    when (val matchVal16 = Pair(parserNestLimit("[ab[cd]]", 2u).parse().unwrapErr(), TestError(span = span(3 until 7), kind = ErrorKind.NestLimitExceeded(2u)))) {
         else -> {
             val leftVal16 = matchVal16.first
             val rightVal16 = matchVal16.second
-            if (!(leftVal16 == rightVal16)) {
+            if (!leftVal16.eq(rightVal16)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal16`\nright: `$rightVal16`\n\n")
             }
         }
     }
-    when (val matchVal17 = Pair(parserNestLimit("[ab[cd]]", 3).parse().unwrapErr(), TestError(span = span(4 until 6), kind = ErrorKind.NestLimitExceeded(3)))) {
+    when (val matchVal17 = Pair(parserNestLimit("[ab[cd]]", 3u).parse().unwrapErr(), TestError(span = span(4 until 6), kind = ErrorKind.NestLimitExceeded(3u)))) {
         else -> {
             val leftVal17 = matchVal17.first
             val rightVal17 = matchVal17.second
-            if (!(leftVal17 == rightVal17)) {
+            if (!leftVal17.eq(rightVal17)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal17`\nright: `$rightVal17`\n\n")
             }
         }
     }
-    when (val matchVal18 = Pair(parserNestLimit("[a--b]", 1).parse().unwrapErr(), TestError(span = span(1 until 5), kind = ErrorKind.NestLimitExceeded(1)))) {
+    when (val matchVal18 = Pair(parserNestLimit("[a--b]", 1u).parse().unwrapErr(), TestError(span = span(1 until 5), kind = ErrorKind.NestLimitExceeded(1u)))) {
         else -> {
             val leftVal18 = matchVal18.first
             val rightVal18 = matchVal18.second
-            if (!(leftVal18 == rightVal18)) {
+            if (!leftVal18.eq(rightVal18)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal18`\nright: `$rightVal18`\n\n")
             }
         }
     }
-    when (val matchVal19 = Pair(parserNestLimit("[a--bc]", 2).parse().unwrapErr(), TestError(span = span(4 until 6), kind = ErrorKind.NestLimitExceeded(2)))) {
+    when (val matchVal19 = Pair(parserNestLimit("[a--bc]", 2u).parse().unwrapErr(), TestError(span = span(4 until 6), kind = ErrorKind.NestLimitExceeded(2u)))) {
         else -> {
             val leftVal19 = matchVal19.first
             val rightVal19 = matchVal19.second
-            if (!(leftVal19 == rightVal19)) {
+            if (!leftVal19.eq(rightVal19)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal19`\nright: `$rightVal19`\n\n")
             }
         }
@@ -350,7 +372,7 @@ public fun parseNestLimit() {
 public fun parseComments() {
     val pat = "(?x)\n# This is comment 1.\nfoo # This is comment 2.\n  # This is comment 3.\nbar\n# This is comment 4."
     val astc = parser(pat).parseWithComments().unwrap()
-    when (val matchVal = Pair(astc.ast, concatWith(spanRange(pat, 0 until pat.len()), mutableListOf(flagSet(pat, 0 until 4, Flag.IgnoreWhitespace, false), litWith('f', spanRange(pat, 26 until 27)), litWith('o', spanRange(pat, 27 until 28)), litWith('o', spanRange(pat, 28 until 29)), litWith('b', spanRange(pat, 74 until 75)), litWith('a', spanRange(pat, 75 until 76)), litWith('r', spanRange(pat, 76 until 77)))))) {
+    when (val matchVal = Pair(astc.ast, concatWith(spanRange(pat, 0 until pat.encodeToByteArray().size), mutableListOf(flagSet(pat, 0 until 4, Flag.IgnoreWhitespace, false), litWith('f', spanRange(pat, 26 until 27)), litWith('o', spanRange(pat, 27 until 28)), litWith('o', spanRange(pat, 28 until 29)), litWith('b', spanRange(pat, 74 until 75)), litWith('a', spanRange(pat, 75 until 76)), litWith('r', spanRange(pat, 76 until 77)))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -372,7 +394,7 @@ public fun parseComments() {
 
 @kotlin.test.Test
 public fun parseHolistic() {
-    when (val matchVal = Pair(parser("]").parse(), Result.success(lit(']', 0)))) {
+    when (val matchVal = Pair(parser("]").parse(), Result.Ok(lit(']', 0)))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -381,7 +403,7 @@ public fun parseHolistic() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("\\\\\\.\\+\\*\\?\\(\\)\\|\\[\\]\\{\\}\\^\\\$\\#\\&\\-\\~").parse(), Result.success(concat(0 until 36, mutableListOf(metaLit('\\', span(0 until 2)), metaLit('.', span(2 until 4)), metaLit('+', span(4 until 6)), metaLit('*', span(6 until 8)), metaLit('?', span(8 until 10)), metaLit('(', span(10 until 12)), metaLit(')', span(12 until 14)), metaLit('|', span(14 until 16)), metaLit('[', span(16 until 18)), metaLit(']', span(18 until 20)), metaLit('{', span(20 until 22)), metaLit('}', span(22 until 24)), metaLit('^', span(24 until 26)), metaLit('$', span(26 until 28)), metaLit('#', span(28 until 30)), metaLit('&', span(30 until 32)), metaLit('-', span(32 until 34)), metaLit('~', span(34 until 36))))))) {
+    when (val matchVal1 = Pair(parser("\\\\\\.\\+\\*\\?\\(\\)\\|\\[\\]\\{\\}\\^\\\$\\#\\&\\-\\~").parse(), Result.Ok(concat(0 until 36, mutableListOf(metaLit('\\', span(0 until 2)), metaLit('.', span(2 until 4)), metaLit('+', span(4 until 6)), metaLit('*', span(6 until 8)), metaLit('?', span(8 until 10)), metaLit('(', span(10 until 12)), metaLit(')', span(12 until 14)), metaLit('|', span(14 until 16)), metaLit('[', span(16 until 18)), metaLit(']', span(18 until 20)), metaLit('{', span(20 until 22)), metaLit('}', span(22 until 24)), metaLit('^', span(24 until 26)), metaLit('$', span(26 until 28)), metaLit('#', span(28 until 30)), metaLit('&', span(30 until 32)), metaLit('-', span(32 until 34)), metaLit('~', span(34 until 36))))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -396,7 +418,7 @@ public fun parseHolistic() {
 public fun parseIgnoreWhitespace() {
     // Test that basic whitespace insensitivity works.
     val pat = "(?x)a b"
-    when (val matchVal = Pair(parser(pat).parse(), Result.success(concatWith(nspan(npos(0, 1, 1), npos(7, 1, 8)), mutableListOf(flagSet(pat, 0 until 4, Flag.IgnoreWhitespace, false), litWith('a', nspan(npos(4, 1, 5), npos(5, 1, 6))), litWith('b', nspan(npos(6, 1, 7), npos(7, 1, 8)))))))) {
+    when (val matchVal = Pair(parser(pat).parse(), Result.Ok(concatWith(nspan(npos(0, 1, 1), npos(7, 1, 8)), mutableListOf(flagSet(pat, 0 until 4, Flag.IgnoreWhitespace, false), litWith('a', nspan(npos(4, 1, 5), npos(5, 1, 6))), litWith('b', nspan(npos(6, 1, 7), npos(7, 1, 8)))))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -407,7 +429,7 @@ public fun parseIgnoreWhitespace() {
     }
     // Test that we can toggle whitespace insensitivity.
     val pat1 = "(?x)a b(?-x)a b"
-    when (val matchVal1 = Pair(parser(pat1).parse(), Result.success(concatWith(nspan(npos(0, 1, 1), npos(15, 1, 16)), mutableListOf(flagSet(pat1, 0 until 4, Flag.IgnoreWhitespace, false), litWith('a', nspan(npos(4, 1, 5), npos(5, 1, 6))), litWith('b', nspan(npos(6, 1, 7), npos(7, 1, 8))), flagSet(pat1, 7 until 12, Flag.IgnoreWhitespace, true), litWith('a', nspan(npos(12, 1, 13), npos(13, 1, 14))), litWith(' ', nspan(npos(13, 1, 14), npos(14, 1, 15))), litWith('b', nspan(npos(14, 1, 15), npos(15, 1, 16)))))))) {
+    when (val matchVal1 = Pair(parser(pat1).parse(), Result.Ok(concatWith(nspan(npos(0, 1, 1), npos(15, 1, 16)), mutableListOf(flagSet(pat1, 0 until 4, Flag.IgnoreWhitespace, false), litWith('a', nspan(npos(4, 1, 5), npos(5, 1, 6))), litWith('b', nspan(npos(6, 1, 7), npos(7, 1, 8))), flagSet(pat1, 7 until 12, Flag.IgnoreWhitespace, true), litWith('a', nspan(npos(12, 1, 13), npos(13, 1, 14))), litWith(' ', nspan(npos(13, 1, 14), npos(14, 1, 15))), litWith('b', nspan(npos(14, 1, 15), npos(15, 1, 16)))))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -418,7 +440,7 @@ public fun parseIgnoreWhitespace() {
     }
     // Test that nesting whitespace insensitive flags works.
     val pat2 = "a (?x:a )a "
-    when (val matchVal2 = Pair(parser(pat2).parse(), Result.success(concatWith(spanRange(pat2, 0 until 11), mutableListOf(litWith('a', spanRange(pat2, 0 until 1)), litWith(' ', spanRange(pat2, 1 until 2)), Ast.group(Group(span = spanRange(pat2, 2 until 9), kind = GroupKind.NonCapturing(Flags(span = spanRange(pat2, 4 until 5), items = mutableListOf(FlagsItem(span = spanRange(pat2, 4 until 5), kind = FlagsItemKind.Flag(Flag.IgnoreWhitespace))))), ast = litWith('a', spanRange(pat2, 6 until 7)))), litWith('a', spanRange(pat2, 9 until 10)), litWith(' ', spanRange(pat2, 10 until 11))))))) {
+    when (val matchVal2 = Pair(parser(pat2).parse(), Result.Ok(concatWith(spanRange(pat2, 0 until 11), mutableListOf(litWith('a', spanRange(pat2, 0 until 1)), litWith(' ', spanRange(pat2, 1 until 2)), Ast.group(Group(span = spanRange(pat2, 2 until 9), kind = GroupKind.NonCapturing(Flags(span = spanRange(pat2, 4 until 5), items = mutableListOf(FlagsItem(span = spanRange(pat2, 4 until 5), kind = FlagsItemKind.Flag(Flag.IgnoreWhitespace))))), ast = litWith('a', spanRange(pat2, 6 until 7)))), litWith('a', spanRange(pat2, 9 until 10)), litWith(' ', spanRange(pat2, 10 until 11))))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -429,7 +451,7 @@ public fun parseIgnoreWhitespace() {
     }
     // Test that whitespace after an opening paren is insignificant.
     val pat3 = "(?x)( ?P<foo> a )"
-    when (val matchVal3 = Pair(parser(pat3).parse(), Result.success(concatWith(spanRange(pat3, 0 until pat3.len()), mutableListOf(flagSet(pat3, 0 until 4, Flag.IgnoreWhitespace, false), Ast.group(Group(span = spanRange(pat3, 4 until pat3.len()), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = spanRange(pat3, 9 until 12), name = s("foo"), index = 1u)), ast = litWith('a', spanRange(pat3, 14 until 15))))))))) {
+    when (val matchVal3 = Pair(parser(pat3).parse(), Result.Ok(concatWith(spanRange(pat3, 0 until pat3.encodeToByteArray().size), mutableListOf(flagSet(pat3, 0 until 4, Flag.IgnoreWhitespace, false), Ast.group(Group(span = spanRange(pat3, 4 until pat3.encodeToByteArray().size), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = spanRange(pat3, 9 until 12), name = s("foo"), index = 1u)), ast = litWith('a', spanRange(pat3, 14 until 15))))))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -439,7 +461,7 @@ public fun parseIgnoreWhitespace() {
         }
     }
     val pat4 = "(?x)(  a )"
-    when (val matchVal4 = Pair(parser(pat4).parse(), Result.success(concatWith(spanRange(pat4, 0 until pat4.len()), mutableListOf(flagSet(pat4, 0 until 4, Flag.IgnoreWhitespace, false), Ast.group(Group(span = spanRange(pat4, 4 until pat4.len()), kind = GroupKind.CaptureIndex(1), ast = litWith('a', spanRange(pat4, 7 until 8))))))))) {
+    when (val matchVal4 = Pair(parser(pat4).parse(), Result.Ok(concatWith(spanRange(pat4, 0 until pat4.encodeToByteArray().size), mutableListOf(flagSet(pat4, 0 until 4, Flag.IgnoreWhitespace, false), Ast.group(Group(span = spanRange(pat4, 4 until pat4.encodeToByteArray().size), kind = GroupKind.CaptureIndex(1u), ast = litWith('a', spanRange(pat4, 7 until 8))))))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -449,7 +471,7 @@ public fun parseIgnoreWhitespace() {
         }
     }
     val pat5 = "(?x)(  ?:  a )"
-    when (val matchVal5 = Pair(parser(pat5).parse(), Result.success(concatWith(spanRange(pat5, 0 until pat5.len()), mutableListOf(flagSet(pat5, 0 until 4, Flag.IgnoreWhitespace, false), Ast.group(Group(span = spanRange(pat5, 4 until pat5.len()), kind = GroupKind.NonCapturing(Flags(span = spanRange(pat5, 8 until 8), items = mutableListOf())), ast = litWith('a', spanRange(pat5, 11 until 12))))))))) {
+    when (val matchVal5 = Pair(parser(pat5).parse(), Result.Ok(concatWith(spanRange(pat5, 0 until pat5.encodeToByteArray().size), mutableListOf(flagSet(pat5, 0 until 4, Flag.IgnoreWhitespace, false), Ast.group(Group(span = spanRange(pat5, 4 until pat5.encodeToByteArray().size), kind = GroupKind.NonCapturing(Flags(span = spanRange(pat5, 8 until 8), items = mutableListOf())), ast = litWith('a', spanRange(pat5, 11 until 12))))))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -459,7 +481,7 @@ public fun parseIgnoreWhitespace() {
         }
     }
     val pat6 = "(?x)\\x { 53 }"
-    when (val matchVal6 = Pair(parser(pat6).parse(), Result.success(concatWith(spanRange(pat6, 0 until pat6.len()), mutableListOf(flagSet(pat6, 0 until 4, Flag.IgnoreWhitespace, false), Ast.literal(Literal(span = span(4 until 13), kind = LiteralKind.HexBrace(HexLiteralKind.X), c = 'S'))))))) {
+    when (val matchVal6 = Pair(parser(pat6).parse(), Result.Ok(concatWith(spanRange(pat6, 0 until pat6.encodeToByteArray().size), mutableListOf(flagSet(pat6, 0 until 4, Flag.IgnoreWhitespace, false), Ast.literal(Literal(span = span(4 until 13), kind = LiteralKind.HexBrace(HexLiteralKind.X), c = 'S'.code.toUInt()))))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -470,7 +492,7 @@ public fun parseIgnoreWhitespace() {
     }
     // Test that whitespace after an escape is OK.
     val pat7 = "(?x)\\ "
-    when (val matchVal7 = Pair(parser(pat7).parse(), Result.success(concatWith(spanRange(pat7, 0 until pat7.len()), mutableListOf(flagSet(pat7, 0 until 4, Flag.IgnoreWhitespace, false), Ast.literal(Literal(span = spanRange(pat7, 4 until 6), kind = LiteralKind.Superfluous, c = ' '))))))) {
+    when (val matchVal7 = Pair(parser(pat7).parse(), Result.Ok(concatWith(spanRange(pat7, 0 until pat7.encodeToByteArray().size), mutableListOf(flagSet(pat7, 0 until 4, Flag.IgnoreWhitespace, false), Ast.literal(Literal(span = spanRange(pat7, 4 until 6), kind = LiteralKind.Superfluous, c = ' '.code.toUInt()))))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -484,7 +506,7 @@ public fun parseIgnoreWhitespace() {
 @kotlin.test.Test
 public fun parseNewlines() {
     val pat = ".\n."
-    when (val matchVal = Pair(parser(pat).parse(), Result.success(concatWith(spanRange(pat, 0 until 3), mutableListOf(Ast.dot(spanRange(pat, 0 until 1)), litWith('\n', spanRange(pat, 1 until 2)), Ast.dot(spanRange(pat, 2 until 3))))))) {
+    when (val matchVal = Pair(parser(pat).parse(), Result.Ok(concatWith(spanRange(pat, 0 until 3), mutableListOf(Ast.dot(spanRange(pat, 0 until 1)), litWith('\n', spanRange(pat, 1 until 2)), Ast.dot(spanRange(pat, 2 until 3))))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -494,7 +516,7 @@ public fun parseNewlines() {
         }
     }
     val pat1 = "foobar\nbaz\nquux\n"
-    when (val matchVal1 = Pair(parser(pat1).parse(), Result.success(concatWith(spanRange(pat1, 0 until pat1.len()), mutableListOf(litWith('f', nspan(npos(0, 1, 1), npos(1, 1, 2))), litWith('o', nspan(npos(1, 1, 2), npos(2, 1, 3))), litWith('o', nspan(npos(2, 1, 3), npos(3, 1, 4))), litWith('b', nspan(npos(3, 1, 4), npos(4, 1, 5))), litWith('a', nspan(npos(4, 1, 5), npos(5, 1, 6))), litWith('r', nspan(npos(5, 1, 6), npos(6, 1, 7))), litWith('\n', nspan(npos(6, 1, 7), npos(7, 2, 1))), litWith('b', nspan(npos(7, 2, 1), npos(8, 2, 2))), litWith('a', nspan(npos(8, 2, 2), npos(9, 2, 3))), litWith('z', nspan(npos(9, 2, 3), npos(10, 2, 4))), litWith('\n', nspan(npos(10, 2, 4), npos(11, 3, 1))), litWith('q', nspan(npos(11, 3, 1), npos(12, 3, 2))), litWith('u', nspan(npos(12, 3, 2), npos(13, 3, 3))), litWith('u', nspan(npos(13, 3, 3), npos(14, 3, 4))), litWith('x', nspan(npos(14, 3, 4), npos(15, 3, 5))), litWith('\n', nspan(npos(15, 3, 5), npos(16, 4, 1)))))))) {
+    when (val matchVal1 = Pair(parser(pat1).parse(), Result.Ok(concatWith(spanRange(pat1, 0 until pat1.encodeToByteArray().size), mutableListOf(litWith('f', nspan(npos(0, 1, 1), npos(1, 1, 2))), litWith('o', nspan(npos(1, 1, 2), npos(2, 1, 3))), litWith('o', nspan(npos(2, 1, 3), npos(3, 1, 4))), litWith('b', nspan(npos(3, 1, 4), npos(4, 1, 5))), litWith('a', nspan(npos(4, 1, 5), npos(5, 1, 6))), litWith('r', nspan(npos(5, 1, 6), npos(6, 1, 7))), litWith('\n', nspan(npos(6, 1, 7), npos(7, 2, 1))), litWith('b', nspan(npos(7, 2, 1), npos(8, 2, 2))), litWith('a', nspan(npos(8, 2, 2), npos(9, 2, 3))), litWith('z', nspan(npos(9, 2, 3), npos(10, 2, 4))), litWith('\n', nspan(npos(10, 2, 4), npos(11, 3, 1))), litWith('q', nspan(npos(11, 3, 1), npos(12, 3, 2))), litWith('u', nspan(npos(12, 3, 2), npos(13, 3, 3))), litWith('u', nspan(npos(13, 3, 3), npos(14, 3, 4))), litWith('x', nspan(npos(14, 3, 4), npos(15, 3, 5))), litWith('\n', nspan(npos(15, 3, 5), npos(16, 4, 1)))))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -507,7 +529,7 @@ public fun parseNewlines() {
 
 @kotlin.test.Test
 public fun parseUncountedRepetition() {
-    when (val matchVal = Pair(parser("a*").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.ZeroOrMore), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal = Pair(parser("a*").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.ZeroOrMore), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -516,7 +538,7 @@ public fun parseUncountedRepetition() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("a+").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.OneOrMore), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal1 = Pair(parser("a+").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.OneOrMore), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -525,7 +547,7 @@ public fun parseUncountedRepetition() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("a?").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal2 = Pair(parser("a?").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -534,7 +556,7 @@ public fun parseUncountedRepetition() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("a??").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 3), op = RepetitionOp(span = span(1 until 3), kind = RepetitionKind.ZeroOrOne), greedy = false, ast = lit('a', 0)))))) {
+    when (val matchVal3 = Pair(parser("a??").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 3), op = RepetitionOp(span = span(1 until 3), kind = RepetitionKind.ZeroOrOne), greedy = false, ast = lit('a', 0)))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -543,7 +565,7 @@ public fun parseUncountedRepetition() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("a?").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal4 = Pair(parser("a?").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -552,7 +574,7 @@ public fun parseUncountedRepetition() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("a?b").parse(), Result.success(concat(0 until 3, mutableListOf(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 0))), lit('b', 2)))))) {
+    when (val matchVal5 = Pair(parser("a?b").parse(), Result.Ok(concat(0 until 3, mutableListOf(Ast.repetition(Repetition(span = span(0 until 2), op = RepetitionOp(span = span(1 until 2), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 0))), lit('b', 2)))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -561,7 +583,7 @@ public fun parseUncountedRepetition() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("a??b").parse(), Result.success(concat(0 until 4, mutableListOf(Ast.repetition(Repetition(span = span(0 until 3), op = RepetitionOp(span = span(1 until 3), kind = RepetitionKind.ZeroOrOne), greedy = false, ast = lit('a', 0))), lit('b', 3)))))) {
+    when (val matchVal6 = Pair(parser("a??b").parse(), Result.Ok(concat(0 until 4, mutableListOf(Ast.repetition(Repetition(span = span(0 until 3), op = RepetitionOp(span = span(1 until 3), kind = RepetitionKind.ZeroOrOne), greedy = false, ast = lit('a', 0))), lit('b', 3)))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -570,7 +592,7 @@ public fun parseUncountedRepetition() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("ab?").parse(), Result.success(concat(0 until 3, mutableListOf(lit('a', 0), Ast.repetition(Repetition(span = span(1 until 3), op = RepetitionOp(span = span(2 until 3), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('b', 1)))))))) {
+    when (val matchVal7 = Pair(parser("ab?").parse(), Result.Ok(concat(0 until 3, mutableListOf(lit('a', 0), Ast.repetition(Repetition(span = span(1 until 3), op = RepetitionOp(span = span(2 until 3), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('b', 1)))))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -579,7 +601,7 @@ public fun parseUncountedRepetition() {
             }
         }
     }
-    when (val matchVal8 = Pair(parser("(ab)?").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 5), op = RepetitionOp(span = span(4 until 5), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = group(0 until 4, 1, concat(1 until 3, mutableListOf(lit('a', 1), lit('b', 2))))))))) {
+    when (val matchVal8 = Pair(parser("(ab)?").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 5), op = RepetitionOp(span = span(4 until 5), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = group(0 until 4, 1u, concat(1 until 3, mutableListOf(lit('a', 1), lit('b', 2))))))))) {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
@@ -588,7 +610,7 @@ public fun parseUncountedRepetition() {
             }
         }
     }
-    when (val matchVal9 = Pair(parser("|a?").parse(), Result.success(alt(0 until 3, mutableListOf(Ast.empty(span(0 until 0)), Ast.repetition(Repetition(span = span(1 until 3), op = RepetitionOp(span = span(2 until 3), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 1)))))))) {
+    when (val matchVal9 = Pair(parser("|a?").parse(), Result.Ok(alt(0 until 3, mutableListOf(Ast.empty(span(0 until 0)), Ast.repetition(Repetition(span = span(1 until 3), op = RepetitionOp(span = span(2 until 3), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 1)))))))) {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
@@ -601,7 +623,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
-            if (!(leftVal10 == rightVal10)) {
+            if (!leftVal10.eq(rightVal10)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal10`\nright: `$rightVal10`\n\n")
             }
         }
@@ -610,7 +632,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
-            if (!(leftVal11 == rightVal11)) {
+            if (!leftVal11.eq(rightVal11)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal11`\nright: `$rightVal11`\n\n")
             }
         }
@@ -619,7 +641,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
-            if (!(leftVal12 == rightVal12)) {
+            if (!leftVal12.eq(rightVal12)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal12`\nright: `$rightVal12`\n\n")
             }
         }
@@ -628,7 +650,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
-            if (!(leftVal13 == rightVal13)) {
+            if (!leftVal13.eq(rightVal13)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal13`\nright: `$rightVal13`\n\n")
             }
         }
@@ -637,7 +659,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
-            if (!(leftVal14 == rightVal14)) {
+            if (!leftVal14.eq(rightVal14)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal14`\nright: `$rightVal14`\n\n")
             }
         }
@@ -646,7 +668,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal15 = matchVal15.first
             val rightVal15 = matchVal15.second
-            if (!(leftVal15 == rightVal15)) {
+            if (!leftVal15.eq(rightVal15)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal15`\nright: `$rightVal15`\n\n")
             }
         }
@@ -655,7 +677,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal16 = matchVal16.first
             val rightVal16 = matchVal16.second
-            if (!(leftVal16 == rightVal16)) {
+            if (!leftVal16.eq(rightVal16)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal16`\nright: `$rightVal16`\n\n")
             }
         }
@@ -664,7 +686,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal17 = matchVal17.first
             val rightVal17 = matchVal17.second
-            if (!(leftVal17 == rightVal17)) {
+            if (!leftVal17.eq(rightVal17)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal17`\nright: `$rightVal17`\n\n")
             }
         }
@@ -673,7 +695,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal18 = matchVal18.first
             val rightVal18 = matchVal18.second
-            if (!(leftVal18 == rightVal18)) {
+            if (!leftVal18.eq(rightVal18)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal18`\nright: `$rightVal18`\n\n")
             }
         }
@@ -682,7 +704,7 @@ public fun parseUncountedRepetition() {
         else -> {
             val leftVal19 = matchVal19.first
             val rightVal19 = matchVal19.second
-            if (!(leftVal19 == rightVal19)) {
+            if (!leftVal19.eq(rightVal19)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal19`\nright: `$rightVal19`\n\n")
             }
         }
@@ -691,7 +713,7 @@ public fun parseUncountedRepetition() {
 
 @kotlin.test.Test
 public fun parseCountedRepetition() {
-    when (val matchVal = Pair(parser("a{5}").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 4), op = RepetitionOp(span = span(1 until 4), kind = RepetitionKind.Range(RepetitionRange.Exactly(5))), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal = Pair(parser("a{5}").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 4), op = RepetitionOp(span = span(1 until 4), kind = RepetitionKind.Range(RepetitionRange.Exactly(5u))), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -700,7 +722,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("a{5,}").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 5), op = RepetitionOp(span = span(1 until 5), kind = RepetitionKind.Range(RepetitionRange.AtLeast(5))), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal1 = Pair(parser("a{5,}").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 5), op = RepetitionOp(span = span(1 until 5), kind = RepetitionKind.Range(RepetitionRange.AtLeast(5u))), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -709,7 +731,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("a{5,9}").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 6), op = RepetitionOp(span = span(1 until 6), kind = RepetitionKind.Range(RepetitionRange.Bounded(5, 9))), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal2 = Pair(parser("a{5,9}").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 6), op = RepetitionOp(span = span(1 until 6), kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u))), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -718,7 +740,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("a{5}?").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 5), op = RepetitionOp(span = span(1 until 5), kind = RepetitionKind.Range(RepetitionRange.Exactly(5))), greedy = false, ast = lit('a', 0)))))) {
+    when (val matchVal3 = Pair(parser("a{5}?").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 5), op = RepetitionOp(span = span(1 until 5), kind = RepetitionKind.Range(RepetitionRange.Exactly(5u))), greedy = false, ast = lit('a', 0)))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -727,7 +749,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("ab{5}").parse(), Result.success(concat(0 until 5, mutableListOf(lit('a', 0), Ast.repetition(Repetition(span = span(1 until 5), op = RepetitionOp(span = span(2 until 5), kind = RepetitionKind.Range(RepetitionRange.Exactly(5))), greedy = true, ast = lit('b', 1)))))))) {
+    when (val matchVal4 = Pair(parser("ab{5}").parse(), Result.Ok(concat(0 until 5, mutableListOf(lit('a', 0), Ast.repetition(Repetition(span = span(1 until 5), op = RepetitionOp(span = span(2 until 5), kind = RepetitionKind.Range(RepetitionRange.Exactly(5u))), greedy = true, ast = lit('b', 1)))))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -736,7 +758,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("ab{5}c").parse(), Result.success(concat(0 until 6, mutableListOf(lit('a', 0), Ast.repetition(Repetition(span = span(1 until 5), op = RepetitionOp(span = span(2 until 5), kind = RepetitionKind.Range(RepetitionRange.Exactly(5))), greedy = true, ast = lit('b', 1))), lit('c', 5)))))) {
+    when (val matchVal5 = Pair(parser("ab{5}c").parse(), Result.Ok(concat(0 until 6, mutableListOf(lit('a', 0), Ast.repetition(Repetition(span = span(1 until 5), op = RepetitionOp(span = span(2 until 5), kind = RepetitionKind.Range(RepetitionRange.Exactly(5u))), greedy = true, ast = lit('b', 1))), lit('c', 5)))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -745,7 +767,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("a{ 5 }").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 6), op = RepetitionOp(span = span(1 until 6), kind = RepetitionKind.Range(RepetitionRange.Exactly(5))), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal6 = Pair(parser("a{ 5 }").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 6), op = RepetitionOp(span = span(1 until 6), kind = RepetitionKind.Range(RepetitionRange.Exactly(5u))), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -754,7 +776,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("a{ 5 , 9 }").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 10), op = RepetitionOp(span = span(1 until 10), kind = RepetitionKind.Range(RepetitionRange.Bounded(5, 9))), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal7 = Pair(parser("a{ 5 , 9 }").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 10), op = RepetitionOp(span = span(1 until 10), kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u))), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -763,7 +785,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal8 = Pair(parserEmptyMinRange("a{,9}").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 5), op = RepetitionOp(span = span(1 until 5), kind = RepetitionKind.Range(RepetitionRange.Bounded(0, 9))), greedy = true, ast = lit('a', 0)))))) {
+    when (val matchVal8 = Pair(parserEmptyMinRange("a{,9}").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 5), op = RepetitionOp(span = span(1 until 5), kind = RepetitionKind.Range(RepetitionRange.Bounded(0u, 9u))), greedy = true, ast = lit('a', 0)))))) {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
@@ -772,7 +794,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal9 = Pair(parserIgnoreWhitespace("a{5,9} ?").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 8), op = RepetitionOp(span = span(1 until 8), kind = RepetitionKind.Range(RepetitionRange.Bounded(5, 9))), greedy = false, ast = lit('a', 0)))))) {
+    when (val matchVal9 = Pair(parserIgnoreWhitespace("a{5,9} ?").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 8), op = RepetitionOp(span = span(1 until 8), kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u))), greedy = false, ast = lit('a', 0)))))) {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
@@ -781,7 +803,7 @@ public fun parseCountedRepetition() {
             }
         }
     }
-    when (val matchVal10 = Pair(parser("\\b{5,9}").parse(), Result.success(Ast.repetition(Repetition(span = span(0 until 7), op = RepetitionOp(span = span(2 until 7), kind = RepetitionKind.Range(RepetitionRange.Bounded(5, 9))), greedy = true, ast = Ast.assertion(Assertion(span = span(0 until 2), kind = AssertionKind.WordBoundary))))))) {
+    when (val matchVal10 = Pair(parser("\\b{5,9}").parse(), Result.Ok(Ast.repetition(Repetition(span = span(0 until 7), op = RepetitionOp(span = span(2 until 7), kind = RepetitionKind.Range(RepetitionRange.Bounded(5u, 9u))), greedy = true, ast = Ast.assertion(Assertion(span = span(0 until 2), kind = AssertionKind.WordBoundary))))))) {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
@@ -794,7 +816,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
-            if (!(leftVal11 == rightVal11)) {
+            if (!leftVal11.eq(rightVal11)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal11`\nright: `$rightVal11`\n\n")
             }
         }
@@ -803,7 +825,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
-            if (!(leftVal12 == rightVal12)) {
+            if (!leftVal12.eq(rightVal12)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal12`\nright: `$rightVal12`\n\n")
             }
         }
@@ -812,7 +834,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
-            if (!(leftVal13 == rightVal13)) {
+            if (!leftVal13.eq(rightVal13)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal13`\nright: `$rightVal13`\n\n")
             }
         }
@@ -821,7 +843,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
-            if (!(leftVal14 == rightVal14)) {
+            if (!leftVal14.eq(rightVal14)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal14`\nright: `$rightVal14`\n\n")
             }
         }
@@ -830,7 +852,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal15 = matchVal15.first
             val rightVal15 = matchVal15.second
-            if (!(leftVal15 == rightVal15)) {
+            if (!leftVal15.eq(rightVal15)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal15`\nright: `$rightVal15`\n\n")
             }
         }
@@ -839,7 +861,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal16 = matchVal16.first
             val rightVal16 = matchVal16.second
-            if (!(leftVal16 == rightVal16)) {
+            if (!leftVal16.eq(rightVal16)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal16`\nright: `$rightVal16`\n\n")
             }
         }
@@ -848,7 +870,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal17 = matchVal17.first
             val rightVal17 = matchVal17.second
-            if (!(leftVal17 == rightVal17)) {
+            if (!leftVal17.eq(rightVal17)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal17`\nright: `$rightVal17`\n\n")
             }
         }
@@ -857,7 +879,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal18 = matchVal18.first
             val rightVal18 = matchVal18.second
-            if (!(leftVal18 == rightVal18)) {
+            if (!leftVal18.eq(rightVal18)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal18`\nright: `$rightVal18`\n\n")
             }
         }
@@ -866,7 +888,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal19 = matchVal19.first
             val rightVal19 = matchVal19.second
-            if (!(leftVal19 == rightVal19)) {
+            if (!leftVal19.eq(rightVal19)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal19`\nright: `$rightVal19`\n\n")
             }
         }
@@ -875,7 +897,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal20 = matchVal20.first
             val rightVal20 = matchVal20.second
-            if (!(leftVal20 == rightVal20)) {
+            if (!leftVal20.eq(rightVal20)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal20`\nright: `$rightVal20`\n\n")
             }
         }
@@ -884,7 +906,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal21 = matchVal21.first
             val rightVal21 = matchVal21.second
-            if (!(leftVal21 == rightVal21)) {
+            if (!leftVal21.eq(rightVal21)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal21`\nright: `$rightVal21`\n\n")
             }
         }
@@ -893,7 +915,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal22 = matchVal22.first
             val rightVal22 = matchVal22.second
-            if (!(leftVal22 == rightVal22)) {
+            if (!leftVal22.eq(rightVal22)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal22`\nright: `$rightVal22`\n\n")
             }
         }
@@ -902,7 +924,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal23 = matchVal23.first
             val rightVal23 = matchVal23.second
-            if (!(leftVal23 == rightVal23)) {
+            if (!leftVal23.eq(rightVal23)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal23`\nright: `$rightVal23`\n\n")
             }
         }
@@ -911,7 +933,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal24 = matchVal24.first
             val rightVal24 = matchVal24.second
-            if (!(leftVal24 == rightVal24)) {
+            if (!leftVal24.eq(rightVal24)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal24`\nright: `$rightVal24`\n\n")
             }
         }
@@ -920,7 +942,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal25 = matchVal25.first
             val rightVal25 = matchVal25.second
-            if (!(leftVal25 == rightVal25)) {
+            if (!leftVal25.eq(rightVal25)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal25`\nright: `$rightVal25`\n\n")
             }
         }
@@ -929,7 +951,7 @@ public fun parseCountedRepetition() {
         else -> {
             val leftVal26 = matchVal26.first
             val rightVal26 = matchVal26.second
-            if (!(leftVal26 == rightVal26)) {
+            if (!leftVal26.eq(rightVal26)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal26`\nright: `$rightVal26`\n\n")
             }
         }
@@ -938,7 +960,7 @@ public fun parseCountedRepetition() {
 
 @kotlin.test.Test
 public fun parseAlternate() {
-    when (val matchVal = Pair(parser("a|b").parse(), Result.success(Ast.alternation(Alternation(span = span(0 until 3), asts = mutableListOf(lit('a', 0), lit('b', 2))))))) {
+    when (val matchVal = Pair(parser("a|b").parse(), Result.Ok(Ast.alternation(Alternation(span = span(0 until 3), asts = mutableListOf(lit('a', 0), lit('b', 2))))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -947,7 +969,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("(a|b)").parse(), Result.success(group(0 until 5, 1, Ast.alternation(Alternation(span = span(1 until 4), asts = mutableListOf(lit('a', 1), lit('b', 3)))))))) {
+    when (val matchVal1 = Pair(parser("(a|b)").parse(), Result.Ok(group(0 until 5, 1u, Ast.alternation(Alternation(span = span(1 until 4), asts = mutableListOf(lit('a', 1), lit('b', 3)))))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -956,7 +978,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("a|b|c").parse(), Result.success(Ast.alternation(Alternation(span = span(0 until 5), asts = mutableListOf(lit('a', 0), lit('b', 2), lit('c', 4))))))) {
+    when (val matchVal2 = Pair(parser("a|b|c").parse(), Result.Ok(Ast.alternation(Alternation(span = span(0 until 5), asts = mutableListOf(lit('a', 0), lit('b', 2), lit('c', 4))))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -965,7 +987,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("ax|by|cz").parse(), Result.success(Ast.alternation(Alternation(span = span(0 until 8), asts = mutableListOf(concat(0 until 2, mutableListOf(lit('a', 0), lit('x', 1))), concat(3 until 5, mutableListOf(lit('b', 3), lit('y', 4))), concat(6 until 8, mutableListOf(lit('c', 6), lit('z', 7))))))))) {
+    when (val matchVal3 = Pair(parser("ax|by|cz").parse(), Result.Ok(Ast.alternation(Alternation(span = span(0 until 8), asts = mutableListOf(concat(0 until 2, mutableListOf(lit('a', 0), lit('x', 1))), concat(3 until 5, mutableListOf(lit('b', 3), lit('y', 4))), concat(6 until 8, mutableListOf(lit('c', 6), lit('z', 7))))))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -974,7 +996,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("(ax|by|cz)").parse(), Result.success(group(0 until 10, 1, Ast.alternation(Alternation(span = span(1 until 9), asts = mutableListOf(concat(1 until 3, mutableListOf(lit('a', 1), lit('x', 2))), concat(4 until 6, mutableListOf(lit('b', 4), lit('y', 5))), concat(7 until 9, mutableListOf(lit('c', 7), lit('z', 8)))))))))) {
+    when (val matchVal4 = Pair(parser("(ax|by|cz)").parse(), Result.Ok(group(0 until 10, 1u, Ast.alternation(Alternation(span = span(1 until 9), asts = mutableListOf(concat(1 until 3, mutableListOf(lit('a', 1), lit('x', 2))), concat(4 until 6, mutableListOf(lit('b', 4), lit('y', 5))), concat(7 until 9, mutableListOf(lit('c', 7), lit('z', 8)))))))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -983,7 +1005,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("(ax|(by|(cz)))").parse(), Result.success(group(0 until 14, 1, alt(1 until 13, mutableListOf(concat(1 until 3, mutableListOf(lit('a', 1), lit('x', 2))), group(4 until 13, 2, alt(5 until 12, mutableListOf(concat(5 until 7, mutableListOf(lit('b', 5), lit('y', 6))), group(8 until 12, 3, concat(9 until 11, mutableListOf(lit('c', 9), lit('z', 10))))))))))))) {
+    when (val matchVal5 = Pair(parser("(ax|(by|(cz)))").parse(), Result.Ok(group(0 until 14, 1u, alt(1 until 13, mutableListOf(concat(1 until 3, mutableListOf(lit('a', 1), lit('x', 2))), group(4 until 13, 2u, alt(5 until 12, mutableListOf(concat(5 until 7, mutableListOf(lit('b', 5), lit('y', 6))), group(8 until 12, 3u, concat(9 until 11, mutableListOf(lit('c', 9), lit('z', 10))))))))))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -992,7 +1014,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("|").parse(), Result.success(alt(0 until 1, mutableListOf(Ast.empty(span(0 until 0)), Ast.empty(span(1 until 1))))))) {
+    when (val matchVal6 = Pair(parser("|").parse(), Result.Ok(alt(0 until 1, mutableListOf(Ast.empty(span(0 until 0)), Ast.empty(span(1 until 1))))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -1001,7 +1023,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("||").parse(), Result.success(alt(0 until 2, mutableListOf(Ast.empty(span(0 until 0)), Ast.empty(span(1 until 1)), Ast.empty(span(2 until 2))))))) {
+    when (val matchVal7 = Pair(parser("||").parse(), Result.Ok(alt(0 until 2, mutableListOf(Ast.empty(span(0 until 0)), Ast.empty(span(1 until 1)), Ast.empty(span(2 until 2))))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -1010,7 +1032,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal8 = Pair(parser("a|").parse(), Result.success(alt(0 until 2, mutableListOf(lit('a', 0), Ast.empty(span(2 until 2))))))) {
+    when (val matchVal8 = Pair(parser("a|").parse(), Result.Ok(alt(0 until 2, mutableListOf(lit('a', 0), Ast.empty(span(2 until 2))))))) {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
@@ -1019,7 +1041,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal9 = Pair(parser("|a").parse(), Result.success(alt(0 until 2, mutableListOf(Ast.empty(span(0 until 0)), lit('a', 1)))))) {
+    when (val matchVal9 = Pair(parser("|a").parse(), Result.Ok(alt(0 until 2, mutableListOf(Ast.empty(span(0 until 0)), lit('a', 1)))))) {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
@@ -1028,7 +1050,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal10 = Pair(parser("(|)").parse(), Result.success(group(0 until 3, 1, alt(1 until 2, mutableListOf(Ast.empty(span(1 until 1)), Ast.empty(span(2 until 2)))))))) {
+    when (val matchVal10 = Pair(parser("(|)").parse(), Result.Ok(group(0 until 3, 1u, alt(1 until 2, mutableListOf(Ast.empty(span(1 until 1)), Ast.empty(span(2 until 2)))))))) {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
@@ -1037,7 +1059,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal11 = Pair(parser("(a|)").parse(), Result.success(group(0 until 4, 1, alt(1 until 3, mutableListOf(lit('a', 1), Ast.empty(span(3 until 3)))))))) {
+    when (val matchVal11 = Pair(parser("(a|)").parse(), Result.Ok(group(0 until 4, 1u, alt(1 until 3, mutableListOf(lit('a', 1), Ast.empty(span(3 until 3)))))))) {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
@@ -1046,7 +1068,7 @@ public fun parseAlternate() {
             }
         }
     }
-    when (val matchVal12 = Pair(parser("(|a)").parse(), Result.success(group(0 until 4, 1, alt(1 until 3, mutableListOf(Ast.empty(span(1 until 1)), lit('a', 2))))))) {
+    when (val matchVal12 = Pair(parser("(|a)").parse(), Result.Ok(group(0 until 4, 1u, alt(1 until 3, mutableListOf(Ast.empty(span(1 until 1)), lit('a', 2))))))) {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
@@ -1059,7 +1081,7 @@ public fun parseAlternate() {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
-            if (!(leftVal13 == rightVal13)) {
+            if (!leftVal13.eq(rightVal13)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal13`\nright: `$rightVal13`\n\n")
             }
         }
@@ -1068,7 +1090,7 @@ public fun parseAlternate() {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
-            if (!(leftVal14 == rightVal14)) {
+            if (!leftVal14.eq(rightVal14)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal14`\nright: `$rightVal14`\n\n")
             }
         }
@@ -1081,7 +1103,7 @@ public fun parseUnsupportedLookaround() {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
-            if (!(leftVal == rightVal)) {
+            if (!leftVal.eq(rightVal)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal`\nright: `$rightVal`\n\n")
             }
         }
@@ -1090,7 +1112,7 @@ public fun parseUnsupportedLookaround() {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
-            if (!(leftVal1 == rightVal1)) {
+            if (!leftVal1.eq(rightVal1)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal1`\nright: `$rightVal1`\n\n")
             }
         }
@@ -1099,7 +1121,7 @@ public fun parseUnsupportedLookaround() {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
-            if (!(leftVal2 == rightVal2)) {
+            if (!leftVal2.eq(rightVal2)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal2`\nright: `$rightVal2`\n\n")
             }
         }
@@ -1108,7 +1130,7 @@ public fun parseUnsupportedLookaround() {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
-            if (!(leftVal3 == rightVal3)) {
+            if (!leftVal3.eq(rightVal3)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal3`\nright: `$rightVal3`\n\n")
             }
         }
@@ -1117,7 +1139,7 @@ public fun parseUnsupportedLookaround() {
 
 @kotlin.test.Test
 public fun parseGroup() {
-    when (val matchVal = Pair(parser("(?i)").parse(), Result.success(Ast.flags(SetFlags(span = span(0 until 4), flags = Flags(span = span(2 until 3), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive))))))))) {
+    when (val matchVal = Pair(parser("(?i)").parse(), Result.Ok(Ast.flags(SetFlags(span = span(0 until 4), flags = Flags(span = span(2 until 3), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive))))))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -1126,7 +1148,7 @@ public fun parseGroup() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("(?iU)").parse(), Result.success(Ast.flags(SetFlags(span = span(0 until 5), flags = Flags(span = span(2 until 4), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))))) {
+    when (val matchVal1 = Pair(parser("(?iU)").parse(), Result.Ok(Ast.flags(SetFlags(span = span(0 until 5), flags = Flags(span = span(2 until 4), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -1135,7 +1157,7 @@ public fun parseGroup() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("(?i-U)").parse(), Result.success(Ast.flags(SetFlags(span = span(0 until 6), flags = Flags(span = span(2 until 5), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Negation), FlagsItem(span = span(4 until 5), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))))) {
+    when (val matchVal2 = Pair(parser("(?i-U)").parse(), Result.Ok(Ast.flags(SetFlags(span = span(0 until 6), flags = Flags(span = span(2 until 5), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Negation), FlagsItem(span = span(4 until 5), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -1144,7 +1166,7 @@ public fun parseGroup() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("()").parse(), Result.success(Ast.group(Group(span = span(0 until 2), kind = GroupKind.CaptureIndex(1), ast = Ast.empty(span(1 until 1))))))) {
+    when (val matchVal3 = Pair(parser("()").parse(), Result.Ok(Ast.group(Group(span = span(0 until 2), kind = GroupKind.CaptureIndex(1u), ast = Ast.empty(span(1 until 1))))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -1153,7 +1175,7 @@ public fun parseGroup() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("(a)").parse(), Result.success(Ast.group(Group(span = span(0 until 3), kind = GroupKind.CaptureIndex(1), ast = lit('a', 1)))))) {
+    when (val matchVal4 = Pair(parser("(a)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 3), kind = GroupKind.CaptureIndex(1u), ast = lit('a', 1)))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -1162,7 +1184,7 @@ public fun parseGroup() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("(())").parse(), Result.success(Ast.group(Group(span = span(0 until 4), kind = GroupKind.CaptureIndex(1), ast = Ast.group(Group(span = span(1 until 3), kind = GroupKind.CaptureIndex(2), ast = Ast.empty(span(2 until 2))))))))) {
+    when (val matchVal5 = Pair(parser("(())").parse(), Result.Ok(Ast.group(Group(span = span(0 until 4), kind = GroupKind.CaptureIndex(1u), ast = Ast.group(Group(span = span(1 until 3), kind = GroupKind.CaptureIndex(2u), ast = Ast.empty(span(2 until 2))))))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -1171,7 +1193,7 @@ public fun parseGroup() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("(?:a)").parse(), Result.success(Ast.group(Group(span = span(0 until 5), kind = GroupKind.NonCapturing(Flags(span = span(2 until 2), items = mutableListOf())), ast = lit('a', 3)))))) {
+    when (val matchVal6 = Pair(parser("(?:a)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 5), kind = GroupKind.NonCapturing(Flags(span = span(2 until 2), items = mutableListOf())), ast = lit('a', 3)))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -1180,7 +1202,7 @@ public fun parseGroup() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("(?i:a)").parse(), Result.success(Ast.group(Group(span = span(0 until 6), kind = GroupKind.NonCapturing(Flags(span = span(2 until 3), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive))))), ast = lit('a', 4)))))) {
+    when (val matchVal7 = Pair(parser("(?i:a)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 6), kind = GroupKind.NonCapturing(Flags(span = span(2 until 3), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive))))), ast = lit('a', 4)))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -1189,7 +1211,7 @@ public fun parseGroup() {
             }
         }
     }
-    when (val matchVal8 = Pair(parser("(?i-U:a)").parse(), Result.success(Ast.group(Group(span = span(0 until 8), kind = GroupKind.NonCapturing(Flags(span = span(2 until 5), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Negation), FlagsItem(span = span(4 until 5), kind = FlagsItemKind.Flag(Flag.SwapGreed))))), ast = lit('a', 6)))))) {
+    when (val matchVal8 = Pair(parser("(?i-U:a)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 8), kind = GroupKind.NonCapturing(Flags(span = span(2 until 5), items = mutableListOf(FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Negation), FlagsItem(span = span(4 until 5), kind = FlagsItemKind.Flag(Flag.SwapGreed))))), ast = lit('a', 6)))))) {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
@@ -1202,7 +1224,7 @@ public fun parseGroup() {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
-            if (!(leftVal9 == rightVal9)) {
+            if (!leftVal9.eq(rightVal9)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal9`\nright: `$rightVal9`\n\n")
             }
         }
@@ -1211,7 +1233,7 @@ public fun parseGroup() {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
-            if (!(leftVal10 == rightVal10)) {
+            if (!leftVal10.eq(rightVal10)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal10`\nright: `$rightVal10`\n\n")
             }
         }
@@ -1220,7 +1242,7 @@ public fun parseGroup() {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
-            if (!(leftVal11 == rightVal11)) {
+            if (!leftVal11.eq(rightVal11)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal11`\nright: `$rightVal11`\n\n")
             }
         }
@@ -1229,7 +1251,7 @@ public fun parseGroup() {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
-            if (!(leftVal12 == rightVal12)) {
+            if (!leftVal12.eq(rightVal12)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal12`\nright: `$rightVal12`\n\n")
             }
         }
@@ -1238,7 +1260,7 @@ public fun parseGroup() {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
-            if (!(leftVal13 == rightVal13)) {
+            if (!leftVal13.eq(rightVal13)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal13`\nright: `$rightVal13`\n\n")
             }
         }
@@ -1247,7 +1269,7 @@ public fun parseGroup() {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
-            if (!(leftVal14 == rightVal14)) {
+            if (!leftVal14.eq(rightVal14)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal14`\nright: `$rightVal14`\n\n")
             }
         }
@@ -1256,7 +1278,7 @@ public fun parseGroup() {
         else -> {
             val leftVal15 = matchVal15.first
             val rightVal15 = matchVal15.second
-            if (!(leftVal15 == rightVal15)) {
+            if (!leftVal15.eq(rightVal15)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal15`\nright: `$rightVal15`\n\n")
             }
         }
@@ -1265,7 +1287,7 @@ public fun parseGroup() {
         else -> {
             val leftVal16 = matchVal16.first
             val rightVal16 = matchVal16.second
-            if (!(leftVal16 == rightVal16)) {
+            if (!leftVal16.eq(rightVal16)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal16`\nright: `$rightVal16`\n\n")
             }
         }
@@ -1274,7 +1296,7 @@ public fun parseGroup() {
 
 @kotlin.test.Test
 public fun parseCaptureName() {
-    when (val matchVal = Pair(parser("(?<a>z)").parse(), Result.success(Ast.group(Group(span = span(0 until 7), kind = GroupKind.CaptureName(startsWithP = false, name = CaptureName(span = span(3 until 4), name = s("a"), index = 1u)), ast = lit('z', 5)))))) {
+    when (val matchVal = Pair(parser("(?<a>z)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 7), kind = GroupKind.CaptureName(startsWithP = false, name = CaptureName(span = span(3 until 4), name = s("a"), index = 1u)), ast = lit('z', 5)))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -1283,7 +1305,7 @@ public fun parseCaptureName() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("(?P<a>z)").parse(), Result.success(Ast.group(Group(span = span(0 until 8), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 5), name = s("a"), index = 1u)), ast = lit('z', 6)))))) {
+    when (val matchVal1 = Pair(parser("(?P<a>z)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 8), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 5), name = s("a"), index = 1u)), ast = lit('z', 6)))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -1292,7 +1314,7 @@ public fun parseCaptureName() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("(?P<abc>z)").parse(), Result.success(Ast.group(Group(span = span(0 until 10), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 7), name = s("abc"), index = 1u)), ast = lit('z', 8)))))) {
+    when (val matchVal2 = Pair(parser("(?P<abc>z)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 10), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 7), name = s("abc"), index = 1u)), ast = lit('z', 8)))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -1301,7 +1323,7 @@ public fun parseCaptureName() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("(?P<a_1>z)").parse(), Result.success(Ast.group(Group(span = span(0 until 10), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 7), name = s("a_1"), index = 1u)), ast = lit('z', 8)))))) {
+    when (val matchVal3 = Pair(parser("(?P<a_1>z)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 10), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 7), name = s("a_1"), index = 1u)), ast = lit('z', 8)))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -1310,7 +1332,7 @@ public fun parseCaptureName() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("(?P<a.1>z)").parse(), Result.success(Ast.group(Group(span = span(0 until 10), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 7), name = s("a.1"), index = 1u)), ast = lit('z', 8)))))) {
+    when (val matchVal4 = Pair(parser("(?P<a.1>z)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 10), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 7), name = s("a.1"), index = 1u)), ast = lit('z', 8)))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -1319,7 +1341,7 @@ public fun parseCaptureName() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("(?P<a[1]>z)").parse(), Result.success(Ast.group(Group(span = span(0 until 11), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 8), name = s("a[1]"), index = 1u)), ast = lit('z', 9)))))) {
+    when (val matchVal5 = Pair(parser("(?P<a[1]>z)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 11), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = span(4 until 8), name = s("a[1]"), index = 1u)), ast = lit('z', 9)))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -1328,7 +1350,7 @@ public fun parseCaptureName() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("(?P<a¾>)").parse(), Result.success(Ast.group(Group(span = Span.new(Position.new(0, 1, 1), Position.new(9, 1, 9)), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = Span.new(Position.new(4, 1, 5), Position.new(7, 1, 7)), name = s("a¾"), index = 1u)), ast = Ast.empty(Span.new(Position.new(8, 1, 8), Position.new(8, 1, 8)))))))) {
+    when (val matchVal6 = Pair(parser("(?P<a¾>)").parse(), Result.Ok(Ast.group(Group(span = Span.new(Position.new(0, 1u, 1), Position.new(9, 1, 9)), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = Span.new(Position.new(4, 1, 5), Position.new(7, 1, 7)), name = s("a¾"), index = 1u)), ast = Ast.empty(Span.new(Position.new(8, 1, 8), Position.new(8, 1, 8)))))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -1337,7 +1359,7 @@ public fun parseCaptureName() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("(?P<名字>)").parse(), Result.success(Ast.group(Group(span = Span.new(Position.new(0, 1, 1), Position.new(12, 1, 9)), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = Span.new(Position.new(4, 1, 5), Position.new(10, 1, 7)), name = s("名字"), index = 1u)), ast = Ast.empty(Span.new(Position.new(11, 1, 8), Position.new(11, 1, 8)))))))) {
+    when (val matchVal7 = Pair(parser("(?P<名字>)").parse(), Result.Ok(Ast.group(Group(span = Span.new(Position.new(0, 1u, 1), Position.new(12, 1, 9)), kind = GroupKind.CaptureName(startsWithP = true, name = CaptureName(span = Span.new(Position.new(4, 1, 5), Position.new(10, 1, 7)), name = s("名字"), index = 1u)), ast = Ast.empty(Span.new(Position.new(11, 1, 8), Position.new(11, 1, 8)))))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -1350,7 +1372,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
-            if (!(leftVal8 == rightVal8)) {
+            if (!leftVal8.eq(rightVal8)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal8`\nright: `$rightVal8`\n\n")
             }
         }
@@ -1359,7 +1381,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
-            if (!(leftVal9 == rightVal9)) {
+            if (!leftVal9.eq(rightVal9)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal9`\nright: `$rightVal9`\n\n")
             }
         }
@@ -1368,7 +1390,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
-            if (!(leftVal10 == rightVal10)) {
+            if (!leftVal10.eq(rightVal10)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal10`\nright: `$rightVal10`\n\n")
             }
         }
@@ -1377,7 +1399,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
-            if (!(leftVal11 == rightVal11)) {
+            if (!leftVal11.eq(rightVal11)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal11`\nright: `$rightVal11`\n\n")
             }
         }
@@ -1386,7 +1408,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
-            if (!(leftVal12 == rightVal12)) {
+            if (!leftVal12.eq(rightVal12)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal12`\nright: `$rightVal12`\n\n")
             }
         }
@@ -1395,7 +1417,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
-            if (!(leftVal13 == rightVal13)) {
+            if (!leftVal13.eq(rightVal13)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal13`\nright: `$rightVal13`\n\n")
             }
         }
@@ -1404,7 +1426,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
-            if (!(leftVal14 == rightVal14)) {
+            if (!leftVal14.eq(rightVal14)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal14`\nright: `$rightVal14`\n\n")
             }
         }
@@ -1413,7 +1435,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal15 = matchVal15.first
             val rightVal15 = matchVal15.second
-            if (!(leftVal15 == rightVal15)) {
+            if (!leftVal15.eq(rightVal15)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal15`\nright: `$rightVal15`\n\n")
             }
         }
@@ -1422,7 +1444,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal16 = matchVal16.first
             val rightVal16 = matchVal16.second
-            if (!(leftVal16 == rightVal16)) {
+            if (!leftVal16.eq(rightVal16)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal16`\nright: `$rightVal16`\n\n")
             }
         }
@@ -1431,7 +1453,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal17 = matchVal17.first
             val rightVal17 = matchVal17.second
-            if (!(leftVal17 == rightVal17)) {
+            if (!leftVal17.eq(rightVal17)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal17`\nright: `$rightVal17`\n\n")
             }
         }
@@ -1440,7 +1462,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal18 = matchVal18.first
             val rightVal18 = matchVal18.second
-            if (!(leftVal18 == rightVal18)) {
+            if (!leftVal18.eq(rightVal18)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal18`\nright: `$rightVal18`\n\n")
             }
         }
@@ -1449,7 +1471,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal19 = matchVal19.first
             val rightVal19 = matchVal19.second
-            if (!(leftVal19 == rightVal19)) {
+            if (!leftVal19.eq(rightVal19)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal19`\nright: `$rightVal19`\n\n")
             }
         }
@@ -1458,7 +1480,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal20 = matchVal20.first
             val rightVal20 = matchVal20.second
-            if (!(leftVal20 == rightVal20)) {
+            if (!leftVal20.eq(rightVal20)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal20`\nright: `$rightVal20`\n\n")
             }
         }
@@ -1467,7 +1489,7 @@ public fun parseCaptureName() {
         else -> {
             val leftVal21 = matchVal21.first
             val rightVal21 = matchVal21.second
-            if (!(leftVal21 == rightVal21)) {
+            if (!leftVal21.eq(rightVal21)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal21`\nright: `$rightVal21`\n\n")
             }
         }
@@ -1476,7 +1498,7 @@ public fun parseCaptureName() {
 
 @kotlin.test.Test
 public fun parseFlags() {
-    when (val matchVal = Pair(parser("i:").parseFlags(), Result.success(Flags(span = span(0 until 1), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive))))))) {
+    when (val matchVal = Pair(parser("i:").parseFlags(), Result.Ok(Flags(span = span(0 until 1), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive))))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -1485,7 +1507,7 @@ public fun parseFlags() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("i)").parseFlags(), Result.success(Flags(span = span(0 until 1), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive))))))) {
+    when (val matchVal1 = Pair(parser("i)").parseFlags(), Result.Ok(Flags(span = span(0 until 1), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive))))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -1494,7 +1516,7 @@ public fun parseFlags() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("isU:").parseFlags(), Result.success(Flags(span = span(0 until 3), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(1 until 2), kind = FlagsItemKind.Flag(Flag.DotMatchesNewLine)), FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))) {
+    when (val matchVal2 = Pair(parser("isU:").parseFlags(), Result.Ok(Flags(span = span(0 until 3), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(1 until 2), kind = FlagsItemKind.Flag(Flag.DotMatchesNewLine)), FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -1503,7 +1525,7 @@ public fun parseFlags() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("-isU:").parseFlags(), Result.success(Flags(span = span(0 until 4), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Negation), FlagsItem(span = span(1 until 2), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.DotMatchesNewLine)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))) {
+    when (val matchVal3 = Pair(parser("-isU:").parseFlags(), Result.Ok(Flags(span = span(0 until 4), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Negation), FlagsItem(span = span(1 until 2), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.DotMatchesNewLine)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -1512,7 +1534,7 @@ public fun parseFlags() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("i-sU:").parseFlags(), Result.success(Flags(span = span(0 until 4), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(1 until 2), kind = FlagsItemKind.Negation), FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.DotMatchesNewLine)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))) {
+    when (val matchVal4 = Pair(parser("i-sU:").parseFlags(), Result.Ok(Flags(span = span(0 until 4), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(1 until 2), kind = FlagsItemKind.Negation), FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.DotMatchesNewLine)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Flag(Flag.SwapGreed))))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -1521,7 +1543,7 @@ public fun parseFlags() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("i-sR:").parseFlags(), Result.success(Flags(span = span(0 until 4), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(1 until 2), kind = FlagsItemKind.Negation), FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.DotMatchesNewLine)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Flag(Flag.CRLF))))))) {
+    when (val matchVal5 = Pair(parser("i-sR:").parseFlags(), Result.Ok(Flags(span = span(0 until 4), items = mutableListOf(FlagsItem(span = span(0 until 1), kind = FlagsItemKind.Flag(Flag.CaseInsensitive)), FlagsItem(span = span(1 until 2), kind = FlagsItemKind.Negation), FlagsItem(span = span(2 until 3), kind = FlagsItemKind.Flag(Flag.DotMatchesNewLine)), FlagsItem(span = span(3 until 4), kind = FlagsItemKind.Flag(Flag.CRLF))))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -1534,7 +1556,7 @@ public fun parseFlags() {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
-            if (!(leftVal6 == rightVal6)) {
+            if (!leftVal6.eq(rightVal6)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal6`\nright: `$rightVal6`\n\n")
             }
         }
@@ -1543,7 +1565,7 @@ public fun parseFlags() {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
-            if (!(leftVal7 == rightVal7)) {
+            if (!leftVal7.eq(rightVal7)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal7`\nright: `$rightVal7`\n\n")
             }
         }
@@ -1552,7 +1574,7 @@ public fun parseFlags() {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
-            if (!(leftVal8 == rightVal8)) {
+            if (!leftVal8.eq(rightVal8)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal8`\nright: `$rightVal8`\n\n")
             }
         }
@@ -1561,7 +1583,7 @@ public fun parseFlags() {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
-            if (!(leftVal9 == rightVal9)) {
+            if (!leftVal9.eq(rightVal9)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal9`\nright: `$rightVal9`\n\n")
             }
         }
@@ -1570,7 +1592,7 @@ public fun parseFlags() {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
-            if (!(leftVal10 == rightVal10)) {
+            if (!leftVal10.eq(rightVal10)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal10`\nright: `$rightVal10`\n\n")
             }
         }
@@ -1579,7 +1601,7 @@ public fun parseFlags() {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
-            if (!(leftVal11 == rightVal11)) {
+            if (!leftVal11.eq(rightVal11)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal11`\nright: `$rightVal11`\n\n")
             }
         }
@@ -1588,7 +1610,7 @@ public fun parseFlags() {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
-            if (!(leftVal12 == rightVal12)) {
+            if (!leftVal12.eq(rightVal12)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal12`\nright: `$rightVal12`\n\n")
             }
         }
@@ -1597,7 +1619,7 @@ public fun parseFlags() {
 
 @kotlin.test.Test
 public fun parseFlag() {
-    when (val matchVal = Pair(parser("i").parseFlag(), Result.success(Flag.CaseInsensitive))) {
+    when (val matchVal = Pair(parser("i").parseFlag(), Result.Ok(Flag.CaseInsensitive))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -1606,7 +1628,7 @@ public fun parseFlag() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("m").parseFlag(), Result.success(Flag.MultiLine))) {
+    when (val matchVal1 = Pair(parser("m").parseFlag(), Result.Ok(Flag.MultiLine))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -1615,7 +1637,7 @@ public fun parseFlag() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("s").parseFlag(), Result.success(Flag.DotMatchesNewLine))) {
+    when (val matchVal2 = Pair(parser("s").parseFlag(), Result.Ok(Flag.DotMatchesNewLine))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -1624,7 +1646,7 @@ public fun parseFlag() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("U").parseFlag(), Result.success(Flag.SwapGreed))) {
+    when (val matchVal3 = Pair(parser("U").parseFlag(), Result.Ok(Flag.SwapGreed))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -1633,7 +1655,7 @@ public fun parseFlag() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("u").parseFlag(), Result.success(Flag.Unicode))) {
+    when (val matchVal4 = Pair(parser("u").parseFlag(), Result.Ok(Flag.Unicode))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -1642,7 +1664,7 @@ public fun parseFlag() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("R").parseFlag(), Result.success(Flag.CRLF))) {
+    when (val matchVal5 = Pair(parser("R").parseFlag(), Result.Ok(Flag.CRLF))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -1651,7 +1673,7 @@ public fun parseFlag() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("x").parseFlag(), Result.success(Flag.IgnoreWhitespace))) {
+    when (val matchVal6 = Pair(parser("x").parseFlag(), Result.Ok(Flag.IgnoreWhitespace))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -1664,7 +1686,7 @@ public fun parseFlag() {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
-            if (!(leftVal7 == rightVal7)) {
+            if (!leftVal7.eq(rightVal7)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal7`\nright: `$rightVal7`\n\n")
             }
         }
@@ -1673,7 +1695,7 @@ public fun parseFlag() {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
-            if (!(leftVal8 == rightVal8)) {
+            if (!leftVal8.eq(rightVal8)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal8`\nright: `$rightVal8`\n\n")
             }
         }
@@ -1682,7 +1704,7 @@ public fun parseFlag() {
 
 @kotlin.test.Test
 public fun parsePrimitiveNonEscape() {
-    when (val matchVal = Pair(parser(".").parsePrimitive(), Result.success(Primitive.Dot(span(0 until 1))))) {
+    when (val matchVal = Pair(parser(".").parsePrimitive(), Result.Ok(Primitive.Dot(span(0 until 1))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -1691,7 +1713,7 @@ public fun parsePrimitiveNonEscape() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("^").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 1), kind = AssertionKind.StartLine))))) {
+    when (val matchVal1 = Pair(parser("^").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 1), kind = AssertionKind.StartLine))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -1700,7 +1722,7 @@ public fun parsePrimitiveNonEscape() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("\$").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 1), kind = AssertionKind.EndLine))))) {
+    when (val matchVal2 = Pair(parser("\$").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 1), kind = AssertionKind.EndLine))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -1709,7 +1731,7 @@ public fun parsePrimitiveNonEscape() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("a").parsePrimitive(), Result.success(Primitive.Literal(Literal(span = span(0 until 1), kind = LiteralKind.Verbatim, c = 'a'))))) {
+    when (val matchVal3 = Pair(parser("a").parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 1), kind = LiteralKind.Verbatim, c = 'a'.code.toUInt()))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -1718,7 +1740,7 @@ public fun parsePrimitiveNonEscape() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("|").parsePrimitive(), Result.success(Primitive.Literal(Literal(span = span(0 until 1), kind = LiteralKind.Verbatim, c = '|'))))) {
+    when (val matchVal4 = Pair(parser("|").parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 1), kind = LiteralKind.Verbatim, c = '|'.code.toUInt()))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -1727,7 +1749,7 @@ public fun parsePrimitiveNonEscape() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("☃").parsePrimitive(), Result.success(Primitive.Literal(Literal(span = spanRange("☃", 0 until 3), kind = LiteralKind.Verbatim, c = '\u2603'))))) {
+    when (val matchVal5 = Pair(parser("☃").parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = spanRange("☃", 0 until 3), kind = LiteralKind.Verbatim, c = '\u2603'.code.toUInt()))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -1740,7 +1762,7 @@ public fun parsePrimitiveNonEscape() {
 
 @kotlin.test.Test
 public fun parseEscape() {
-    when (val matchVal = Pair(parser("\\|").parsePrimitive(), Result.success(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Meta, c = '|'))))) {
+    when (val matchVal = Pair(parser("\\|").parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Meta, c = '|'.code.toUInt()))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -1751,7 +1773,7 @@ public fun parseEscape() {
     }
     val specials = listOf(Triple("\\a", '\u0007', SpecialLiteralKind.Bell), Triple("\\f", '\u000c', SpecialLiteralKind.FormFeed), Triple("\\t", '\t', SpecialLiteralKind.Tab), Triple("\\n", '\n', SpecialLiteralKind.LineFeed), Triple("\\r", '\r', SpecialLiteralKind.CarriageReturn), Triple("\\v", '\u000b', SpecialLiteralKind.VerticalTab))
     for ((pat, c, kind) in specials) {
-        when (val matchVal1 = Pair(parser(pat).parsePrimitive(), Result.success(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Special(kind.clone()), c = c))))) {
+        when (val matchVal1 = Pair(parser(pat).parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Special(kind.clone()), c = c))))) {
             else -> {
                 val leftVal1 = matchVal1.first
                 val rightVal1 = matchVal1.second
@@ -1761,7 +1783,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("\\A").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.StartText))))) {
+    when (val matchVal2 = Pair(parser("\\A").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.StartText))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -1770,7 +1792,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("\\z").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.EndText))))) {
+    when (val matchVal3 = Pair(parser("\\z").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.EndText))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -1779,7 +1801,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("\\b").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.WordBoundary))))) {
+    when (val matchVal4 = Pair(parser("\\b").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.WordBoundary))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -1788,7 +1810,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("\\b{start}").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 9), kind = AssertionKind.WordBoundaryStart))))) {
+    when (val matchVal5 = Pair(parser("\\b{start}").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 9), kind = AssertionKind.WordBoundaryStart))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -1797,7 +1819,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("\\b{end}").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 7), kind = AssertionKind.WordBoundaryEnd))))) {
+    when (val matchVal6 = Pair(parser("\\b{end}").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 7), kind = AssertionKind.WordBoundaryEnd))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -1806,7 +1828,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("\\b{start-half}").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 14), kind = AssertionKind.WordBoundaryStartHalf))))) {
+    when (val matchVal7 = Pair(parser("\\b{start-half}").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 14), kind = AssertionKind.WordBoundaryStartHalf))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -1815,7 +1837,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal8 = Pair(parser("\\b{end-half}").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 12), kind = AssertionKind.WordBoundaryEndHalf))))) {
+    when (val matchVal8 = Pair(parser("\\b{end-half}").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 12), kind = AssertionKind.WordBoundaryEndHalf))))) {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
@@ -1824,7 +1846,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal9 = Pair(parser("\\<").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.WordBoundaryStartAngle))))) {
+    when (val matchVal9 = Pair(parser("\\<").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.WordBoundaryStartAngle))))) {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
@@ -1833,7 +1855,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal10 = Pair(parser("\\>").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.WordBoundaryEndAngle))))) {
+    when (val matchVal10 = Pair(parser("\\>").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.WordBoundaryEndAngle))))) {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
@@ -1842,7 +1864,7 @@ public fun parseEscape() {
             }
         }
     }
-    when (val matchVal11 = Pair(parser("\\B").parsePrimitive(), Result.success(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.NotWordBoundary))))) {
+    when (val matchVal11 = Pair(parser("\\B").parsePrimitive(), Result.Ok(Primitive.Assertion(Assertion(span = span(0 until 2), kind = AssertionKind.NotWordBoundary))))) {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
@@ -1854,7 +1876,7 @@ public fun parseEscape() {
     // We also support superfluous escapes in most cases now too.
     for (c1 in listOf('!', '@', '%', '"', '\'', '/', ' ')) {
         val pat1 = "\\$c"
-        when (val matchVal12 = Pair(parser(pat1).parsePrimitive(), Result.success(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Superfluous, c = c1))))) {
+        when (val matchVal12 = Pair(parser(pat1).parsePrimitive(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 2), kind = LiteralKind.Superfluous, c = c1))))) {
             else -> {
                 val leftVal12 = matchVal12.first
                 val rightVal12 = matchVal12.second
@@ -1868,7 +1890,7 @@ public fun parseEscape() {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
-            if (!(leftVal13 == rightVal13)) {
+            if (!leftVal13.eq(rightVal13)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal13`\nright: `$rightVal13`\n\n")
             }
         }
@@ -1877,7 +1899,7 @@ public fun parseEscape() {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
-            if (!(leftVal14 == rightVal14)) {
+            if (!leftVal14.eq(rightVal14)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal14`\nright: `$rightVal14`\n\n")
             }
         }
@@ -1886,7 +1908,7 @@ public fun parseEscape() {
         else -> {
             val leftVal15 = matchVal15.first
             val rightVal15 = matchVal15.second
-            if (!(leftVal15 == rightVal15)) {
+            if (!leftVal15.eq(rightVal15)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal15`\nright: `$rightVal15`\n\n")
             }
         }
@@ -1895,7 +1917,7 @@ public fun parseEscape() {
         else -> {
             val leftVal16 = matchVal16.first
             val rightVal16 = matchVal16.second
-            if (!(leftVal16 == rightVal16)) {
+            if (!leftVal16.eq(rightVal16)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal16`\nright: `$rightVal16`\n\n")
             }
         }
@@ -1904,7 +1926,7 @@ public fun parseEscape() {
         else -> {
             val leftVal17 = matchVal17.first
             val rightVal17 = matchVal17.second
-            if (!(leftVal17 == rightVal17)) {
+            if (!leftVal17.eq(rightVal17)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal17`\nright: `$rightVal17`\n\n")
             }
         }
@@ -1913,7 +1935,7 @@ public fun parseEscape() {
         else -> {
             val leftVal18 = matchVal18.first
             val rightVal18 = matchVal18.second
-            if (!(leftVal18 == rightVal18)) {
+            if (!leftVal18.eq(rightVal18)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal18`\nright: `$rightVal18`\n\n")
             }
         }
@@ -1922,7 +1944,7 @@ public fun parseEscape() {
         else -> {
             val leftVal19 = matchVal19.first
             val rightVal19 = matchVal19.second
-            if (!(leftVal19 == rightVal19)) {
+            if (!leftVal19.eq(rightVal19)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal19`\nright: `$rightVal19`\n\n")
             }
         }
@@ -1931,7 +1953,7 @@ public fun parseEscape() {
         else -> {
             val leftVal20 = matchVal20.first
             val rightVal20 = matchVal20.second
-            if (!(leftVal20 == rightVal20)) {
+            if (!leftVal20.eq(rightVal20)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal20`\nright: `$rightVal20`\n\n")
             }
         }
@@ -1940,7 +1962,7 @@ public fun parseEscape() {
         else -> {
             val leftVal21 = matchVal21.first
             val rightVal21 = matchVal21.second
-            if (!(leftVal21 == rightVal21)) {
+            if (!leftVal21.eq(rightVal21)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal21`\nright: `$rightVal21`\n\n")
             }
         }
@@ -1953,7 +1975,7 @@ public fun parseUnsupportedBackreference() {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
-            if (!(leftVal == rightVal)) {
+            if (!leftVal.eq(rightVal)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal`\nright: `$rightVal`\n\n")
             }
         }
@@ -1962,7 +1984,7 @@ public fun parseUnsupportedBackreference() {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
-            if (!(leftVal1 == rightVal1)) {
+            if (!leftVal1.eq(rightVal1)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal1`\nright: `$rightVal1`\n\n")
             }
         }
@@ -1972,8 +1994,8 @@ public fun parseUnsupportedBackreference() {
 @kotlin.test.Test
 public fun parseOctal() {
     for (i in 0 until 511) {
-        val pat = "\\$i"
-        when (val matchVal = Pair(parserOctal(pat).parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until pat.len()), kind = LiteralKind.Octal, c = Char.fromU32(i).unwrap()))))) {
+        val pat = "\\" + i.toString(8)
+        when (val matchVal = Pair(parserOctal(pat).parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until pat.encodeToByteArray().size), kind = LiteralKind.Octal, c = scalarFromU32(i.toUInt())!!))))) {
             else -> {
                 val leftVal = matchVal.first
                 val rightVal = matchVal.second
@@ -1983,7 +2005,7 @@ public fun parseOctal() {
             }
         }
     }
-    when (val matchVal1 = Pair(parserOctal("\\778").parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until 3), kind = LiteralKind.Octal, c = '?'))))) {
+    when (val matchVal1 = Pair(parserOctal("\\778").parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 3), kind = LiteralKind.Octal, c = '?'.code.toUInt()))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -1992,7 +2014,7 @@ public fun parseOctal() {
             }
         }
     }
-    when (val matchVal2 = Pair(parserOctal("\\7777").parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until 4), kind = LiteralKind.Octal, c = '\u01ff'))))) {
+    when (val matchVal2 = Pair(parserOctal("\\7777").parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 4), kind = LiteralKind.Octal, c = '\u01ff'.code.toUInt()))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -2001,7 +2023,7 @@ public fun parseOctal() {
             }
         }
     }
-    when (val matchVal3 = Pair(parserOctal("\\778").parse(), Result.success(Ast.concat(Concat(span = span(0 until 4), asts = mutableListOf(Ast.literal(Literal(span = span(0 until 3), kind = LiteralKind.Octal, c = '?')), Ast.literal(Literal(span = span(3 until 4), kind = LiteralKind.Verbatim, c = '8')))))))) {
+    when (val matchVal3 = Pair(parserOctal("\\778").parse(), Result.Ok(Ast.concat(Concat(span = span(0 until 4), asts = mutableListOf(Ast.literal(Literal(span = span(0 until 3), kind = LiteralKind.Octal, c = '?'.code.toUInt())), Ast.literal(Literal(span = span(3 until 4), kind = LiteralKind.Verbatim, c = '8'.code.toUInt())))))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -2010,7 +2032,7 @@ public fun parseOctal() {
             }
         }
     }
-    when (val matchVal4 = Pair(parserOctal("\\7777").parse(), Result.success(Ast.concat(Concat(span = span(0 until 5), asts = mutableListOf(Ast.literal(Literal(span = span(0 until 4), kind = LiteralKind.Octal, c = '\u01ff')), Ast.literal(Literal(span = span(4 until 5), kind = LiteralKind.Verbatim, c = '7')))))))) {
+    when (val matchVal4 = Pair(parserOctal("\\7777").parse(), Result.Ok(Ast.concat(Concat(span = span(0 until 5), asts = mutableListOf(Ast.literal(Literal(span = span(0 until 4), kind = LiteralKind.Octal, c = '\u01ff'.code.toUInt())), Ast.literal(Literal(span = span(4 until 5), kind = LiteralKind.Verbatim, c = '7'.code.toUInt())))))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -2023,7 +2045,7 @@ public fun parseOctal() {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
-            if (!(leftVal5 == rightVal5)) {
+            if (!leftVal5.eq(rightVal5)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal5`\nright: `$rightVal5`\n\n")
             }
         }
@@ -2033,8 +2055,8 @@ public fun parseOctal() {
 @kotlin.test.Test
 public fun parseHexTwo() {
     for (i in 0 until 256) {
-        val pat = "\\x$i"
-        when (val matchVal = Pair(parser(pat).parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until pat.len()), kind = LiteralKind.HexFixed(HexLiteralKind.X), c = Char.fromU32(i).unwrap()))))) {
+        val pat = "\\x" + i.toString(16).padStart(2, '0')
+        when (val matchVal = Pair(parser(pat).parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until pat.encodeToByteArray().size), kind = LiteralKind.HexFixed(HexLiteralKind.X), c = scalarFromU32(i.toUInt())!!))))) {
             else -> {
                 val leftVal = matchVal.first
                 val rightVal = matchVal.second
@@ -2048,7 +2070,7 @@ public fun parseHexTwo() {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
-            if (!(leftVal1 == rightVal1)) {
+            if (!leftVal1.eq(rightVal1)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal1`\nright: `$rightVal1`\n\n")
             }
         }
@@ -2057,7 +2079,7 @@ public fun parseHexTwo() {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
-            if (!(leftVal2 == rightVal2)) {
+            if (!leftVal2.eq(rightVal2)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal2`\nright: `$rightVal2`\n\n")
             }
         }
@@ -2066,7 +2088,7 @@ public fun parseHexTwo() {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
-            if (!(leftVal3 == rightVal3)) {
+            if (!leftVal3.eq(rightVal3)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal3`\nright: `$rightVal3`\n\n")
             }
         }
@@ -2076,16 +2098,9 @@ public fun parseHexTwo() {
 @kotlin.test.Test
 public fun parseHexFour() {
     for (i in 0 until 65536) {
-        val c1 =
-            when (val matchVal = Char.fromU32(i)) {
-                null -> { continue }
-                else -> {
-                    val c = matchVal
-                    c
-                }
-            }
-        val pat = "\\u$i"
-        when (val matchVal1 = Pair(parser(pat).parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until pat.len()), kind = LiteralKind.HexFixed(HexLiteralKind.UnicodeShort), c = c1))))) {
+        val c1 = scalarFromU32(i.toUInt()) ?: continue
+        val pat = "\\u" + i.toString(16).padStart(4, '0')
+        when (val matchVal1 = Pair(parser(pat).parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until pat.encodeToByteArray().size), kind = LiteralKind.HexFixed(HexLiteralKind.UnicodeShort), c = c1))))) {
             else -> {
                 val leftVal = matchVal1.first
                 val rightVal = matchVal1.second
@@ -2099,7 +2114,7 @@ public fun parseHexFour() {
         else -> {
             val leftVal1 = matchVal2.first
             val rightVal1 = matchVal2.second
-            if (!(leftVal1 == rightVal1)) {
+            if (!leftVal1.eq(rightVal1)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal1`\nright: `$rightVal1`\n\n")
             }
         }
@@ -2108,7 +2123,7 @@ public fun parseHexFour() {
         else -> {
             val leftVal2 = matchVal3.first
             val rightVal2 = matchVal3.second
-            if (!(leftVal2 == rightVal2)) {
+            if (!leftVal2.eq(rightVal2)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal2`\nright: `$rightVal2`\n\n")
             }
         }
@@ -2117,7 +2132,7 @@ public fun parseHexFour() {
         else -> {
             val leftVal3 = matchVal4.first
             val rightVal3 = matchVal4.second
-            if (!(leftVal3 == rightVal3)) {
+            if (!leftVal3.eq(rightVal3)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal3`\nright: `$rightVal3`\n\n")
             }
         }
@@ -2126,7 +2141,7 @@ public fun parseHexFour() {
         else -> {
             val leftVal4 = matchVal5.first
             val rightVal4 = matchVal5.second
-            if (!(leftVal4 == rightVal4)) {
+            if (!leftVal4.eq(rightVal4)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal4`\nright: `$rightVal4`\n\n")
             }
         }
@@ -2135,7 +2150,7 @@ public fun parseHexFour() {
         else -> {
             val leftVal5 = matchVal6.first
             val rightVal5 = matchVal6.second
-            if (!(leftVal5 == rightVal5)) {
+            if (!leftVal5.eq(rightVal5)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal5`\nright: `$rightVal5`\n\n")
             }
         }
@@ -2144,7 +2159,7 @@ public fun parseHexFour() {
         else -> {
             val leftVal6 = matchVal7.first
             val rightVal6 = matchVal7.second
-            if (!(leftVal6 == rightVal6)) {
+            if (!leftVal6.eq(rightVal6)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal6`\nright: `$rightVal6`\n\n")
             }
         }
@@ -2154,16 +2169,9 @@ public fun parseHexFour() {
 @kotlin.test.Test
 public fun parseHexEight() {
     for (i in 0 until 65536) {
-        val c1 =
-            when (val matchVal = Char.fromU32(i)) {
-                null -> { continue }
-                else -> {
-                    val c = matchVal
-                    c
-                }
-            }
-        val pat = "\\U$i"
-        when (val matchVal1 = Pair(parser(pat).parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until pat.len()), kind = LiteralKind.HexFixed(HexLiteralKind.UnicodeLong), c = c1))))) {
+        val c1 = scalarFromU32(i.toUInt()) ?: continue
+        val pat = "\\U" + i.toString(16).padStart(8, '0')
+        when (val matchVal1 = Pair(parser(pat).parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until pat.encodeToByteArray().size), kind = LiteralKind.HexFixed(HexLiteralKind.UnicodeLong), c = c1))))) {
             else -> {
                 val leftVal = matchVal1.first
                 val rightVal = matchVal1.second
@@ -2177,7 +2185,7 @@ public fun parseHexEight() {
         else -> {
             val leftVal1 = matchVal2.first
             val rightVal1 = matchVal2.second
-            if (!(leftVal1 == rightVal1)) {
+            if (!leftVal1.eq(rightVal1)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal1`\nright: `$rightVal1`\n\n")
             }
         }
@@ -2186,7 +2194,7 @@ public fun parseHexEight() {
         else -> {
             val leftVal2 = matchVal3.first
             val rightVal2 = matchVal3.second
-            if (!(leftVal2 == rightVal2)) {
+            if (!leftVal2.eq(rightVal2)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal2`\nright: `$rightVal2`\n\n")
             }
         }
@@ -2195,7 +2203,7 @@ public fun parseHexEight() {
         else -> {
             val leftVal3 = matchVal4.first
             val rightVal3 = matchVal4.second
-            if (!(leftVal3 == rightVal3)) {
+            if (!leftVal3.eq(rightVal3)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal3`\nright: `$rightVal3`\n\n")
             }
         }
@@ -2204,7 +2212,7 @@ public fun parseHexEight() {
         else -> {
             val leftVal4 = matchVal5.first
             val rightVal4 = matchVal5.second
-            if (!(leftVal4 == rightVal4)) {
+            if (!leftVal4.eq(rightVal4)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal4`\nright: `$rightVal4`\n\n")
             }
         }
@@ -2213,7 +2221,7 @@ public fun parseHexEight() {
         else -> {
             val leftVal5 = matchVal6.first
             val rightVal5 = matchVal6.second
-            if (!(leftVal5 == rightVal5)) {
+            if (!leftVal5.eq(rightVal5)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal5`\nright: `$rightVal5`\n\n")
             }
         }
@@ -2222,7 +2230,7 @@ public fun parseHexEight() {
         else -> {
             val leftVal6 = matchVal7.first
             val rightVal6 = matchVal7.second
-            if (!(leftVal6 == rightVal6)) {
+            if (!leftVal6.eq(rightVal6)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal6`\nright: `$rightVal6`\n\n")
             }
         }
@@ -2231,7 +2239,7 @@ public fun parseHexEight() {
         else -> {
             val leftVal7 = matchVal8.first
             val rightVal7 = matchVal8.second
-            if (!(leftVal7 == rightVal7)) {
+            if (!leftVal7.eq(rightVal7)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal7`\nright: `$rightVal7`\n\n")
             }
         }
@@ -2240,7 +2248,7 @@ public fun parseHexEight() {
         else -> {
             val leftVal8 = matchVal9.first
             val rightVal8 = matchVal9.second
-            if (!(leftVal8 == rightVal8)) {
+            if (!leftVal8.eq(rightVal8)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal8`\nright: `$rightVal8`\n\n")
             }
         }
@@ -2249,7 +2257,7 @@ public fun parseHexEight() {
         else -> {
             val leftVal9 = matchVal10.first
             val rightVal9 = matchVal10.second
-            if (!(leftVal9 == rightVal9)) {
+            if (!leftVal9.eq(rightVal9)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal9`\nright: `$rightVal9`\n\n")
             }
         }
@@ -2258,7 +2266,7 @@ public fun parseHexEight() {
 
 @kotlin.test.Test
 public fun parseHexBrace() {
-    when (val matchVal = Pair(parser("\\u{26c4}").parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until 8), kind = LiteralKind.HexBrace(HexLiteralKind.UnicodeShort), c = '\u26c4'))))) {
+    when (val matchVal = Pair(parser("\\u{26c4}").parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 8), kind = LiteralKind.HexBrace(HexLiteralKind.UnicodeShort), c = '\u26c4'.code.toUInt()))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -2267,7 +2275,7 @@ public fun parseHexBrace() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("\\U{26c4}").parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until 8), kind = LiteralKind.HexBrace(HexLiteralKind.UnicodeLong), c = '\u26c4'))))) {
+    when (val matchVal1 = Pair(parser("\\U{26c4}").parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 8), kind = LiteralKind.HexBrace(HexLiteralKind.UnicodeLong), c = '\u26c4'.code.toUInt()))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -2276,7 +2284,7 @@ public fun parseHexBrace() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("\\x{26c4}").parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until 8), kind = LiteralKind.HexBrace(HexLiteralKind.X), c = '\u26c4'))))) {
+    when (val matchVal2 = Pair(parser("\\x{26c4}").parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 8), kind = LiteralKind.HexBrace(HexLiteralKind.X), c = '\u26c4'.code.toUInt()))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -2285,7 +2293,7 @@ public fun parseHexBrace() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("\\x{26C4}").parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until 8), kind = LiteralKind.HexBrace(HexLiteralKind.X), c = '\u26c4'))))) {
+    when (val matchVal3 = Pair(parser("\\x{26C4}").parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 8), kind = LiteralKind.HexBrace(HexLiteralKind.X), c = '\u26c4'.code.toUInt()))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -2294,7 +2302,7 @@ public fun parseHexBrace() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("\\x{10fFfF}").parseEscape(), Result.success(Primitive.Literal(Literal(span = span(0 until 10), kind = LiteralKind.HexBrace(HexLiteralKind.X), c = 0x10ffff))))) {
+    when (val matchVal4 = Pair(parser("\\x{10fFfF}").parseEscape(), Result.Ok(Primitive.Literal(Literal(span = span(0 until 10), kind = LiteralKind.HexBrace(HexLiteralKind.X), c = 0x10ffffu))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -2307,7 +2315,7 @@ public fun parseHexBrace() {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
-            if (!(leftVal5 == rightVal5)) {
+            if (!leftVal5.eq(rightVal5)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal5`\nright: `$rightVal5`\n\n")
             }
         }
@@ -2316,7 +2324,7 @@ public fun parseHexBrace() {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
-            if (!(leftVal6 == rightVal6)) {
+            if (!leftVal6.eq(rightVal6)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal6`\nright: `$rightVal6`\n\n")
             }
         }
@@ -2325,7 +2333,7 @@ public fun parseHexBrace() {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
-            if (!(leftVal7 == rightVal7)) {
+            if (!leftVal7.eq(rightVal7)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal7`\nright: `$rightVal7`\n\n")
             }
         }
@@ -2334,7 +2342,7 @@ public fun parseHexBrace() {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
-            if (!(leftVal8 == rightVal8)) {
+            if (!leftVal8.eq(rightVal8)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal8`\nright: `$rightVal8`\n\n")
             }
         }
@@ -2343,7 +2351,7 @@ public fun parseHexBrace() {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
-            if (!(leftVal9 == rightVal9)) {
+            if (!leftVal9.eq(rightVal9)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal9`\nright: `$rightVal9`\n\n")
             }
         }
@@ -2352,7 +2360,7 @@ public fun parseHexBrace() {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
-            if (!(leftVal10 == rightVal10)) {
+            if (!leftVal10.eq(rightVal10)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal10`\nright: `$rightVal10`\n\n")
             }
         }
@@ -2361,7 +2369,7 @@ public fun parseHexBrace() {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
-            if (!(leftVal11 == rightVal11)) {
+            if (!leftVal11.eq(rightVal11)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal11`\nright: `$rightVal11`\n\n")
             }
         }
@@ -2370,7 +2378,7 @@ public fun parseHexBrace() {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
-            if (!(leftVal12 == rightVal12)) {
+            if (!leftVal12.eq(rightVal12)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal12`\nright: `$rightVal12`\n\n")
             }
         }
@@ -2379,7 +2387,7 @@ public fun parseHexBrace() {
 
 @kotlin.test.Test
 public fun parseDecimal() {
-    when (val matchVal = Pair(parser("123").parseDecimal(), Result.success(123))) {
+    when (val matchVal = Pair(parser("123").parseDecimal(), Result.Ok(123))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -2388,7 +2396,7 @@ public fun parseDecimal() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("0").parseDecimal(), Result.success(0))) {
+    when (val matchVal1 = Pair(parser("0").parseDecimal(), Result.Ok(0))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -2397,7 +2405,7 @@ public fun parseDecimal() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("01").parseDecimal(), Result.success(1))) {
+    when (val matchVal2 = Pair(parser("01").parseDecimal(), Result.Ok(1))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -2410,7 +2418,7 @@ public fun parseDecimal() {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
-            if (!(leftVal3 == rightVal3)) {
+            if (!leftVal3.eq(rightVal3)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal3`\nright: `$rightVal3`\n\n")
             }
         }
@@ -2419,7 +2427,7 @@ public fun parseDecimal() {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
-            if (!(leftVal4 == rightVal4)) {
+            if (!leftVal4.eq(rightVal4)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal4`\nright: `$rightVal4`\n\n")
             }
         }
@@ -2428,7 +2436,7 @@ public fun parseDecimal() {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
-            if (!(leftVal5 == rightVal5)) {
+            if (!leftVal5.eq(rightVal5)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal5`\nright: `$rightVal5`\n\n")
             }
         }
@@ -2446,16 +2454,16 @@ public fun parseSetClass() {
     fun itemUnicode(cls: ClassUnicode): ClassSetItem = ClassSetItem.Unicode(cls)
     fun itemPerl(cls: ClassPerl): ClassSetItem = ClassSetItem.Perl(cls)
     fun itemBracket(cls: ClassBracketed): ClassSetItem = ClassSetItem.Bracketed(cls)
-    fun lit(span: Span, c: Char): ClassSetItem = ClassSetItem.Literal(Literal(span = span, kind = LiteralKind.Verbatim, c = c))
+    fun lit(span: Span, c: Char): ClassSetItem = ClassSetItem.Literal(Literal(span = span, kind = LiteralKind.Verbatim, c = c.code.toUInt()))
     fun empty(span: Span): ClassSetItem = ClassSetItem.Empty(span)
     fun range(span: Span, start: Char, end: Char): ClassSetItem {
-        val pos1 = span.start.copy(offset = span.start.offset + start.lenUtf8(), column = span.start.column + 1)
-        val pos2 = span.end.copy(offset = span.end.offset - end.lenUtf8(), column = span.end.column - 1)
-        return ClassSetItem.Range(ClassSetRange(span = span, start = Literal(span = span.copy(end = pos1), kind = LiteralKind.Verbatim, c = start), end = Literal(span = span.copy(start = pos2), kind = LiteralKind.Verbatim, c = end)))
+        val pos1 = span.start.copy(offset = span.start.offset + scalarLenUtf8(start.code.toUInt()), column = span.start.column + 1)
+        val pos2 = span.end.copy(offset = span.end.offset - scalarLenUtf8(end.code.toUInt()), column = span.end.column - 1)
+        return ClassSetItem.Range(ClassSetRange(span = span, start = Literal(span = span.copy(end = pos1), kind = LiteralKind.Verbatim, c = start.code.toUInt()), end = Literal(span = span.copy(start = pos2), kind = LiteralKind.Verbatim, c = end.code.toUInt())))
     }
     fun alnum(span: Span, negated: Boolean): ClassAscii = ClassAscii(span = span, kind = ClassAsciiKind.Alnum, negated = negated)
     fun lower(span: Span, negated: Boolean): ClassAscii = ClassAscii(span = span, kind = ClassAsciiKind.Lower, negated = negated)
-    when (val matchVal = Pair(parser("[[:alnum:]]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 11), negated = false, kind = itemset(itemAscii(alnum(span(1 until 10), false)))))))) {
+    when (val matchVal = Pair(parser("[[:alnum:]]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 11), negated = false, kind = itemset(itemAscii(alnum(span(1 until 10), false)))))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -2464,7 +2472,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("[[[:alnum:]]]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 13), negated = false, kind = itemset(itemBracket(ClassBracketed(span = span(1 until 12), negated = false, kind = itemset(itemAscii(alnum(span(2 until 11), false))))))))))) {
+    when (val matchVal1 = Pair(parser("[[[:alnum:]]]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 13), negated = false, kind = itemset(itemBracket(ClassBracketed(span = span(1 until 12), negated = false, kind = itemset(itemAscii(alnum(span(2 until 11), false))))))))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -2473,7 +2481,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("[[:alnum:]&&[:lower:]]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 22), negated = false, kind = intersection(span(1 until 21), itemset(itemAscii(alnum(span(1 until 10), false))), itemset(itemAscii(lower(span(12 until 21), false))))))))) {
+    when (val matchVal2 = Pair(parser("[[:alnum:]&&[:lower:]]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 22), negated = false, kind = intersection(span(1 until 21), itemset(itemAscii(alnum(span(1 until 10), false))), itemset(itemAscii(lower(span(12 until 21), false))))))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -2482,7 +2490,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("[[:alnum:]--[:lower:]]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 22), negated = false, kind = difference(span(1 until 21), itemset(itemAscii(alnum(span(1 until 10), false))), itemset(itemAscii(lower(span(12 until 21), false))))))))) {
+    when (val matchVal3 = Pair(parser("[[:alnum:]--[:lower:]]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 22), negated = false, kind = difference(span(1 until 21), itemset(itemAscii(alnum(span(1 until 10), false))), itemset(itemAscii(lower(span(12 until 21), false))))))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -2491,7 +2499,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("[[:alnum:]~~[:lower:]]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 22), negated = false, kind = symdifference(span(1 until 21), itemset(itemAscii(alnum(span(1 until 10), false))), itemset(itemAscii(lower(span(12 until 21), false))))))))) {
+    when (val matchVal4 = Pair(parser("[[:alnum:]~~[:lower:]]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 22), negated = false, kind = symdifference(span(1 until 21), itemset(itemAscii(alnum(span(1 until 10), false))), itemset(itemAscii(lower(span(12 until 21), false))))))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -2500,7 +2508,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("[a]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 3), negated = false, kind = itemset(lit(span(1 until 2), 'a'))))))) {
+    when (val matchVal5 = Pair(parser("[a]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 3), negated = false, kind = itemset(lit(span(1 until 2), 'a'))))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -2509,7 +2517,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("[a\\]]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 5), negated = false, kind = union(span(1 until 4), mutableListOf(lit(span(1 until 2), 'a'), ClassSetItem.Literal(Literal(span = span(2 until 4), kind = LiteralKind.Meta, c = ']'))))))))) {
+    when (val matchVal6 = Pair(parser("[a\\]]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 5), negated = false, kind = union(span(1 until 4), mutableListOf(lit(span(1 until 2), 'a'), ClassSetItem.Literal(Literal(span = span(2 until 4), kind = LiteralKind.Meta, c = ']'.code.toUInt()))))))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -2518,7 +2526,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("[a\\-z]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 6), negated = false, kind = union(span(1 until 5), mutableListOf(lit(span(1 until 2), 'a'), ClassSetItem.Literal(Literal(span = span(2 until 4), kind = LiteralKind.Meta, c = '-')), lit(span(4 until 5), 'z')))))))) {
+    when (val matchVal7 = Pair(parser("[a\\-z]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 6), negated = false, kind = union(span(1 until 5), mutableListOf(lit(span(1 until 2), 'a'), ClassSetItem.Literal(Literal(span = span(2 until 4), kind = LiteralKind.Meta, c = '-'.code.toUInt())), lit(span(4 until 5), 'z')))))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -2527,7 +2535,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal8 = Pair(parser("[ab]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = union(span(1 until 3), mutableListOf(lit(span(1 until 2), 'a'), lit(span(2 until 3), 'b')))))))) {
+    when (val matchVal8 = Pair(parser("[ab]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = union(span(1 until 3), mutableListOf(lit(span(1 until 2), 'a'), lit(span(2 until 3), 'b')))))))) {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
@@ -2536,7 +2544,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal9 = Pair(parser("[a-]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = union(span(1 until 3), mutableListOf(lit(span(1 until 2), 'a'), lit(span(2 until 3), '-')))))))) {
+    when (val matchVal9 = Pair(parser("[a-]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = union(span(1 until 3), mutableListOf(lit(span(1 until 2), 'a'), lit(span(2 until 3), '-')))))))) {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
@@ -2545,7 +2553,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal10 = Pair(parser("[-a]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = union(span(1 until 3), mutableListOf(lit(span(1 until 2), '-'), lit(span(2 until 3), 'a')))))))) {
+    when (val matchVal10 = Pair(parser("[-a]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = union(span(1 until 3), mutableListOf(lit(span(1 until 2), '-'), lit(span(2 until 3), 'a')))))))) {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
@@ -2554,7 +2562,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal11 = Pair(parser("[\\pL]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 5), negated = false, kind = itemset(itemUnicode(ClassUnicode(span = span(1 until 4), negated = false, kind = ClassUnicodeKind.OneLetter('L'))))))))) {
+    when (val matchVal11 = Pair(parser("[\\pL]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 5), negated = false, kind = itemset(itemUnicode(ClassUnicode(span = span(1 until 4), negated = false, kind = ClassUnicodeKind.OneLetter('L'.code.toUInt()))))))))) {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
@@ -2563,7 +2571,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal12 = Pair(parser("[\\w]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = itemset(itemPerl(ClassPerl(span = span(1 until 3), kind = ClassPerlKind.Word, negated = false)))))))) {
+    when (val matchVal12 = Pair(parser("[\\w]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = itemset(itemPerl(ClassPerl(span = span(1 until 3), kind = ClassPerlKind.Word, negated = false)))))))) {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
@@ -2572,7 +2580,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal13 = Pair(parser("[a\\wz]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 6), negated = false, kind = union(span(1 until 5), mutableListOf(lit(span(1 until 2), 'a'), itemPerl(ClassPerl(span = span(2 until 4), kind = ClassPerlKind.Word, negated = false)), lit(span(4 until 5), 'z')))))))) {
+    when (val matchVal13 = Pair(parser("[a\\wz]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 6), negated = false, kind = union(span(1 until 5), mutableListOf(lit(span(1 until 2), 'a'), itemPerl(ClassPerl(span = span(2 until 4), kind = ClassPerlKind.Word, negated = false)), lit(span(4 until 5), 'z')))))))) {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
@@ -2581,7 +2589,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal14 = Pair(parser("[a-z]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 5), negated = false, kind = itemset(range(span(1 until 4), 'a', 'z'))))))) {
+    when (val matchVal14 = Pair(parser("[a-z]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 5), negated = false, kind = itemset(range(span(1 until 4), 'a', 'z'))))))) {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
@@ -2590,7 +2598,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal15 = Pair(parser("[a-cx-z]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 8), negated = false, kind = union(span(1 until 7), mutableListOf(range(span(1 until 4), 'a', 'c'), range(span(4 until 7), 'x', 'z')))))))) {
+    when (val matchVal15 = Pair(parser("[a-cx-z]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 8), negated = false, kind = union(span(1 until 7), mutableListOf(range(span(1 until 4), 'a', 'c'), range(span(4 until 7), 'x', 'z')))))))) {
         else -> {
             val leftVal15 = matchVal15.first
             val rightVal15 = matchVal15.second
@@ -2599,7 +2607,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal16 = Pair(parser("[\\w&&a-cx-z]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 12), negated = false, kind = intersection(span(1 until 11), itemset(itemPerl(ClassPerl(span = span(1 until 3), kind = ClassPerlKind.Word, negated = false))), union(span(5 until 11), mutableListOf(range(span(5 until 8), 'a', 'c'), range(span(8 until 11), 'x', 'z'))))))))) {
+    when (val matchVal16 = Pair(parser("[\\w&&a-cx-z]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 12), negated = false, kind = intersection(span(1 until 11), itemset(itemPerl(ClassPerl(span = span(1 until 3), kind = ClassPerlKind.Word, negated = false))), union(span(5 until 11), mutableListOf(range(span(5 until 8), 'a', 'c'), range(span(8 until 11), 'x', 'z'))))))))) {
         else -> {
             val leftVal16 = matchVal16.first
             val rightVal16 = matchVal16.second
@@ -2608,7 +2616,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal17 = Pair(parser("[a-cx-z&&\\w]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 12), negated = false, kind = intersection(span(1 until 11), union(span(1 until 7), mutableListOf(range(span(1 until 4), 'a', 'c'), range(span(4 until 7), 'x', 'z'))), itemset(itemPerl(ClassPerl(span = span(9 until 11), kind = ClassPerlKind.Word, negated = false))))))))) {
+    when (val matchVal17 = Pair(parser("[a-cx-z&&\\w]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 12), negated = false, kind = intersection(span(1 until 11), union(span(1 until 7), mutableListOf(range(span(1 until 4), 'a', 'c'), range(span(4 until 7), 'x', 'z'))), itemset(itemPerl(ClassPerl(span = span(9 until 11), kind = ClassPerlKind.Word, negated = false))))))))) {
         else -> {
             val leftVal17 = matchVal17.first
             val rightVal17 = matchVal17.second
@@ -2617,7 +2625,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal18 = Pair(parser("[a--b--c]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 9), negated = false, kind = difference(span(1 until 8), difference(span(1 until 5), itemset(lit(span(1 until 2), 'a')), itemset(lit(span(4 until 5), 'b'))), itemset(lit(span(7 until 8), 'c')))))))) {
+    when (val matchVal18 = Pair(parser("[a--b--c]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 9), negated = false, kind = difference(span(1 until 8), difference(span(1 until 5), itemset(lit(span(1 until 2), 'a')), itemset(lit(span(4 until 5), 'b'))), itemset(lit(span(7 until 8), 'c')))))))) {
         else -> {
             val leftVal18 = matchVal18.first
             val rightVal18 = matchVal18.second
@@ -2626,7 +2634,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal19 = Pair(parser("[a~~b~~c]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 9), negated = false, kind = symdifference(span(1 until 8), symdifference(span(1 until 5), itemset(lit(span(1 until 2), 'a')), itemset(lit(span(4 until 5), 'b'))), itemset(lit(span(7 until 8), 'c')))))))) {
+    when (val matchVal19 = Pair(parser("[a~~b~~c]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 9), negated = false, kind = symdifference(span(1 until 8), symdifference(span(1 until 5), itemset(lit(span(1 until 2), 'a')), itemset(lit(span(4 until 5), 'b'))), itemset(lit(span(7 until 8), 'c')))))))) {
         else -> {
             val leftVal19 = matchVal19.first
             val rightVal19 = matchVal19.second
@@ -2635,7 +2643,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal20 = Pair(parser("[\\^&&^]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 7), negated = false, kind = intersection(span(1 until 6), itemset(ClassSetItem.Literal(Literal(span = span(1 until 3), kind = LiteralKind.Meta, c = '^'))), itemset(lit(span(5 until 6), '^')))))))) {
+    when (val matchVal20 = Pair(parser("[\\^&&^]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 7), negated = false, kind = intersection(span(1 until 6), itemset(ClassSetItem.Literal(Literal(span = span(1 until 3), kind = LiteralKind.Meta, c = '^'.code.toUInt()))), itemset(lit(span(5 until 6), '^')))))))) {
         else -> {
             val leftVal20 = matchVal20.first
             val rightVal20 = matchVal20.second
@@ -2644,7 +2652,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal21 = Pair(parser("[\\&&&&]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 7), negated = false, kind = intersection(span(1 until 6), itemset(ClassSetItem.Literal(Literal(span = span(1 until 3), kind = LiteralKind.Meta, c = '&'))), itemset(lit(span(5 until 6), '&')))))))) {
+    when (val matchVal21 = Pair(parser("[\\&&&&]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 7), negated = false, kind = intersection(span(1 until 6), itemset(ClassSetItem.Literal(Literal(span = span(1 until 3), kind = LiteralKind.Meta, c = '&'.code.toUInt()))), itemset(lit(span(5 until 6), '&')))))))) {
         else -> {
             val leftVal21 = matchVal21.first
             val rightVal21 = matchVal21.second
@@ -2653,7 +2661,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal22 = Pair(parser("[&&&&]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 6), negated = false, kind = intersection(span(1 until 5), intersection(span(1 until 3), itemset(empty(span(1 until 1))), itemset(empty(span(3 until 3)))), itemset(empty(span(5 until 5))))))))) {
+    when (val matchVal22 = Pair(parser("[&&&&]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 6), negated = false, kind = intersection(span(1 until 5), intersection(span(1 until 3), itemset(empty(span(1 until 1))), itemset(empty(span(3 until 3)))), itemset(empty(span(5 until 5))))))))) {
         else -> {
             val leftVal22 = matchVal22.first
             val rightVal22 = matchVal22.second
@@ -2663,7 +2671,7 @@ public fun parseSetClass() {
         }
     }
     val pat = "[☃-⛄]"
-    when (val matchVal23 = Pair(parser(pat).parse(), Result.success(Ast.classBracketed(ClassBracketed(span = spanRange(pat, 0 until 9), negated = false, kind = itemset(ClassSetItem.Range(ClassSetRange(span = spanRange(pat, 1 until 8), start = Literal(span = spanRange(pat, 1 until 4), kind = LiteralKind.Verbatim, c = '\u2603'), end = Literal(span = spanRange(pat, 5 until 8), kind = LiteralKind.Verbatim, c = '\u26c4'))))))))) {
+    when (val matchVal23 = Pair(parser(pat).parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = spanRange(pat, 0 until 9), negated = false, kind = itemset(ClassSetItem.Range(ClassSetRange(span = spanRange(pat, 1 until 8), start = Literal(span = spanRange(pat, 1 until 4), kind = LiteralKind.Verbatim, c = '\u2603'.code.toUInt()), end = Literal(span = spanRange(pat, 5 until 8), kind = LiteralKind.Verbatim, c = '\u26c4'.code.toUInt()))))))))) {
         else -> {
             val leftVal23 = matchVal23.first
             val rightVal23 = matchVal23.second
@@ -2672,7 +2680,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal24 = Pair(parser("[]]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 3), negated = false, kind = itemset(lit(span(1 until 2), ']'))))))) {
+    when (val matchVal24 = Pair(parser("[]]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 3), negated = false, kind = itemset(lit(span(1 until 2), ']'))))))) {
         else -> {
             val leftVal24 = matchVal24.first
             val rightVal24 = matchVal24.second
@@ -2681,7 +2689,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal25 = Pair(parser("[]\\[]").parse(), Result.success(Ast.classBracketed(ClassBracketed(span = span(0 until 5), negated = false, kind = union(span(1 until 4), mutableListOf(lit(span(1 until 2), ']'), ClassSetItem.Literal(Literal(span = span(2 until 4), kind = LiteralKind.Meta, c = '['))))))))) {
+    when (val matchVal25 = Pair(parser("[]\\[]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 5), negated = false, kind = union(span(1 until 4), mutableListOf(lit(span(1 until 2), ']'), ClassSetItem.Literal(Literal(span = span(2 until 4), kind = LiteralKind.Meta, c = '['.code.toUInt()))))))))) {
         else -> {
             val leftVal25 = matchVal25.first
             val rightVal25 = matchVal25.second
@@ -2690,7 +2698,7 @@ public fun parseSetClass() {
             }
         }
     }
-    when (val matchVal26 = Pair(parser("[\\[]]").parse(), Result.success(concat(0 until 5, mutableListOf(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = itemset(ClassSetItem.Literal(Literal(span = span(1 until 3), kind = LiteralKind.Meta, c = '['))))), Ast.literal(Literal(span = span(4 until 5), kind = LiteralKind.Verbatim, c = ']'))))))) {
+    when (val matchVal26 = Pair(parser("[\\[]]").parse(), Result.Ok(concat(0 until 5, mutableListOf(Ast.classBracketed(ClassBracketed(span = span(0 until 4), negated = false, kind = itemset(ClassSetItem.Literal(Literal(span = span(1 until 3), kind = LiteralKind.Meta, c = '['.code.toUInt()))))), Ast.literal(Literal(span = span(4 until 5), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))))) {
         else -> {
             val leftVal26 = matchVal26.first
             val rightVal26 = matchVal26.second
@@ -2703,7 +2711,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal27 = matchVal27.first
             val rightVal27 = matchVal27.second
-            if (!(leftVal27 == rightVal27)) {
+            if (!leftVal27.eq(rightVal27)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal27`\nright: `$rightVal27`\n\n")
             }
         }
@@ -2712,7 +2720,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal28 = matchVal28.first
             val rightVal28 = matchVal28.second
-            if (!(leftVal28 == rightVal28)) {
+            if (!leftVal28.eq(rightVal28)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal28`\nright: `$rightVal28`\n\n")
             }
         }
@@ -2721,7 +2729,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal29 = matchVal29.first
             val rightVal29 = matchVal29.second
-            if (!(leftVal29 == rightVal29)) {
+            if (!leftVal29.eq(rightVal29)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal29`\nright: `$rightVal29`\n\n")
             }
         }
@@ -2730,7 +2738,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal30 = matchVal30.first
             val rightVal30 = matchVal30.second
-            if (!(leftVal30 == rightVal30)) {
+            if (!leftVal30.eq(rightVal30)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal30`\nright: `$rightVal30`\n\n")
             }
         }
@@ -2739,7 +2747,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal31 = matchVal31.first
             val rightVal31 = matchVal31.second
-            if (!(leftVal31 == rightVal31)) {
+            if (!leftVal31.eq(rightVal31)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal31`\nright: `$rightVal31`\n\n")
             }
         }
@@ -2748,7 +2756,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal32 = matchVal32.first
             val rightVal32 = matchVal32.second
-            if (!(leftVal32 == rightVal32)) {
+            if (!leftVal32.eq(rightVal32)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal32`\nright: `$rightVal32`\n\n")
             }
         }
@@ -2757,7 +2765,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal33 = matchVal33.first
             val rightVal33 = matchVal33.second
-            if (!(leftVal33 == rightVal33)) {
+            if (!leftVal33.eq(rightVal33)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal33`\nright: `$rightVal33`\n\n")
             }
         }
@@ -2766,7 +2774,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal34 = matchVal34.first
             val rightVal34 = matchVal34.second
-            if (!(leftVal34 == rightVal34)) {
+            if (!leftVal34.eq(rightVal34)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal34`\nright: `$rightVal34`\n\n")
             }
         }
@@ -2775,7 +2783,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal35 = matchVal35.first
             val rightVal35 = matchVal35.second
-            if (!(leftVal35 == rightVal35)) {
+            if (!leftVal35.eq(rightVal35)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal35`\nright: `$rightVal35`\n\n")
             }
         }
@@ -2784,7 +2792,7 @@ public fun parseSetClass() {
         else -> {
             val leftVal36 = matchVal36.first
             val rightVal36 = matchVal36.second
-            if (!(leftVal36 == rightVal36)) {
+            if (!leftVal36.eq(rightVal36)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal36`\nright: `$rightVal36`\n\n")
             }
         }
@@ -2796,7 +2804,7 @@ public fun parseSetClassOpen() {
     when (val matchVal = Pair(parser("[a]").parseSetClassOpen(), run {
         val set = ClassBracketed(span = span(0 until 1), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
         val union = ClassSetUnion(span = span(1 until 1), items = mutableListOf())
-        Result.success(Pair(set, union))
+        Result.Ok(Pair(set, union))
     })) {
         else -> {
             val leftVal = matchVal.first
@@ -2809,7 +2817,7 @@ public fun parseSetClassOpen() {
     when (val matchVal1 = Pair(parserIgnoreWhitespace("[   a]").parseSetClassOpen(), run {
         val set1 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(4 until 4), items = mutableListOf())))
         val union1 = ClassSetUnion(span = span(4 until 4), items = mutableListOf())
-        Result.success(Pair(set1, union1))
+        Result.Ok(Pair(set1, union1))
     })) {
         else -> {
             val leftVal1 = matchVal1.first
@@ -2822,7 +2830,7 @@ public fun parseSetClassOpen() {
     when (val matchVal2 = Pair(parser("[^a]").parseSetClassOpen(), run {
         val set2 = ClassBracketed(span = span(0 until 2), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
         val union2 = ClassSetUnion(span = span(2 until 2), items = mutableListOf())
-        Result.success(Pair(set2, union2))
+        Result.Ok(Pair(set2, union2))
     })) {
         else -> {
             val leftVal2 = matchVal2.first
@@ -2835,7 +2843,7 @@ public fun parseSetClassOpen() {
     when (val matchVal3 = Pair(parserIgnoreWhitespace("[ ^ a]").parseSetClassOpen(), run {
         val set3 = ClassBracketed(span = span(0 until 4), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(4 until 4), items = mutableListOf())))
         val union3 = ClassSetUnion(span = span(4 until 4), items = mutableListOf())
-        Result.success(Pair(set3, union3))
+        Result.Ok(Pair(set3, union3))
     })) {
         else -> {
             val leftVal3 = matchVal3.first
@@ -2847,8 +2855,8 @@ public fun parseSetClassOpen() {
     }
     when (val matchVal4 = Pair(parser("[-a]").parseSetClassOpen(), run {
         val set4 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
-        val union4 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'))))
-        Result.success(Pair(set4, union4))
+        val union4 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+        Result.Ok(Pair(set4, union4))
     })) {
         else -> {
             val leftVal4 = matchVal4.first
@@ -2860,8 +2868,8 @@ public fun parseSetClassOpen() {
     }
     when (val matchVal5 = Pair(parserIgnoreWhitespace("[ - a]").parseSetClassOpen(), run {
         val set5 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
-        val union5 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'))))
-        Result.success(Pair(set5, union5))
+        val union5 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+        Result.Ok(Pair(set5, union5))
     })) {
         else -> {
             val leftVal5 = matchVal5.first
@@ -2873,8 +2881,8 @@ public fun parseSetClassOpen() {
     }
     when (val matchVal6 = Pair(parser("[^-a]").parseSetClassOpen(), run {
         val set6 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
-        val union6 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'))))
-        Result.success(Pair(set6, union6))
+        val union6 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+        Result.Ok(Pair(set6, union6))
     })) {
         else -> {
             val leftVal6 = matchVal6.first
@@ -2886,8 +2894,8 @@ public fun parseSetClassOpen() {
     }
     when (val matchVal7 = Pair(parser("[--a]").parseSetClassOpen(), run {
         val set7 = ClassBracketed(span = span(0 until 3), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
-        val union7 = ClassSetUnion(span = span(1 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-')), ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'))))
-        Result.success(Pair(set7, union7))
+        val union7 = ClassSetUnion(span = span(1 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt())), ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+        Result.Ok(Pair(set7, union7))
     })) {
         else -> {
             val leftVal7 = matchVal7.first
@@ -2899,8 +2907,8 @@ public fun parseSetClassOpen() {
     }
     when (val matchVal8 = Pair(parser("[]a]").parseSetClassOpen(), run {
         val set8 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
-        val union8 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = ']'))))
-        Result.success(Pair(set8, union8))
+        val union8 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
+        Result.Ok(Pair(set8, union8))
     })) {
         else -> {
             val leftVal8 = matchVal8.first
@@ -2912,8 +2920,8 @@ public fun parseSetClassOpen() {
     }
     when (val matchVal9 = Pair(parserIgnoreWhitespace("[ ] a]").parseSetClassOpen(), run {
         val set9 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
-        val union9 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'))))
-        Result.success(Pair(set9, union9))
+        val union9 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
+        Result.Ok(Pair(set9, union9))
     })) {
         else -> {
             val leftVal9 = matchVal9.first
@@ -2925,8 +2933,8 @@ public fun parseSetClassOpen() {
     }
     when (val matchVal10 = Pair(parser("[^]a]").parseSetClassOpen(), run {
         val set10 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
-        val union10 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'))))
-        Result.success(Pair(set10, union10))
+        val union10 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
+        Result.Ok(Pair(set10, union10))
     })) {
         else -> {
             val leftVal10 = matchVal10.first
@@ -2938,8 +2946,8 @@ public fun parseSetClassOpen() {
     }
     when (val matchVal11 = Pair(parser("[-]a]").parseSetClassOpen(), run {
         val set11 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
-        val union11 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'))))
-        Result.success(Pair(set11, union11))
+        val union11 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+        Result.Ok(Pair(set11, union11))
     })) {
         else -> {
             val leftVal11 = matchVal11.first
@@ -2953,7 +2961,7 @@ public fun parseSetClassOpen() {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
-            if (!(leftVal12 == rightVal12)) {
+            if (!leftVal12.eq(rightVal12)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal12`\nright: `$rightVal12`\n\n")
             }
         }
@@ -2962,7 +2970,7 @@ public fun parseSetClassOpen() {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
-            if (!(leftVal13 == rightVal13)) {
+            if (!leftVal13.eq(rightVal13)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal13`\nright: `$rightVal13`\n\n")
             }
         }
@@ -2971,7 +2979,7 @@ public fun parseSetClassOpen() {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
-            if (!(leftVal14 == rightVal14)) {
+            if (!leftVal14.eq(rightVal14)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal14`\nright: `$rightVal14`\n\n")
             }
         }
@@ -2980,7 +2988,7 @@ public fun parseSetClassOpen() {
         else -> {
             val leftVal15 = matchVal15.first
             val rightVal15 = matchVal15.second
-            if (!(leftVal15 == rightVal15)) {
+            if (!leftVal15.eq(rightVal15)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal15`\nright: `$rightVal15`\n\n")
             }
         }
@@ -2989,7 +2997,7 @@ public fun parseSetClassOpen() {
         else -> {
             val leftVal16 = matchVal16.first
             val rightVal16 = matchVal16.second
-            if (!(leftVal16 == rightVal16)) {
+            if (!leftVal16.eq(rightVal16)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal16`\nright: `$rightVal16`\n\n")
             }
         }
@@ -2998,7 +3006,7 @@ public fun parseSetClassOpen() {
         else -> {
             val leftVal17 = matchVal17.first
             val rightVal17 = matchVal17.second
-            if (!(leftVal17 == rightVal17)) {
+            if (!leftVal17.eq(rightVal17)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal17`\nright: `$rightVal17`\n\n")
             }
         }
@@ -3007,7 +3015,7 @@ public fun parseSetClassOpen() {
         else -> {
             val leftVal18 = matchVal18.first
             val rightVal18 = matchVal18.second
-            if (!(leftVal18 == rightVal18)) {
+            if (!leftVal18.eq(rightVal18)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal18`\nright: `$rightVal18`\n\n")
             }
         }
@@ -3161,7 +3169,7 @@ public fun maybeParseAsciiClass() {
 
 @kotlin.test.Test
 public fun parseUnicodeClass() {
-    when (val matchVal = Pair(parser("\\pN").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 3), negated = false, kind = ClassUnicodeKind.OneLetter('N')))))) {
+    when (val matchVal = Pair(parser("\\pN").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 3), negated = false, kind = ClassUnicodeKind.OneLetter('N'.code.toUInt())))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -3170,7 +3178,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("\\PN").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 3), negated = true, kind = ClassUnicodeKind.OneLetter('N')))))) {
+    when (val matchVal1 = Pair(parser("\\PN").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 3), negated = true, kind = ClassUnicodeKind.OneLetter('N'.code.toUInt())))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -3179,7 +3187,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("\\p{N}").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 5), negated = false, kind = ClassUnicodeKind.Named(s("N"))))))) {
+    when (val matchVal2 = Pair(parser("\\p{N}").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 5), negated = false, kind = ClassUnicodeKind.Named(s("N"))))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -3188,7 +3196,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("\\P{N}").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 5), negated = true, kind = ClassUnicodeKind.Named(s("N"))))))) {
+    when (val matchVal3 = Pair(parser("\\P{N}").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 5), negated = true, kind = ClassUnicodeKind.Named(s("N"))))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -3197,7 +3205,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("\\p{Greek}").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 9), negated = false, kind = ClassUnicodeKind.Named(s("Greek"))))))) {
+    when (val matchVal4 = Pair(parser("\\p{Greek}").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 9), negated = false, kind = ClassUnicodeKind.Named(s("Greek"))))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -3206,7 +3214,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("\\p{scx:Katakana}").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 16), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Colon, name = s("scx"), value = s("Katakana"))))))) {
+    when (val matchVal5 = Pair(parser("\\p{scx:Katakana}").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 16), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Colon, name = s("scx"), value = s("Katakana"))))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -3215,7 +3223,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("\\p{scx=Katakana}").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 16), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Equal, name = s("scx"), value = s("Katakana"))))))) {
+    when (val matchVal6 = Pair(parser("\\p{scx=Katakana}").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 16), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Equal, name = s("scx"), value = s("Katakana"))))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -3224,7 +3232,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("\\p{scx!=Katakana}").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 17), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.NotEqual, name = s("scx"), value = s("Katakana"))))))) {
+    when (val matchVal7 = Pair(parser("\\p{scx!=Katakana}").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 17), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.NotEqual, name = s("scx"), value = s("Katakana"))))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -3233,7 +3241,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal8 = Pair(parser("\\p{:}").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 5), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Colon, name = s(""), value = s(""))))))) {
+    when (val matchVal8 = Pair(parser("\\p{:}").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 5), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Colon, name = s(""), value = s(""))))))) {
         else -> {
             val leftVal8 = matchVal8.first
             val rightVal8 = matchVal8.second
@@ -3242,7 +3250,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal9 = Pair(parser("\\p{=}").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 5), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Equal, name = s(""), value = s(""))))))) {
+    when (val matchVal9 = Pair(parser("\\p{=}").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 5), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.Equal, name = s(""), value = s(""))))))) {
         else -> {
             val leftVal9 = matchVal9.first
             val rightVal9 = matchVal9.second
@@ -3251,7 +3259,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal10 = Pair(parser("\\p{!=}").parseEscape(), Result.success(Primitive.Unicode(ClassUnicode(span = span(0 until 6), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.NotEqual, name = s(""), value = s(""))))))) {
+    when (val matchVal10 = Pair(parser("\\p{!=}").parseEscape(), Result.Ok(Primitive.Unicode(ClassUnicode(span = span(0 until 6), negated = false, kind = ClassUnicodeKind.NamedValue(op = ClassUnicodeOpKind.NotEqual, name = s(""), value = s(""))))))) {
         else -> {
             val leftVal10 = matchVal10.first
             val rightVal10 = matchVal10.second
@@ -3264,7 +3272,7 @@ public fun parseUnicodeClass() {
         else -> {
             val leftVal11 = matchVal11.first
             val rightVal11 = matchVal11.second
-            if (!(leftVal11 == rightVal11)) {
+            if (!leftVal11.eq(rightVal11)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal11`\nright: `$rightVal11`\n\n")
             }
         }
@@ -3273,7 +3281,7 @@ public fun parseUnicodeClass() {
         else -> {
             val leftVal12 = matchVal12.first
             val rightVal12 = matchVal12.second
-            if (!(leftVal12 == rightVal12)) {
+            if (!leftVal12.eq(rightVal12)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal12`\nright: `$rightVal12`\n\n")
             }
         }
@@ -3282,7 +3290,7 @@ public fun parseUnicodeClass() {
         else -> {
             val leftVal13 = matchVal13.first
             val rightVal13 = matchVal13.second
-            if (!(leftVal13 == rightVal13)) {
+            if (!leftVal13.eq(rightVal13)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal13`\nright: `$rightVal13`\n\n")
             }
         }
@@ -3291,12 +3299,12 @@ public fun parseUnicodeClass() {
         else -> {
             val leftVal14 = matchVal14.first
             val rightVal14 = matchVal14.second
-            if (!(leftVal14 == rightVal14)) {
+            if (!leftVal14.eq(rightVal14)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal14`\nright: `$rightVal14`\n\n")
             }
         }
     }
-    when (val matchVal15 = Pair(parser("\\pNz").parse(), Result.success(Ast.concat(Concat(span = span(0 until 4), asts = mutableListOf(Ast.classUnicode(ClassUnicode(span = span(0 until 3), negated = false, kind = ClassUnicodeKind.OneLetter('N'))), Ast.literal(Literal(span = span(3 until 4), kind = LiteralKind.Verbatim, c = 'z')))))))) {
+    when (val matchVal15 = Pair(parser("\\pNz").parse(), Result.Ok(Ast.concat(Concat(span = span(0 until 4), asts = mutableListOf(Ast.classUnicode(ClassUnicode(span = span(0 until 3), negated = false, kind = ClassUnicodeKind.OneLetter('N'.code.toUInt()))), Ast.literal(Literal(span = span(3 until 4), kind = LiteralKind.Verbatim, c = 'z'.code.toUInt())))))))) {
         else -> {
             val leftVal15 = matchVal15.first
             val rightVal15 = matchVal15.second
@@ -3305,7 +3313,7 @@ public fun parseUnicodeClass() {
             }
         }
     }
-    when (val matchVal16 = Pair(parser("\\p{Greek}z").parse(), Result.success(Ast.concat(Concat(span = span(0 until 10), asts = mutableListOf(Ast.classUnicode(ClassUnicode(span = span(0 until 9), negated = false, kind = ClassUnicodeKind.Named(s("Greek")))), Ast.literal(Literal(span = span(9 until 10), kind = LiteralKind.Verbatim, c = 'z')))))))) {
+    when (val matchVal16 = Pair(parser("\\p{Greek}z").parse(), Result.Ok(Ast.concat(Concat(span = span(0 until 10), asts = mutableListOf(Ast.classUnicode(ClassUnicode(span = span(0 until 9), negated = false, kind = ClassUnicodeKind.Named(s("Greek")))), Ast.literal(Literal(span = span(9 until 10), kind = LiteralKind.Verbatim, c = 'z'.code.toUInt())))))))) {
         else -> {
             val leftVal16 = matchVal16.first
             val rightVal16 = matchVal16.second
@@ -3318,7 +3326,7 @@ public fun parseUnicodeClass() {
         else -> {
             val leftVal17 = matchVal17.first
             val rightVal17 = matchVal17.second
-            if (!(leftVal17 == rightVal17)) {
+            if (!leftVal17.eq(rightVal17)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal17`\nright: `$rightVal17`\n\n")
             }
         }
@@ -3327,7 +3335,7 @@ public fun parseUnicodeClass() {
         else -> {
             val leftVal18 = matchVal18.first
             val rightVal18 = matchVal18.second
-            if (!(leftVal18 == rightVal18)) {
+            if (!leftVal18.eq(rightVal18)) {
                 error("assertion failed: `(left == right)`\n\nleft:  `$leftVal18`\nright: `$rightVal18`\n\n")
             }
         }
@@ -3336,7 +3344,7 @@ public fun parseUnicodeClass() {
 
 @kotlin.test.Test
 public fun parsePerlClass() {
-    when (val matchVal = Pair(parser("\\d").parseEscape(), Result.success(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Digit, negated = false))))) {
+    when (val matchVal = Pair(parser("\\d").parseEscape(), Result.Ok(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Digit, negated = false))))) {
         else -> {
             val leftVal = matchVal.first
             val rightVal = matchVal.second
@@ -3345,7 +3353,7 @@ public fun parsePerlClass() {
             }
         }
     }
-    when (val matchVal1 = Pair(parser("\\D").parseEscape(), Result.success(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Digit, negated = true))))) {
+    when (val matchVal1 = Pair(parser("\\D").parseEscape(), Result.Ok(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Digit, negated = true))))) {
         else -> {
             val leftVal1 = matchVal1.first
             val rightVal1 = matchVal1.second
@@ -3354,7 +3362,7 @@ public fun parsePerlClass() {
             }
         }
     }
-    when (val matchVal2 = Pair(parser("\\s").parseEscape(), Result.success(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Space, negated = false))))) {
+    when (val matchVal2 = Pair(parser("\\s").parseEscape(), Result.Ok(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Space, negated = false))))) {
         else -> {
             val leftVal2 = matchVal2.first
             val rightVal2 = matchVal2.second
@@ -3363,7 +3371,7 @@ public fun parsePerlClass() {
             }
         }
     }
-    when (val matchVal3 = Pair(parser("\\S").parseEscape(), Result.success(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Space, negated = true))))) {
+    when (val matchVal3 = Pair(parser("\\S").parseEscape(), Result.Ok(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Space, negated = true))))) {
         else -> {
             val leftVal3 = matchVal3.first
             val rightVal3 = matchVal3.second
@@ -3372,7 +3380,7 @@ public fun parsePerlClass() {
             }
         }
     }
-    when (val matchVal4 = Pair(parser("\\w").parseEscape(), Result.success(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Word, negated = false))))) {
+    when (val matchVal4 = Pair(parser("\\w").parseEscape(), Result.Ok(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Word, negated = false))))) {
         else -> {
             val leftVal4 = matchVal4.first
             val rightVal4 = matchVal4.second
@@ -3381,7 +3389,7 @@ public fun parsePerlClass() {
             }
         }
     }
-    when (val matchVal5 = Pair(parser("\\W").parseEscape(), Result.success(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Word, negated = true))))) {
+    when (val matchVal5 = Pair(parser("\\W").parseEscape(), Result.Ok(Primitive.Perl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Word, negated = true))))) {
         else -> {
             val leftVal5 = matchVal5.first
             val rightVal5 = matchVal5.second
@@ -3390,7 +3398,7 @@ public fun parsePerlClass() {
             }
         }
     }
-    when (val matchVal6 = Pair(parser("\\d").parse(), Result.success(Ast.classPerl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Digit, negated = false))))) {
+    when (val matchVal6 = Pair(parser("\\d").parse(), Result.Ok(Ast.classPerl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Digit, negated = false))))) {
         else -> {
             val leftVal6 = matchVal6.first
             val rightVal6 = matchVal6.second
@@ -3399,7 +3407,7 @@ public fun parsePerlClass() {
             }
         }
     }
-    when (val matchVal7 = Pair(parser("\\dz").parse(), Result.success(Ast.concat(Concat(span = span(0 until 3), asts = mutableListOf(Ast.classPerl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Digit, negated = false)), Ast.literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = 'z')))))))) {
+    when (val matchVal7 = Pair(parser("\\dz").parse(), Result.Ok(Ast.concat(Concat(span = span(0 until 3), asts = mutableListOf(Ast.classPerl(ClassPerl(span = span(0 until 2), kind = ClassPerlKind.Digit, negated = false)), Ast.literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = 'z'.code.toUInt())))))))) {
         else -> {
             val leftVal7 = matchVal7.first
             val rightVal7 = matchVal7.second
@@ -3416,7 +3424,7 @@ public fun parsePerlClass() {
 @kotlin.test.Test
 public fun regression454NestTooBig() {
     val pattern = "\n        2(?:\n          [45]\\d{3}|\n          7(?:\n            1[0-267]|\n            2[0-289]|\n            3[0-29]|\n            4[01]|\n            5[1-3]|\n            6[013]|\n            7[0178]|\n            91\n          )|\n          8(?:\n            0[125]|\n            [139][1-6]|\n            2[0157-9]|\n            41|\n            6[1-35]|\n            7[1-5]|\n            8[1-8]|\n            90\n          )|\n          9(?:\n            0[0-2]|\n            1[0-4]|\n            2[568]|\n            3[3-6]|\n            5[5-7]|\n            6[0167]|\n            7[15]|\n            8[0146-9]\n          )\n        )\\d{4}\n        "
-    check(parserNestLimit(pattern, 50).parse().isOk())
+    check(parserNestLimit(pattern, 50u).parse().isOk())
 }
 
 // This tests that we treat a trailing `-` in a character class as a

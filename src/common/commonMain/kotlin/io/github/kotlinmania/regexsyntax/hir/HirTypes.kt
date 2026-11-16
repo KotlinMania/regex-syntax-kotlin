@@ -1,6 +1,9 @@
 package io.github.kotlinmania.regexsyntax.hir
 
 import io.github.kotlinmania.regexsyntax.debug.Byte
+import io.github.kotlinmania.regexsyntax.scalarEscapeDebug
+import io.github.kotlinmania.regexsyntax.unicode.CaseFoldError
+import io.github.kotlinmania.rustlang.core.result.Result
 
 /**
  * The type of an error that occurred while building an `Hir`.
@@ -66,6 +69,8 @@ public sealed class ErrorKind {
             }
         f.append(msg)
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 }
 
 /**
@@ -86,7 +91,7 @@ public sealed class HirKind {
     /**
      * A literal string that matches exactly these bytes.
      */
-    public data class Literal(public var value: Literal) : HirKind()
+    public data class Literal(public var value: io.github.kotlinmania.regexsyntax.hir.Literal) : HirKind()
     /**
      * A single character class that matches any of the characters in the
      * class. A class can either consist of Unicode scalar values as
@@ -94,19 +99,19 @@ public sealed class HirKind {
      *
      * A class may be empty. In which case, it matches nothing.
      */
-    public data class Class(public var value: Class) : HirKind()
+    public data class Class(public var value: io.github.kotlinmania.regexsyntax.hir.Class) : HirKind()
     /**
      * A look-around assertion. A look-around match always has zero length.
      */
-    public data class Look(public var value: Look) : HirKind()
+    public data class Look(public var value: io.github.kotlinmania.regexsyntax.hir.Look) : HirKind()
     /**
      * A repetition operation applied to a sub-expression.
      */
-    public data class Repetition(public var value: Repetition) : HirKind()
+    public data class Repetition(public var value: io.github.kotlinmania.regexsyntax.hir.Repetition) : HirKind()
     /**
      * A capturing group, which contains a sub-expression.
      */
-    public data class Capture(public var value: Capture) : HirKind()
+    public data class Capture(public var value: io.github.kotlinmania.regexsyntax.hir.Capture) : HirKind()
     /**
      * A concatenation of expressions.
      *
@@ -135,28 +140,31 @@ public sealed class HirKind {
      * Returns a slice of this kind's sub-expressions, if any.
      */
     public open fun subs(): List<Hir> =
-        when {
-            this == HirKind.Empty -> listOf()
-            this is HirKind.Literal -> listOf()
-            this is HirKind.Class -> listOf()
-            this is HirKind.Look -> listOf()
-            this is HirKind.Repetition -> {
-                val sub = this.value.sub
-                sub
-            }
-            this is HirKind.Capture -> {
-                val sub1 = this.value.sub
-                sub1
-            }
-            this is HirKind.Concat -> {
-                val (subs) = this
-                subs
-            }
-            else -> {
-                val (subs1) = this
-                subs1
-            }
+        when (this) {
+            is HirKind.Empty -> listOf()
+            is HirKind.Literal -> listOf()
+            is HirKind.Class -> listOf()
+            is HirKind.Look -> listOf()
+            is HirKind.Repetition -> listOf(this.value.sub)
+            is HirKind.Capture -> listOf(this.value.sub)
+            is HirKind.Concat -> this.value
+            is HirKind.Alternation -> this.value
         }
+
+    public open fun fmt(f: StringBuilder) {
+        when (this) {
+            is HirKind.Empty -> f.append("Empty")
+            is HirKind.Literal -> f.append("Literal(${this.value})")
+            is HirKind.Class -> f.append("Class(${this.value})")
+            is HirKind.Look -> f.append("Look(${this.value})")
+            is HirKind.Repetition -> f.append("Repetition(${this.value})")
+            is HirKind.Capture -> f.append("Capture(${this.value})")
+            is HirKind.Concat -> f.append("Concat(${this.value})")
+            is HirKind.Alternation -> f.append("Alternation(${this.value})")
+        }
+    }
+
+    override fun toString(): String = buildString { fmt(this) }
 }
 
 /**
@@ -239,18 +247,18 @@ public sealed class Class {
      * `unicode - case` feature is not enabled and the underlying class is
      * Unicode oriented.
      */
-    public open fun tryCaseFoldSimple(): Result<Unit> {
+    public open fun tryCaseFoldSimple(): Result<Unit, CaseFoldError> {
         when (this) {
             is Class.Unicode -> {
                 val (x) = this
-                x.tryCaseFoldSimple().getOrElse { return Result.failure(it) }
+                return x.tryCaseFoldSimple()
             }
             is Class.Bytes -> {
                 val (x1) = this
                 x1.caseFoldSimple()
             }
         }
-        return Result.success(Unit)
+        return Result.Ok(Unit)
     }
 
     /**
@@ -433,23 +441,25 @@ public sealed class Class {
         }
 
     public open fun fmt(f: StringBuilder) {
-        val fmter = object { val entries = mutableListOf<Any?>(); fun entry(v: Any?) = apply { entries.add(v) }; fun entries(iter: Iterable<*>) = apply { for (e in iter) entries.add(e) }; fun finish() { f.append(entries.joinToString(", ", "{", "}")) } }
+        val entries = mutableListOf<String>()
         when (this) {
             is Class.Unicode -> {
                 val (cls) = this
-                for (r in cls.ranges().iter()) {
-                    fmter.entry((r.start..r.end))
+                for (r in cls.ranges()) {
+                    entries.add("'${scalarEscapeDebug(r.start)}'..='${scalarEscapeDebug(r.end)}'")
                 }
             }
             is Class.Bytes -> {
                 val (cls1) = this
-                for (r1 in cls1.ranges().iter()) {
-                    fmter.entry((Byte(r1.start)..Byte(r1.end)))
+                for (r1 in cls1.ranges()) {
+                    entries.add("${Byte(r1.start)}..=${Byte(r1.end)}")
                 }
             }
         }
-        fmter.finish()
+        f.append(entries.joinToString(", ", "{", "}"))
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 }
 
 /**
@@ -607,9 +617,8 @@ public sealed class Look(
      * one started with within a semver compatible release of this crate.
      */
     public open fun asRepr(): UInt {
-        // AFAIK, 'as' is the only way to zero-cost convert an int enum to an
-        // actual int.
-        return this.toUInt()
+        // Direct conversion of the integer enum representation to UInt.
+        return this.value.toUInt()
     }
 
     /**
@@ -621,26 +630,26 @@ public sealed class Look(
      * human friendly but succinct output intended for a programmer working on
      * regex internals.
      */
-    public open fun asChar(): Char =
+    public open fun asChar(): UInt =
         when (this) {
-            Look.Start -> 'A'
-            Look.End -> 'z'
-            Look.StartLF -> '^'
-            Look.EndLF -> '$'
-            Look.StartCRLF -> 'r'
-            Look.EndCRLF -> 'R'
-            Look.WordAscii -> 'b'
-            Look.WordAsciiNegate -> 'B'
-            Look.WordUnicode -> 0x1d6c3
-            Look.WordUnicodeNegate -> 0x1d6a9
-            Look.WordStartAscii -> '<'
-            Look.WordEndAscii -> '>'
-            Look.WordStartUnicode -> '\u3008'
-            Look.WordEndUnicode -> '\u3009'
-            Look.WordStartHalfAscii -> '\u25c1'
-            Look.WordEndHalfAscii -> '\u25b7'
-            Look.WordStartHalfUnicode -> '\u25c0'
-            Look.WordEndHalfUnicode -> '\u25b6'
+            Look.Start -> 'A'.code.toUInt()
+            Look.End -> 'z'.code.toUInt()
+            Look.StartLF -> '^'.code.toUInt()
+            Look.EndLF -> '$'.code.toUInt()
+            Look.StartCRLF -> 'r'.code.toUInt()
+            Look.EndCRLF -> 'R'.code.toUInt()
+            Look.WordAscii -> 'b'.code.toUInt()
+            Look.WordAsciiNegate -> 'B'.code.toUInt()
+            Look.WordUnicode -> 0x1D6C3u
+            Look.WordUnicodeNegate -> 0x1D6A9u
+            Look.WordStartAscii -> '<'.code.toUInt()
+            Look.WordEndAscii -> '>'.code.toUInt()
+            Look.WordStartUnicode -> '\u3008'.code.toUInt()
+            Look.WordEndUnicode -> '\u3009'.code.toUInt()
+            Look.WordStartHalfAscii -> '\u25c1'.code.toUInt()
+            Look.WordEndHalfAscii -> '\u25b7'.code.toUInt()
+            Look.WordStartHalfUnicode -> '\u25c0'.code.toUInt()
+            Look.WordEndHalfUnicode -> '\u25b6'.code.toUInt()
         }
 
     public companion object {
@@ -651,24 +660,24 @@ public sealed class Look(
          */
         public fun fromRepr(repr: UInt): Look? =
             when (repr) {
-                0x1 -> Look.Start
-                0x2 -> Look.End
-                0x4 -> Look.StartLF
-                0x8 -> Look.EndLF
-                0x10 -> Look.StartCRLF
-                0x20 -> Look.EndCRLF
-                0x40 -> Look.WordAscii
-                0x80 -> Look.WordAsciiNegate
-                0x100 -> Look.WordUnicode
-                0x200 -> Look.WordUnicodeNegate
-                0x400 -> Look.WordStartAscii
-                0x800 -> Look.WordEndAscii
-                0x1000 -> Look.WordStartUnicode
-                0x2000 -> Look.WordEndUnicode
-                0x4000 -> Look.WordStartHalfAscii
-                0x8000 -> Look.WordEndHalfAscii
-                0x10000 -> Look.WordStartHalfUnicode
-                0x20000 -> Look.WordEndHalfUnicode
+                0x1u -> Look.Start
+                0x2u -> Look.End
+                0x4u -> Look.StartLF
+                0x8u -> Look.EndLF
+                0x10u -> Look.StartCRLF
+                0x20u -> Look.EndCRLF
+                0x40u -> Look.WordAscii
+                0x80u -> Look.WordAsciiNegate
+                0x100u -> Look.WordUnicode
+                0x200u -> Look.WordUnicodeNegate
+                0x400u -> Look.WordStartAscii
+                0x800u -> Look.WordEndAscii
+                0x1000u -> Look.WordStartUnicode
+                0x2000u -> Look.WordEndUnicode
+                0x4000u -> Look.WordStartHalfAscii
+                0x8000u -> Look.WordEndHalfAscii
+                0x10000u -> Look.WordStartHalfUnicode
+                0x20000u -> Look.WordEndHalfUnicode
                 else -> null
             }
     }
@@ -706,7 +715,7 @@ public sealed class Dot {
      * (This and `AnyCharExceptLF` both exist because of legacy reasons.
      * `AnyCharExceptLF` will be dropped in the next breaking change release.)
      */
-    public data class AnyCharExcept(public var value: Char) : Dot()
+    public data class AnyCharExcept(public var value: UInt) : Dot()
     /**
      * Matches the UTF-8 encoding of any Unicode scalar value except for `\n`.
      *

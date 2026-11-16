@@ -1,19 +1,29 @@
 package io.github.kotlinmania.regexsyntax.hir
 
+import io.github.kotlinmania.regexsyntax.appendScalar
 import io.github.kotlinmania.regexsyntax.ast.Span
-import io.github.kotlinmania.regexsyntax.debug.Byte
 import io.github.kotlinmania.regexsyntax.debug.Bytes
-import io.github.kotlinmania.regexsyntax.from
+import io.github.kotlinmania.regexsyntax.encodeScalarUtf8List
+import io.github.kotlinmania.regexsyntax.error.fromFormatterErrorKind
+import io.github.kotlinmania.regexsyntax.formatHexUpper
+import io.github.kotlinmania.regexsyntax.hir.interval.Bound
 import io.github.kotlinmania.regexsyntax.hir.interval.Interval
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSet
 import io.github.kotlinmania.regexsyntax.hir.interval.IntervalSetIter
+import io.github.kotlinmania.regexsyntax.hir.interval.ScalarBound
+import io.github.kotlinmania.regexsyntax.hir.interval.UByteBound
 import io.github.kotlinmania.regexsyntax.hir.print.Printer
-import io.github.kotlinmania.regexsyntax.hir.visitor.visit
-import io.github.kotlinmania.rustlang.core.mem.ObjectSlotLayout
-import io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts
-import io.github.kotlinmania.rustlang.core.mem.TypeLayout
+import io.github.kotlinmania.regexsyntax.isValidUtf8
+import io.github.kotlinmania.regexsyntax.scalarFromU32
+import io.github.kotlinmania.regexsyntax.scalarIsControl
+import io.github.kotlinmania.regexsyntax.scalarIsWhitespace
+import io.github.kotlinmania.regexsyntax.scalarLenUtf8
+import io.github.kotlinmania.regexsyntax.scalarToString
+import io.github.kotlinmania.regexsyntax.unicode.CaseFoldError
+import io.github.kotlinmania.regexsyntax.unicode.SimpleCaseFolder
+import io.github.kotlinmania.rustlang.core.result.Result
 
-public class DebugStruct(
+internal class DebugStruct(
     private val out: StringBuilder,
     private val name: String,
 ) {
@@ -45,17 +55,17 @@ public open class Error(
     /**
      * The kind of error.
      */
-    public var kind: ErrorKind,
+    internal var kind: ErrorKind,
     /**
      * The original pattern that the translator's Ast was parsed from. Every
      * span in an error is a valid range into this string.
      */
-    public var pattern: String,
+    internal var pattern: String,
     /**
      * The span of this error, derived from the Ast given to the translator.
      */
-    public var span: Span,
-) : Error {
+    internal var span: Span,
+) : Exception() {
     /**
      * Return the type of this error.
      */
@@ -74,8 +84,20 @@ public open class Error(
     public open fun span(): Span = this.span
 
     public open fun fmt(f: StringBuilder) {
-        from(this).fmt(f)
+        fromFormatterErrorKind(this).fmt(f)
     }
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is Error && this.kind == other.kind && this.pattern == other.pattern && this.span == other.span)
+
+    override fun hashCode(): Int {
+        var result = this.kind.hashCode()
+        result = 31 * result + this.pattern.hashCode()
+        result = 31 * result + this.span.hashCode()
+        return result
+    }
+
+    override fun toString(): String = buildString { fmt(this) }
 }
 
 /**
@@ -164,7 +186,11 @@ public open class Hir(
      * Consumes ownership of this HIR expression and returns its underlying
      * `HirKind`.
      */
-    public open fun intoKind(): HirKind = replace(this.kind, HirKind.Empty)
+    public open fun intoKind(): HirKind {
+        val k = this.kind
+        this.kind = HirKind.Empty
+        return k
+    }
 
     /**
      * Returns the properties computed for this `Hir`.
@@ -177,7 +203,13 @@ public open class Hir(
      * This is useful because `val Hir { kind, props } = hir;` does not work
      * because of `Hir`s custom `Drop` implementation.
      */
-    public open fun intoParts(): Pair<HirKind, Properties> = Pair(replace(this.kind, HirKind.Empty), replace(this.props, Properties.empty()))
+    public open fun intoParts(): Pair<HirKind, Properties> {
+        val k = this.kind
+        val p = this.props
+        this.kind = HirKind.Empty
+        this.props = Properties.empty()
+        return Pair(k, p)
+    }
 
     public open fun fmt(f: StringBuilder) {
         this.kind.fmt(f)
@@ -195,62 +227,50 @@ public open class Hir(
         Printer.new().print(this, f)
     }
 
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is Hir && this.kind == other.kind && this.props == other.props)
+
+    override fun hashCode(): Int {
+        var result = this.kind.hashCode()
+        result = 31 * result + this.props.hashCode()
+        return result
+    }
+
+    override fun toString(): String = buildString { fmtDisplay(this) }
+
     /**
      * A custom `Drop` impl is used for `HirKind` such that it uses constant stack
      * space but heap space proportional to the depth of the total `Hir`.
      */
     public open fun drop() {
-        run {
-            val matchVal = this.kind()
-            when {
-                matchVal == HirKind.Empty -> { return }
-                matchVal is HirKind.Literal -> { return }
-                matchVal is HirKind.Class -> { return }
-                matchVal is HirKind.Look -> { return }
-                matchVal is HirKind.Capture && (matchVal as HirKind.Capture).value.sub.kind.subs().isEmpty() -> {
-                    val (x) = matchVal
-                    return
-                }
-                matchVal is HirKind.Repetition && (matchVal as HirKind.Repetition).value.sub.kind.subs().isEmpty() -> {
-                    val (x1) = matchVal
-                    return
-                }
-                matchVal is HirKind.Concat && (matchVal as HirKind.Concat).value.isEmpty() -> {
-                    val (x2) = matchVal
-                    return
-                }
-                matchVal is HirKind.Alternation && (matchVal as HirKind.Alternation).value.isEmpty() -> {
-                    val (x3) = matchVal
-                    return
-                }
-                else -> {}
-            }
+        when (val matchVal = this.kind()) {
+            is HirKind.Empty, is HirKind.Literal, is HirKind.Class, is HirKind.Look -> return
+            is HirKind.Capture -> if (matchVal.value.sub.kind.subs().isEmpty()) return
+            is HirKind.Repetition -> if (matchVal.value.sub.kind.subs().isEmpty()) return
+            is HirKind.Concat -> if (matchVal.value.isEmpty()) return
+            is HirKind.Alternation -> if (matchVal.value.isEmpty()) return
         }
-        val stack = mutableListOf(mem.replace(this, Hir.empty()))
-        while (true) {
-            val matchVal1 = stack.removeLastOrNull()
-            if (matchVal1 == null) break
-            val expr = matchVal1
+        val (rootKind, rootProps) = this.intoParts()
+        val stack = mutableListOf(Hir(kind = rootKind, props = rootProps))
+        while (stack.isNotEmpty()) {
+            val expr = stack.removeLast()
             when (val matchVal2 = expr.kind) {
-                HirKind.Empty -> {}
-                is HirKind.Literal -> {}
-                is HirKind.Class -> {}
-                is HirKind.Look -> {}
+                HirKind.Empty, is HirKind.Literal, is HirKind.Class, is HirKind.Look -> {}
                 is HirKind.Capture -> {
-                    val (x4) = matchVal2
-                    stack.add(mem.replace(x4.sub, Hir.empty()))
+                    val (ck, cp) = matchVal2.value.sub.intoParts()
+                    stack.add(Hir(kind = ck, props = cp))
                 }
                 is HirKind.Repetition -> {
-                    val (x5) = matchVal2
-                    stack.add(mem.replace(x5.sub, Hir.empty()))
+                    val (rk, rp) = matchVal2.value.sub.intoParts()
+                    stack.add(Hir(kind = rk, props = rp))
                 }
                 is HirKind.Concat -> {
-                    val (x6) = matchVal2
-                    stack.extend(x6.drain(0 until 0))
+                    stack.addAll(matchVal2.value)
+                    matchVal2.value = emptyList()
                 }
                 is HirKind.Alternation -> {
-                    val (x7) = matchVal2
-                    stack.extend(x7.drain(0 until 0))
+                    stack.addAll(matchVal2.value)
+                    matchVal2.value = emptyList()
                 }
             }
         }
@@ -356,7 +376,7 @@ public open class Hir(
                 return Hir.empty()
             }
             val lit1 = Literal(bytes)
-            val props = Properties.Literal(lit1)
+            val props = Properties.literal(lit1)
             return Hir(kind = HirKind.Literal(lit1), props = props)
         }
 
@@ -374,7 +394,7 @@ public open class Hir(
                 null -> {}
                 else -> {
                     val bytes = matchVal
-                    return Hir.Literal(bytes)
+                    return Hir.literal(bytes)
                 }
             }
             val props = Properties.cls(cls)
@@ -397,19 +417,19 @@ public open class Hir(
             // string, then we force its maximum to be at most 1.
             if (rep.sub.properties().maximumLen() == 0) {
                 rep.min = minOf(rep.min, 1u)
-                rep.max = (rep.max?.let({ n -> minOf(n, 1) }) ?: 1)
+                rep.max = rep.max?.let { n -> minOf(n, 1u) } ?: 1u
             }
-            // The regex a{0}' is always equivalent to the empty regex. This is
-            // true even when 'a' is an expression that never matches anything
-            // (like '\P{any}').
+            // The regex `a{0}` is always equivalent to the empty regex. This is
+            // true even when `a` is an expression that never matches anything
+            // (like `\P{any}`).
             //
-            // Additionally, the regex a{1}' is always equivalent to 'a'.
-            if (rep.min == 0u && rep.max == 0) {
+            // Additionally, the regex `a{1}` is always equivalent to `a`.
+            if (rep.min == 0u && rep.max == 0u) {
                 return Hir.empty()
-            } else if (rep.min == 1u && rep.max == 1) {
+            } else if (rep.min == 1u && rep.max == 1u) {
                 return rep.sub
             }
-            val props = Properties.Repetition(rep)
+            val props = Properties.repetition(rep)
             return Hir(kind = HirKind.Repetition(rep), props = props)
         }
 
@@ -438,30 +458,28 @@ public open class Hir(
          * and literals.
          *
          * ```kotlin
-         * val hir = Hir.concat(mutableListOf(Hir.concat(mutableListOf(Hir.Literal(listOf(97u)), Hir.Literal(listOf(98u)), Hir.Literal(listOf(99u)))), Hir.concat(mutableListOf(Hir.Literal(listOf(120u)), Hir.Literal(listOf(121u)), Hir.Literal(listOf(122u))))))
-         * val expected = Hir.Literal("abcxyz".encodeToByteArray().map { it.toUByte() })
+         * val hir = Hir.concat(listOf(Hir.concat(listOf(Hir.literal(listOf(97u)), Hir.literal(listOf(98u)), Hir.literal(listOf(99u)))), Hir.concat(listOf(Hir.literal(listOf(120u)), Hir.literal(listOf(121u)), Hir.literal(listOf(122u))))))
+         * val expected = Hir.literal("abcxyz".encodeToByteArray().map { it.toUByte() })
          * check(expected == hir)
          * ```
          */
         public fun concat(subs: List<Hir>): Hir {
-            // We rebuild the concatenation by simplifying it. Would be nice to do
-            // it in place, but that seems a little tricky?
-            val new = mutableListOf()
+            // We rebuild the concatenation by simplifying it.
+            val new = mutableListOf<Hir>()
             // This gobbles up any adjacent literals in a concatenation and smushes
             // them together. Basically, when we see a literal, we add its bytes
-            // to 'priorLit', and whenever we see anything else, we first take
-            // any bytes in 'priorLit' and add it to the 'new' concatenation.
-            var priorLit: List<UByte>? = null
+            // to `priorLit`, and whenever we see anything else, we first take
+            // any bytes in `priorLit` and add it to the `new` concatenation.
+            var priorLit: MutableList<UByte>? = null
             for (sub in subs) {
                 val (kind, props) = sub.intoParts()
                 when {
-                    kind is HirKind.Literal && kind.value is Literal -> {
-                        val (bytes) = kind.value as Literal
+                    kind is HirKind.Literal -> {
+                        val bytes = kind.value.value
                         if (priorLit != null) {
-                            val priorBytes = priorLit
-                            priorBytes.extendFromSlice(bytes)
+                            priorLit.addAll(bytes)
                         } else {
-                            priorLit = bytes.toVec()
+                            priorLit = bytes.toMutableList()
                         }
                     }
                     // We also flatten concats that are direct children of another
@@ -469,29 +487,25 @@ public open class Hir(
                     // Hir.concat is the only way to build concatenations, and so
                     // flattening happens inductively.
                     kind is HirKind.Concat -> {
-                        val (subs2) = kind
+                        val subs2 = kind.value
                         for (sub2 in subs2) {
                             val (kind2, props2) = sub2.intoParts()
                             when {
-                                kind2 is HirKind.Literal && kind2.value is Literal -> {
-                                    val (bytes1) = kind2.value as Literal
+                                kind2 is HirKind.Literal -> {
+                                    val bytes1 = kind2.value.value
                                     if (priorLit != null) {
-                                        val priorBytes1 = priorLit
-                                        priorBytes1.extendFromSlice(bytes1)
+                                        priorLit.addAll(bytes1)
                                     } else {
-                                        priorLit = bytes1.toVec()
+                                        priorLit = bytes1.toMutableList()
                                     }
                                 }
                                 else -> {
-                                    val kind21 = kind2
-                                    when (val matchVal = priorLit.also { priorLit = null }) {
-                                        null -> {}
-                                        else -> {
-                                            val priorBytes2 = matchVal
-                                            new.add(Hir.Literal(priorBytes2))
-                                        }
+                                    val taken = priorLit
+                                    priorLit = null
+                                    if (taken != null) {
+                                        new.add(Hir.literal(taken))
                                     }
-                                    new.add(Hir(kind = kind21, props = props2))
+                                    new.add(Hir(kind = kind2, props = props2))
                                 }
                             }
                         }
@@ -499,24 +513,19 @@ public open class Hir(
                     // We can just skip empty HIRs.
                     kind == HirKind.Empty -> {}
                     else -> {
-                        val kind1 = kind
-                        when (val matchVal1 = priorLit.also { priorLit = null }) {
-                            null -> {}
-                            else -> {
-                                val priorBytes3 = matchVal1
-                                new.add(Hir.Literal(priorBytes3))
-                            }
+                        val taken = priorLit
+                        priorLit = null
+                        if (taken != null) {
+                            new.add(Hir.literal(taken))
                         }
-                        new.add(Hir(kind = kind1, props = props))
+                        new.add(Hir(kind = kind, props = props))
                     }
                 }
             }
-            when (val matchVal2 = priorLit.also { priorLit = null }) {
-                null -> {}
-                else -> {
-                    val priorBytes4 = matchVal2
-                    new.add(Hir.Literal(priorBytes4))
-                }
+            val takenTail = priorLit
+            priorLit = null
+            if (takenTail != null) {
+                new.add(Hir.literal(takenTail))
             }
             if (new.isEmpty()) {
                 return Hir.empty()
@@ -539,43 +548,21 @@ public open class Hir(
          * alternation with a single sub-expression, in the concrete syntax of a
          * regex.)
          *
-         * # Example
-         *
-         * This is a simple example showing how an alternation might get
-         * simplified.
-         *
-         * ```kotlin
-         * val hir = Hir.alternation(mutableListOf(Hir.Literal(listOf(97u)), Hir.Literal(listOf(98u)), Hir.Literal(listOf(99u)), Hir.Literal(listOf(100u)), Hir.Literal(listOf(101u)), Hir.Literal(listOf(102u))))
-         * val expected = Hir.Class(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new('a', 'f')))))
-         * check(expected == hir)
-         * ```
-         *
-         * And another example showing how common prefixes might get factored
-         * out.
-         *
-         * ```kotlin
-         * val hir = Hir.alternation(mutableListOf(Hir.concat(mutableListOf(Hir.Literal("abc".encodeToByteArray().map { it.toUByte() }), Hir.Class(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new('A', 'Z'))))))), Hir.concat(mutableListOf(Hir.Literal("abc".encodeToByteArray().map { it.toUByte() }), Hir.Class(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new('a', 'z')))))))))
-         * val expected = Hir.concat(mutableListOf(Hir.Literal("abc".encodeToByteArray().map { it.toUByte() }), Hir.alternation(mutableListOf(Hir.Class(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new('A', 'Z'))))), Hir.Class(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new('a', 'z')))))))))
-         * check(expected == hir)
-         * ```
-         *
          * Note that these sorts of simplifications are not guaranteed.
          */
         public fun alternation(subs: List<Hir>): Hir {
             // We rebuild the alternation by simplifying it. We proceed similarly
             // as the concatenation case. But in this case, there's no literal
             // simplification happening. We're just flattening alternations.
-            var new = ArrayList(subs.size)
+            var new = ArrayList<Hir>(subs.size)
             for (sub in subs) {
                 val (kind, props) = sub.intoParts()
                 when (kind) {
                     is HirKind.Alternation -> {
-                        val (subs2) = kind
-                        new.extend(subs2)
+                        new.addAll(kind.value)
                     }
                     else -> {
-                        val kind1 = kind
-                        new.add(Hir(kind = kind1, props = props))
+                        new.add(Hir(kind = kind, props = props))
                     }
                 }
             }
@@ -585,60 +572,47 @@ public open class Hir(
                 return new.removeLastOrNull()!!
             }
             // Now that it's completely flattened, look for the special case of
-            // char1|char2|...|charN' and collapse that into a class. Note that
-            // we look for 'char' first and then bytes. The issue here is that if
+            // `char1|char2|...|charN` and collapse that into a class. Note that
+            // we look for scalar codepoints first and then bytes. The issue here is that if
             // we find both non-ASCII codepoints and non-ASCII singleton bytes,
             // then it isn't actually possible to smush them into a single class.
             // (Because classes are either "all codepoints" or "all bytes." You
             // can have a class that both matches non-ASCII but valid UTF-8 and
-            // invalid UTF-8.) So we look for all chars and then all bytes, and
+            // invalid UTF-8.) So we look for all scalars and then all bytes, and
             // don't handle anything else.
-            when (val matchVal = singletonChars(new)) {
+            when (val singletons = singletonChars(new)) {
                 null -> {}
                 else -> {
-                    val singletons = matchVal
-                    val it = singletons.map({ ch -> ClassUnicodeRange(start = ch, end = ch) })
-                    return Hir.Class(Class.Unicode(ClassUnicode.new(it)))
+                    val it = singletons.map { ch -> ClassUnicodeRange(start = ch, end = ch) }
+                    return Hir.cls(Class.Unicode(ClassUnicode.new(it)))
                 }
             }
-            when (val matchVal1 = singletonBytes(new)) {
+            when (val singletons1 = singletonBytes(new)) {
                 null -> {}
                 else -> {
-                    val singletons1 = matchVal1
-                    val it1 = singletons1.map({ b -> ClassBytesRange(start = b, end = b) })
-                    return Hir.Class(Class.Bytes(ClassBytes.new(it1)))
+                    val it1 = singletons1.map { b -> ClassBytesRange(start = b, end = b) }
+                    return Hir.cls(Class.Bytes(ClassBytes.new(it1)))
                 }
             }
-            // Similar to singleton chars, we can also look for alternations of
+            // Similar to singleton scalars, we can also look for alternations of
             // classes. Those can be smushed into a single class.
-            when (val matchVal2 = classChars(new)) {
+            when (val cls = classChars(new)) {
                 null -> {}
-                else -> {
-                    val cls = matchVal2
-                    return Hir.Class(cls)
-                }
+                else -> return Hir.cls(cls)
             }
-            when (val matchVal3 = classBytes(new)) {
+            when (val cls1 = classBytes(new)) {
                 null -> {}
-                else -> {
-                    val cls1 = matchVal3
-                    return Hir.Class(cls1)
-                }
+                else -> return Hir.cls(cls1)
             }
             // Factor out a common prefix if we can, which might potentially
             // simplify the expression and unlock other optimizations downstream.
             // It also might generally make NFA matching and DFA construction
             // faster by reducing the scope of branching in the regex.
-            new = run {
-                val matchVal4 = liftCommonPrefix(new)
-                if (matchVal4.isSuccess) {
-                    val hir = matchVal4.getOrThrow()
-                    return hir
-                } else {
-                    val unchanged = matchVal4.exceptionOrNull()!!
-                    unchanged
+            new =
+                when (val lifted = liftCommonPrefix(new)) {
+                    is Result.Ok -> return lifted.value
+                    is Result.Err -> lifted.error as ArrayList<Hir>
                 }
-            }
             val props1 = Properties.alternation(new)
             return Hir(kind = HirKind.Alternation(new), props = props1)
         }
@@ -660,38 +634,38 @@ public open class Hir(
          * HIR value. It is just an abbreviation for a common character class.
          *
          * ```kotlin
-         * val hir = Hir.Dot(Dot.AnyByte)
-         * val expected = Hir.Class(Class.Bytes(ClassBytes.new(listOf(ClassBytesRange.new(0x00u, 0xFFu)))))
+         * val hir = Hir.dot(Dot.AnyByte)
+         * val expected = Hir.cls(Class.Bytes(ClassBytes.new(listOf(ClassBytesRange.new(0x00u, 0xFFu)))))
          * check(expected == hir)
          * ```
          */
         public fun dot(dot: Dot): Hir =
             when (dot) {
-                Dot.AnyChar -> Hir.Class(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new('\u0000', 0x10ffff)))))
-                Dot.AnyByte -> Hir.Class(Class.Bytes(ClassBytes.new(listOf(ClassBytesRange.new(0u, 255u)))))
+                Dot.AnyChar -> Hir.cls(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new(0x00u, 0x10FFFFu)))))
+                Dot.AnyByte -> Hir.cls(Class.Bytes(ClassBytes.new(listOf(ClassBytesRange.new(0u, 255u)))))
                 is Dot.AnyCharExcept -> {
                     val (ch) = dot
-                    var cls = ClassUnicode.new(listOf(ClassUnicodeRange.new(ch, ch)))
+                    val cls = ClassUnicode.new(listOf(ClassUnicodeRange.new(ch, ch)))
                     cls.negate()
-                    Hir.Class(Class.Unicode(cls))
+                    Hir.cls(Class.Unicode(cls))
                 }
                 Dot.AnyCharExceptLF -> {
-                    Hir.Class(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new('\u0000', '\t'), ClassUnicodeRange.new('\u000b', 0x10ffff)))))
+                    Hir.cls(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new(0x00u, 0x09u), ClassUnicodeRange.new(0x0Bu, 0x10FFFFu)))))
                 }
                 Dot.AnyCharExceptCRLF -> {
-                    Hir.Class(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new('\u0000', '\t'), ClassUnicodeRange.new('\u000b', '\u000c'), ClassUnicodeRange.new('\u000e', 0x10ffff)))))
+                    Hir.cls(Class.Unicode(ClassUnicode.new(listOf(ClassUnicodeRange.new(0x00u, 0x09u), ClassUnicodeRange.new(0x0Bu, 0x0Cu), ClassUnicodeRange.new(0x0Eu, 0x10FFFFu)))))
                 }
                 is Dot.AnyByteExcept -> {
                     val (byte) = dot
-                    var cls1 = ClassBytes.new(listOf(ClassBytesRange.new(byte, byte)))
+                    val cls1 = ClassBytes.new(listOf(ClassBytesRange.new(byte, byte)))
                     cls1.negate()
-                    Hir.Class(Class.Bytes(cls1))
+                    Hir.cls(Class.Bytes(cls1))
                 }
                 Dot.AnyByteExceptLF -> {
-                    Hir.Class(Class.Bytes(ClassBytes.new(listOf(ClassBytesRange.new(0u, 9u), ClassBytesRange.new(11u, 255u)))))
+                    Hir.cls(Class.Bytes(ClassBytes.new(listOf(ClassBytesRange.new(0u, 9u), ClassBytesRange.new(11u, 255u)))))
                 }
                 Dot.AnyByteExceptCRLF -> {
-                    Hir.Class(Class.Bytes(ClassBytes.new(listOf(ClassBytesRange.new(0u, 9u), ClassBytesRange.new(11u, 12u), ClassBytesRange.new(14u, 255u)))))
+                    Hir.cls(Class.Bytes(ClassBytes.new(listOf(ClassBytesRange.new(0u, 9u), ClassBytesRange.new(11u, 12u), ClassBytesRange.new(14u, 255u)))))
                 }
             }
     }
@@ -712,7 +686,7 @@ public open class Hir(
 public open class Literal(
     public var value: List<UByte>,
 ) {
-    public var field0: List<UByte>
+    internal var field0: List<UByte>
         get() = value
         set(v) {
             value = v
@@ -721,16 +695,22 @@ public open class Literal(
     public open fun fmt(f: StringBuilder) {
         Bytes(this.value).fmt(f)
     }
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is Literal && this.value == other.value)
+
+    override fun hashCode(): Int = this.value.hashCode()
+
+    override fun toString(): String = buildString { fmt(this) }
 }
 
 /**
  * A set of characters represented by Unicode scalar values.
  */
 public open class ClassUnicode internal constructor(
-    setCtorArg: IntervalSet<ClassUnicodeRange>,
+    setCtorArg: IntervalSet<ClassUnicodeRange, UInt>,
 ) {
-    public var set: IntervalSet<ClassUnicodeRange> = setCtorArg
-        internal set
+    internal var set: IntervalSet<ClassUnicodeRange, UInt> = setCtorArg
 
     /**
      * Add a new range to this set.
@@ -760,14 +740,17 @@ public open class ClassUnicode internal constructor(
      * # Panics
      *
      * This routine panics when the case mapping data necessary for this
-     * routine to complete is unavailable. This occurs when the `unicode - case`
+     * routine to complete is unavailable. This occurs when the `unicode-case`
      * feature is not enabled.
      *
      * Callers should prefer using `tryCaseFoldSimple` instead, which will
      * return an error instead of panicking.
      */
     public open fun caseFoldSimple() {
-        this.set.caseFoldSimple().expect("unicode-case feature must be enabled")
+        when (this.set.caseFoldSimple()) {
+            is Result.Ok -> {}
+            is Result.Err -> error("unicode-case feature must be enabled")
+        }
     }
 
     /**
@@ -780,9 +763,9 @@ public open class ClassUnicode internal constructor(
      *
      * This routine returns an error when the case mapping data necessary
      * for this routine to complete is unavailable. This occurs when the
-     * `unicode - case` feature is not enabled.
+     * `unicode-case` feature is not enabled.
      */
-    public open fun tryCaseFoldSimple(): Result<Unit> = this.set.caseFoldSimple()
+    public open fun tryCaseFoldSimple(): Result<Unit, CaseFoldError> = this.set.caseFoldSimple()
 
     /**
      * Negate this character class.
@@ -822,7 +805,7 @@ public open class ClassUnicode internal constructor(
      *
      * This computes the symmetric difference of two character classes. This
      * removes all elements in this class that are also in the given class,
-     * but all adds all elements from the given class that aren't in this
+     * but adds all elements from the given class that aren't in this
      * class. That is, the class will contain all elements in either class,
      * but will not contain any elements that are in both classes.
      */
@@ -835,7 +818,7 @@ public open class ClassUnicode internal constructor(
      * nothing or only ASCII bytes. Stated differently, this returns false
      * if and only if this class contains a non-ASCII codepoint.
      */
-    public open fun isAscii(): Boolean = (this.set.intervals().last()?.let({ r -> r.end <= '\u007f' }) ?: true)
+    public open fun isAscii(): Boolean = this.set.intervals().lastOrNull()?.let { r -> r.end <= 0x7Fu } ?: true
 
     /**
      * Returns the length, in bytes, of the smallest string matched by this
@@ -844,9 +827,9 @@ public open class ClassUnicode internal constructor(
      * Returns `None` when the class is empty.
      */
     public open fun minimumLen(): Int? {
-        val first = (this.ranges().get(0) ?: return null)
-        // Correct because c1 < c2 implies c1.lenUtf8() < c2.lenUtf8().
-        return first.start.lenUtf8()
+        val first = this.ranges().firstOrNull() ?: return null
+        // Correct because c1 < c2 implies scalarLenUtf8(c1) <= scalarLenUtf8(c2).
+        return scalarLenUtf8(first.start)
     }
 
     /**
@@ -856,9 +839,9 @@ public open class ClassUnicode internal constructor(
      * Returns `None` when the class is empty.
      */
     public open fun maximumLen(): Int? {
-        val last = (this.ranges().last() ?: return null)
-        // Correct because c1 < c2 implies c1.lenUtf8() < c2.lenUtf8().
-        return last.end.lenUtf8()
+        val last = this.ranges().lastOrNull() ?: return null
+        // Correct because c1 < c2 implies scalarLenUtf8(c1) <= scalarLenUtf8(c2).
+        return scalarLenUtf8(last.end)
     }
 
     /**
@@ -871,7 +854,7 @@ public open class ClassUnicode internal constructor(
     public open fun literal(): List<UByte>? {
         val rs = this.ranges()
         return if (rs.size == 1 && rs[0].start == rs[0].end) {
-            rs[0].start.encodeUtf8(List(4) { 0 }).toString().intoBytes()
+            encodeScalarUtf8List(rs[0].start)
         } else {
             null
         }
@@ -885,19 +868,34 @@ public open class ClassUnicode internal constructor(
         if (!this.isAscii()) {
             return null
         }
-        return ClassBytes.new(this.ranges().map({ r ->
-            // Since we are guaranteed that our codepoint range is ASCII, the
-            // u8::tryFrom' calls below are guaranteed to be correct.
-            ClassBytesRange(start = UByte.tryFrom(r.start).unwrap(), end = UByte.tryFrom(r.end).unwrap())
-        }))
+        return ClassBytes.new(
+            this.ranges().map { r ->
+                // Since we are guaranteed that our codepoint range is ASCII, the
+                // UByte conversions below are guaranteed to be correct.
+                ClassBytesRange(start = r.start.toUByte(), end = r.end.toUByte())
+            },
+        )
+    }
+
+    internal fun clone(): ClassUnicode = ClassUnicode(setCtorArg = this.set.copySet())
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is ClassUnicode && this.set == other.set)
+
+    override fun hashCode(): Int = this.set.hashCode()
+
+    override fun toString(): String = buildString {
+        val entries = mutableListOf<String>()
+        for (r in ranges()) {
+            entries.add(r.toString())
+        }
+        append("ClassUnicode(${entries.joinToString(", ", "{", "}")})")
     }
 
     public companion object {
-        public operator fun invoke(
-            set: IntervalSet<ClassUnicodeRange>,
-        ): ClassUnicode = ClassUnicode(
-            setCtorArg = set,
-        )
+        internal operator fun invoke(
+            set: IntervalSet<ClassUnicodeRange, UInt>,
+        ): ClassUnicode = ClassUnicode(setCtorArg = set)
 
         /**
          * Create a new class from a sequence of ranges.
@@ -906,7 +904,8 @@ public open class ClassUnicode internal constructor(
          * may overlap. Ranges will automatically be sorted into a canonical
          * non-overlapping order.
          */
-        public fun <I> new(ranges: I): ClassUnicode where I : Iterable<ClassUnicodeRange> = ClassUnicode(set = IntervalSet.new(ranges))
+        public fun new(ranges: List<ClassUnicodeRange>): ClassUnicode =
+            ClassUnicode(set = IntervalSet.new(ranges, ClassUnicodeRangeInterval))
 
         /**
          * Create a new class with no ranges.
@@ -914,44 +913,34 @@ public open class ClassUnicode internal constructor(
          * An empty class matches nothing. That is, it is equivalent to
          * [Hir.fail].
          */
-        public fun empty(): ClassUnicode = ClassUnicode.new(mutableListOf())
+        public fun empty(): ClassUnicode = ClassUnicode.new(emptyList())
     }
 }
 
 /**
  * An iterator over all ranges in a Unicode character class.
- *
- * The scope `a` refers to the scope of the underlying class.
  */
 public open class ClassUnicodeIter internal constructor(
     valueCtorArg: IntervalSetIter<ClassUnicodeRange>,
 ) : Iterable<ClassUnicodeRange> {
-    public var value: IntervalSetIter<ClassUnicodeRange> = valueCtorArg
-        internal set
+    internal var value: IntervalSetIter<ClassUnicodeRange> = valueCtorArg
 
-    public var field0: IntervalSetIter<ClassUnicodeRange>
-        get() = value
-        set(v) {
-            value = v
-        }
-
-    override fun iterator(): kotlin.collections.Iterator<ClassUnicodeRange> = object : AbstractIterator<ClassUnicodeRange>() {
-        override fun computeNext() {
-            when (val v = this@ClassUnicodeIter.next()) {
-                null -> done()
-                else -> setNext(v)
+    override fun iterator(): kotlin.collections.Iterator<ClassUnicodeRange> =
+        object : AbstractIterator<ClassUnicodeRange>() {
+            override fun computeNext() {
+                when (val v = this@ClassUnicodeIter.next()) {
+                    null -> done()
+                    else -> setNext(v)
+                }
             }
         }
-    }
 
     public open fun next(): ClassUnicodeRange? = this.value.next()
 
-    public companion object {
-        public operator fun invoke(
+    internal companion object {
+        internal operator fun invoke(
             value: IntervalSetIter<ClassUnicodeRange>,
-        ): ClassUnicodeIter = ClassUnicodeIter(
-            valueCtorArg = value,
-        )
+        ): ClassUnicodeIter = ClassUnicodeIter(valueCtorArg = value)
     }
 }
 
@@ -962,34 +951,50 @@ public open class ClassUnicodeIter internal constructor(
  * in the range.
  */
 public open class ClassUnicodeRange(
-    public var start: Char,
-    public var end: Char,
-) : Interval {
-    public open fun fmt(f: StringBuilder) {
-        val start =
-            if (!this.start.isWhitespace() && !this.start.isControl()) {
-                this.start.toString()
-            } else {
-                "0x${UInt.from(this.start)}"
-            }
-        val end =
-            if (!this.end.isWhitespace() && !this.end.isControl()) {
-                this.end.toString()
-            } else {
-                "0x${UInt.from(this.end)}"
-            }
-        DebugStruct(f, "ClassUnicodeRange").field("start", start).field("end", end).finish()
+    public var start: UInt,
+    public var end: UInt,
+) : Comparable<ClassUnicodeRange> {
+    override fun compareTo(other: ClassUnicodeRange): Int {
+        val startCmp = this.start.compareTo(other.start)
+        return if (startCmp != 0) startCmp else this.end.compareTo(other.end)
     }
 
-    public open fun lower(): Char = this.start
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is ClassUnicodeRange && this.start == other.start && this.end == other.end)
 
-    public open fun upper(): Char = this.end
+    override fun hashCode(): Int {
+        var result = this.start.hashCode()
+        result = 31 * result + this.end.hashCode()
+        return result
+    }
 
-    public open fun setLower(bound: Char) {
+    public open fun fmt(f: StringBuilder) {
+        val startStr =
+            if (!scalarIsWhitespace(this.start) && !scalarIsControl(this.start)) {
+                scalarToString(this.start)
+            } else {
+                "0x${formatHexUpper(this.start)}"
+            }
+        val endStr =
+            if (!scalarIsWhitespace(this.end) && !scalarIsControl(this.end)) {
+                scalarToString(this.end)
+            } else {
+                "0x${formatHexUpper(this.end)}"
+            }
+        DebugStruct(f, "ClassUnicodeRange").field("start", startStr).field("end", endStr).finish()
+    }
+
+    override fun toString(): String = buildString { fmt(this) }
+
+    internal fun lower(): UInt = this.start
+
+    internal fun upper(): UInt = this.end
+
+    internal fun setLower(bound: UInt) {
         this.start = bound
     }
 
-    public open fun setUpper(bound: Char) {
+    internal fun setUpper(bound: UInt) {
         this.end = bound
     }
 
@@ -999,18 +1004,24 @@ public open class ClassUnicodeRange(
      * Additional ranges are appended to the given vector. Canonical ordering
      * is *not* maintained in the given vector.
      */
-    public open fun caseFoldSimple(ranges: List<ClassUnicodeRange>): Result<Unit> {
-        val folder = SimpleCaseFolder.new().getOrElse { return Result.failure(it) }
+    internal fun caseFoldSimple(ranges: MutableList<ClassUnicodeRange>): Result<Unit, CaseFoldError> {
+        val folder =
+            when (val res = SimpleCaseFolder.new()) {
+                is Result.Ok -> res.value
+                is Result.Err -> return Result.Err(res.error)
+            }
         if (!folder.overlaps(this.start, this.end)) {
-            return Result.success(Unit)
+            return Result.Ok(Unit)
         }
-        val (start, end) = Pair(UInt.from(this.start), UInt.from(this.end))
-        for (cp in (start..end).filterMap(Char::fromU32)) {
+        val start = this.start
+        val end = this.end
+        for (raw in start..end) {
+            val cp = scalarFromU32(raw) ?: continue
             for (cpFolded in folder.mapping(cp)) {
-                ranges.push(ClassUnicodeRange.new(cpFolded, cpFolded))
+                ranges.add(ClassUnicodeRange.new(cpFolded, cpFolded))
             }
         }
-        return Result.success(Unit)
+        return Result.Ok(Unit)
     }
 
     /**
@@ -1019,7 +1030,7 @@ public open class ClassUnicodeRange(
      * The start of a range is always less than or equal to the end of the
      * range.
      */
-    public open fun start(): Char = this.start
+    public open fun start(): UInt = this.start
 
     /**
      * Return the end of this range.
@@ -1027,46 +1038,53 @@ public open class ClassUnicodeRange(
      * The end of a range is always greater than or equal to the start of the
      * range.
      */
-    public open fun end(): Char = this.end
+    public open fun end(): UInt = this.end
 
     /**
      * Returns the number of codepoints in this range.
      */
     public open fun len(): Int {
-        val diff = 1 + UInt.from(this.end) - UInt.from(this.start)
-        // This is likely to panic in 16-bit targets since a Int can only fit
-        // 2^16. It's not clear what to do here, other than to return an error
-        // when building a Unicode class that contains a range whose length
-        // overflows Int. (Which, to be honest, is probably quite common on
-        // 16-bit targets. For example, this would imply that '.' and '\p{any}'
-        // would be impossible to build.)
-        return Int.tryFrom(diff).expect("char class len fits in usize")
+        val diff = 1u + this.end - this.start
+        return diff.toInt()
     }
 
     public companion object {
-        public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<ClassUnicodeRange> =
-            object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<ClassUnicodeRange> {
-                override val alignBytes: Long = 4L
-                override val sizeBytes: Long = 8L
-                override fun readNative(addr: Long): ClassUnicodeRange =
-                    ClassUnicodeRange(
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.CHAR).readNative(addr),
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.CHAR).readNative(addr + 4L),
-                    )
-                override fun writeNative(addr: Long, value: ClassUnicodeRange) {
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.CHAR).writeNative(addr, value.start)
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.CHAR).writeNative(addr + 4L, value.end)
-                }
-            }
-
         /**
          * Create a new Unicode scalar value range for a character class.
          *
          * The returned range is always in a canonical form. That is, the range
          * returned always satisfies the invariant that `start <= end`.
          */
-        public fun new(start: Char, end: Char): ClassUnicodeRange = ClassUnicodeRange.create(start, end)
+        public fun new(start: UInt, end: UInt): ClassUnicodeRange = ClassUnicodeRangeInterval.create(start, end)
+
+        internal fun default(): ClassUnicodeRange = ClassUnicodeRange(start = 0x00u, end = 0x00u)
     }
+}
+
+internal object ClassUnicodeRangeInterval : Interval<ClassUnicodeRange, UInt> {
+    override fun boundOps(): Bound<UInt> = ScalarBound
+
+    override fun lower(range: ClassUnicodeRange): UInt = range.start
+
+    override fun upper(range: ClassUnicodeRange): UInt = range.end
+
+    override fun setLower(range: ClassUnicodeRange, bound: UInt) {
+        range.start = bound
+    }
+
+    override fun setUpper(range: ClassUnicodeRange, bound: UInt) {
+        range.end = bound
+    }
+
+    override fun copyInterval(range: ClassUnicodeRange): ClassUnicodeRange =
+        ClassUnicodeRange(start = range.start, end = range.end)
+
+    override fun defaultInterval(): ClassUnicodeRange = ClassUnicodeRange.default()
+
+    override fun caseFoldSimple(
+        range: ClassUnicodeRange,
+        intervals: MutableList<ClassUnicodeRange>,
+    ): Result<Unit, CaseFoldError> = range.caseFoldSimple(intervals)
 }
 
 /**
@@ -1075,10 +1093,9 @@ public open class ClassUnicodeRange(
  * Each byte corresponds to one character.
  */
 public open class ClassBytes internal constructor(
-    setCtorArg: IntervalSet<ClassBytesRange>,
+    setCtorArg: IntervalSet<ClassBytesRange, UByte>,
 ) {
-    public var set: IntervalSet<ClassBytesRange> = setCtorArg
-        internal set
+    internal var set: IntervalSet<ClassBytesRange, UByte> = setCtorArg
 
     /**
      * Add a new range to this set.
@@ -1109,13 +1126,16 @@ public open class ClassBytes internal constructor(
      * characters `a - z` and `A - Z`.
      */
     public open fun caseFoldSimple() {
-        this.set.caseFoldSimple().expect("ASCII case folding never fails")
+        when (this.set.caseFoldSimple()) {
+            is Result.Ok -> {}
+            is Result.Err -> error("ASCII case folding never fails")
+        }
     }
 
     /**
      * Negate this byte class.
      *
-     * For all `b` where `b` is a any byte, if `b` was in this set, then it
+     * For all `b` where `b` is any byte, if `b` was in this set, then it
      * will not be in this set after negation.
      */
     public open fun negate() {
@@ -1148,7 +1168,7 @@ public open class ClassBytes internal constructor(
      *
      * This computes the symmetric difference of two byte classes. This
      * removes all elements in this class that are also in the given class,
-     * but all adds all elements from the given class that aren't in this
+     * but adds all elements from the given class that aren't in this
      * class. That is, the class will contain all elements in either class,
      * but will not contain any elements that are in both classes.
      */
@@ -1161,7 +1181,7 @@ public open class ClassBytes internal constructor(
      * nothing or only ASCII bytes. Stated differently, this returns false
      * if and only if this class contains a non-ASCII byte.
      */
-    public open fun isAscii(): Boolean = (this.set.intervals().last()?.let({ r -> r.end <= 0x7F }) ?: true)
+    public open fun isAscii(): Boolean = this.set.intervals().lastOrNull()?.let { r -> r.end <= 0x7Fu.toUByte() } ?: true
 
     /**
      * Returns the length, in bytes, of the smallest string matched by this
@@ -1199,7 +1219,7 @@ public open class ClassBytes internal constructor(
     public open fun literal(): List<UByte>? {
         val rs = this.ranges()
         return if (rs.size == 1 && rs[0].start == rs[0].end) {
-            mutableListOf(rs[0].start)
+            listOf(rs[0].start)
         } else {
             null
         }
@@ -1213,20 +1233,35 @@ public open class ClassBytes internal constructor(
         if (!this.isAscii()) {
             return null
         }
-        return ClassUnicode.new(this.ranges().map({ r ->
-            // Since we are guaranteed that our byte range is ASCII, the
-            // char::from' calls below are correct and will not erroneously
-            // convert a raw byte value into its corresponding codepoint.
-            ClassUnicodeRange(start = Char.from(r.start), end = Char.from(r.end))
-        }))
+        return ClassUnicode.new(
+            this.ranges().map { r ->
+                // Since we are guaranteed that our byte range is ASCII, the
+                // UInt conversions below are correct and will not erroneously
+                // convert a raw byte value into its corresponding codepoint.
+                ClassUnicodeRange(start = r.start.toUInt(), end = r.end.toUInt())
+            },
+        )
+    }
+
+    internal fun clone(): ClassBytes = ClassBytes(setCtorArg = this.set.copySet())
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is ClassBytes && this.set == other.set)
+
+    override fun hashCode(): Int = this.set.hashCode()
+
+    override fun toString(): String = buildString {
+        val entries = mutableListOf<String>()
+        for (r in ranges()) {
+            entries.add(r.toString())
+        }
+        append("ClassBytes(${entries.joinToString(", ", "{", "}")})")
     }
 
     public companion object {
-        public operator fun invoke(
-            set: IntervalSet<ClassBytesRange>,
-        ): ClassBytes = ClassBytes(
-            setCtorArg = set,
-        )
+        internal operator fun invoke(
+            set: IntervalSet<ClassBytesRange, UByte>,
+        ): ClassBytes = ClassBytes(setCtorArg = set)
 
         /**
          * Create a new class from a sequence of ranges.
@@ -1235,7 +1270,8 @@ public open class ClassBytes internal constructor(
          * may overlap. Ranges will automatically be sorted into a canonical
          * non-overlapping order.
          */
-        public fun <I> new(ranges: I): ClassBytes where I : Iterable<ClassBytesRange> = ClassBytes(set = IntervalSet.new(ranges))
+        public fun new(ranges: List<ClassBytesRange>): ClassBytes =
+            ClassBytes(set = IntervalSet.new(ranges, ClassBytesRangeInterval))
 
         /**
          * Create a new class with no ranges.
@@ -1243,44 +1279,34 @@ public open class ClassBytes internal constructor(
          * An empty class matches nothing. That is, it is equivalent to
          * [Hir.fail].
          */
-        public fun empty(): ClassBytes = ClassBytes.new(mutableListOf())
+        public fun empty(): ClassBytes = ClassBytes.new(emptyList())
     }
 }
 
 /**
  * An iterator over all ranges in a byte character class.
- *
- * The scope `a` refers to the scope of the underlying class.
  */
 public open class ClassBytesIter internal constructor(
     valueCtorArg: IntervalSetIter<ClassBytesRange>,
 ) : Iterable<ClassBytesRange> {
-    public var value: IntervalSetIter<ClassBytesRange> = valueCtorArg
-        internal set
+    internal var value: IntervalSetIter<ClassBytesRange> = valueCtorArg
 
-    public var field0: IntervalSetIter<ClassBytesRange>
-        get() = value
-        set(v) {
-            value = v
-        }
-
-    override fun iterator(): kotlin.collections.Iterator<ClassBytesRange> = object : AbstractIterator<ClassBytesRange>() {
-        override fun computeNext() {
-            when (val v = this@ClassBytesIter.next()) {
-                null -> done()
-                else -> setNext(v)
+    override fun iterator(): kotlin.collections.Iterator<ClassBytesRange> =
+        object : AbstractIterator<ClassBytesRange>() {
+            override fun computeNext() {
+                when (val v = this@ClassBytesIter.next()) {
+                    null -> done()
+                    else -> setNext(v)
+                }
             }
         }
-    }
 
     public open fun next(): ClassBytesRange? = this.value.next()
 
-    public companion object {
-        public operator fun invoke(
+    internal companion object {
+        internal operator fun invoke(
             value: IntervalSetIter<ClassBytesRange>,
-        ): ClassBytesIter = ClassBytesIter(
-            valueCtorArg = value,
-        )
+        ): ClassBytesIter = ClassBytesIter(valueCtorArg = value)
     }
 }
 
@@ -1293,16 +1319,30 @@ public open class ClassBytesIter internal constructor(
 public open class ClassBytesRange(
     public var start: UByte,
     public var end: UByte,
-) : Interval {
-    public open fun lower(): UByte = this.start
+) : Comparable<ClassBytesRange> {
+    override fun compareTo(other: ClassBytesRange): Int {
+        val startCmp = this.start.compareTo(other.start)
+        return if (startCmp != 0) startCmp else this.end.compareTo(other.end)
+    }
 
-    public open fun upper(): UByte = this.end
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is ClassBytesRange && this.start == other.start && this.end == other.end)
 
-    public open fun setLower(bound: UByte) {
+    override fun hashCode(): Int {
+        var result = this.start.hashCode()
+        result = 31 * result + this.end.hashCode()
+        return result
+    }
+
+    internal fun lower(): UByte = this.start
+
+    internal fun upper(): UByte = this.end
+
+    internal fun setLower(bound: UByte) {
         this.start = bound
     }
 
-    public open fun setUpper(bound: UByte) {
+    internal fun setUpper(bound: UByte) {
         this.end = bound
     }
 
@@ -1313,18 +1353,18 @@ public open class ClassBytesRange(
      * Additional ranges are appended to the given vector. Canonical ordering
      * is *not* maintained in the given vector.
      */
-    public open fun caseFoldSimple(ranges: List<ClassBytesRange>): Result<Unit> {
-        if (!ClassBytesRange.new(97u, 122u).isIntersectionEmpty(this)) {
-            val lower = max(this.start, 97u)
-            val upper = minOf(this.end, 122u)
-            ranges.push(ClassBytesRange.new((lower - 32u).toUByte(), (upper - 32u).toUByte()))
+    internal fun caseFoldSimple(ranges: MutableList<ClassBytesRange>): Result<Unit, CaseFoldError> {
+        if (!ClassBytesRangeInterval.isIntersectionEmpty(ClassBytesRange.new(97u, 122u), this)) {
+            val lower = maxOf(this.start, 97u.toUByte())
+            val upper = minOf(this.end, 122u.toUByte())
+            ranges.add(ClassBytesRange.new((lower.toUInt() - 32u).toUByte(), (upper.toUInt() - 32u).toUByte()))
         }
-        if (!ClassBytesRange.new(65u, 90u).isIntersectionEmpty(this)) {
-            val lower1 = max(this.start, 65u)
-            val upper1 = minOf(this.end, 90u)
-            ranges.push(ClassBytesRange.new((lower1 + 32u).toUByte(), (upper1 + 32u).toUByte()))
+        if (!ClassBytesRangeInterval.isIntersectionEmpty(ClassBytesRange.new(65u, 90u), this)) {
+            val lower1 = maxOf(this.start, 65u.toUByte())
+            val upper1 = minOf(this.end, 90u.toUByte())
+            ranges.add(ClassBytesRange.new((lower1.toUInt() + 32u).toUByte(), (upper1.toUInt() + 32u).toUByte()))
         }
-        return Result.success(Unit)
+        return Result.Ok(Unit)
     }
 
     /**
@@ -1346,36 +1386,54 @@ public open class ClassBytesRange(
     /**
      * Returns the number of bytes in this range.
      */
-    public open fun len(): Int = (((Int.from((((this.end).toLong() - (this.start).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt())!!)).toLong() + (1).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt())!!
+    public open fun len(): Int = (this.end.toInt() - this.start.toInt()) + 1
 
     public open fun fmt(f: StringBuilder) {
-        DebugStruct(f, "ClassBytesRange").field("start", io.github.kotlinmania.regexsyntax.debug.Byte(this.start)).field("end", io.github.kotlinmania.regexsyntax.debug.Byte(this.end)).finish()
+        DebugStruct(f, "ClassBytesRange")
+            .field("start", io.github.kotlinmania.regexsyntax.debug.Byte(this.start))
+            .field("end", io.github.kotlinmania.regexsyntax.debug.Byte(this.end))
+            .finish()
     }
 
-    public companion object {
-        public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<ClassBytesRange> =
-            object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<ClassBytesRange> {
-                override val alignBytes: Long = 1L
-                override val sizeBytes: Long = 2L
-                override fun readNative(addr: Long): ClassBytesRange =
-                    ClassBytesRange(
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U8).readNative(addr),
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U8).readNative(addr + 1L),
-                    )
-                override fun writeNative(addr: Long, value: ClassBytesRange) {
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U8).writeNative(addr, value.start)
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U8).writeNative(addr + 1L, value.end)
-                }
-            }
+    override fun toString(): String = buildString { fmt(this) }
 
+    public companion object {
         /**
          * Create a new byte range for a character class.
          *
          * The returned range is always in a canonical form. That is, the range
          * returned always satisfies the invariant that `start <= end`.
          */
-        public fun new(start: UByte, end: UByte): ClassBytesRange = ClassBytesRange.create(start, end)
+        public fun new(start: UByte, end: UByte): ClassBytesRange = ClassBytesRangeInterval.create(start, end)
+
+        internal fun default(): ClassBytesRange = ClassBytesRange(start = 0u, end = 0u)
     }
+}
+
+internal object ClassBytesRangeInterval : Interval<ClassBytesRange, UByte> {
+    override fun boundOps(): Bound<UByte> = UByteBound
+
+    override fun lower(range: ClassBytesRange): UByte = range.start
+
+    override fun upper(range: ClassBytesRange): UByte = range.end
+
+    override fun setLower(range: ClassBytesRange, bound: UByte) {
+        range.start = bound
+    }
+
+    override fun setUpper(range: ClassBytesRange, bound: UByte) {
+        range.end = bound
+    }
+
+    override fun copyInterval(range: ClassBytesRange): ClassBytesRange =
+        ClassBytesRange(start = range.start, end = range.end)
+
+    override fun defaultInterval(): ClassBytesRange = ClassBytesRange.default()
+
+    override fun caseFoldSimple(
+        range: ClassBytesRange,
+        intervals: MutableList<ClassBytesRange>,
+    ): Result<Unit, CaseFoldError> = range.caseFoldSimple(intervals)
 }
 
 /**
@@ -1402,7 +1460,19 @@ public open class Capture(
      * The expression inside the capturing group, which may be empty.
      */
     public var sub: Hir,
-)
+) {
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is Capture && this.index == other.index && this.name == other.name && this.sub == other.sub)
+
+    override fun hashCode(): Int {
+        var result = this.index.hashCode()
+        result = 31 * result + (this.name?.hashCode() ?: 0)
+        result = 31 * result + this.sub.hashCode()
+        return result
+    }
+
+    override fun toString(): String = "Capture(index=$index, name=$name, sub=$sub)"
+}
 
 /**
  * The high-level intermediate representation of a repetition operator.
@@ -1450,6 +1520,19 @@ public open class Repetition(
      * values, but with its sub-expression replaced with the one given.
      */
     public open fun with(sub: Hir): Repetition = Repetition(min = this.min, max = this.max, greedy = this.greedy, sub = sub)
+
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is Repetition && this.min == other.min && this.max == other.max && this.greedy == other.greedy && this.sub == other.sub)
+
+    override fun hashCode(): Int {
+        var result = this.min.hashCode()
+        result = 31 * result + (this.max?.hashCode() ?: 0)
+        result = 31 * result + this.greedy.hashCode()
+        result = 31 * result + this.sub.hashCode()
+        return result
+    }
+
+    override fun toString(): String = "Repetition(min=$min, max=$max, greedy=$greedy, sub=$sub)"
 }
 
 /**
@@ -1462,14 +1545,15 @@ public open class Repetition(
  * All methods on a `Properties` value take constant time and are meant to
  * be cheap to call.
  */
-public open class Properties(
-    public var value: PropertiesI,
+public open class Properties internal constructor(
+    internal var value: PropertiesI,
 ) {
-    public var field0: PropertiesI
-        get() = value
-        set(v) {
-            value = v
-        }
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is Properties && this.value == other.value)
+
+    override fun hashCode(): Int = this.value.hashCode()
+
+    override fun toString(): String = "Properties(${this.value})"
 
     /**
      * Returns the length (in bytes) of the smallest string matched by this
@@ -1502,7 +1586,7 @@ public open class Properties(
      * Returns a set of all look-around assertions that appear at least once
      * in this HIR value.
      */
-    public open fun lookSet(): LookSet = this.value.lookSet
+    public open fun lookSet(): LookSet = LookSet(bits = this.value.lookSet.bits)
 
     /**
      * Returns a set of all look-around assertions that appear as a prefix for
@@ -1512,7 +1596,7 @@ public open class Properties(
      * For example, `hir.lookSetPrefix().contains(Look.Start)` returns true
      * if and only if the HIR is fully anchored at the start.
      */
-    public open fun lookSetPrefix(): LookSet = this.value.lookSetPrefix
+    public open fun lookSetPrefix(): LookSet = LookSet(bits = this.value.lookSetPrefix.bits)
 
     /**
      * Returns a set of all look-around assertions that appear as a _possible_
@@ -1524,7 +1608,7 @@ public open class Properties(
      * true if and only if it's possible for the regex to match through a
      * anchored assertion before consuming any input.
      */
-    public open fun lookSetPrefixAny(): LookSet = this.value.lookSetPrefixAny
+    public open fun lookSetPrefixAny(): LookSet = LookSet(bits = this.value.lookSetPrefixAny.bits)
 
     /**
      * Returns a set of all look-around assertions that appear as a suffix for
@@ -1535,7 +1619,7 @@ public open class Properties(
      * For example, `hir.lookSetSuffix().contains(Look.End)` returns true
      * if and only if the HIR is fully anchored at the end.
      */
-    public open fun lookSetSuffix(): LookSet = this.value.lookSetSuffix
+    public open fun lookSetSuffix(): LookSet = LookSet(bits = this.value.lookSetSuffix.bits)
 
     /**
      * Returns a set of all look-around assertions that appear as a _possible_
@@ -1547,7 +1631,7 @@ public open class Properties(
      * true if and only if it's possible for the regex to match through a
      * anchored assertion at the end of a match without consuming any input.
      */
-    public open fun lookSetSuffixAny(): LookSet = this.value.lookSetSuffixAny
+    public open fun lookSetSuffixAny(): LookSet = LookSet(bits = this.value.lookSetSuffixAny.bits)
 
     /**
      * Return true if and only if the corresponding HIR will always match
@@ -1699,90 +1783,52 @@ public open class Properties(
      * Returns the total amount of heap memory usage, in bytes, used by this
      * `Properties` value.
      */
-    public open fun memoryUsage(): ULong = mem.sizeOf<PropertiesI>(typeLayoutT = ObjectSlotLayout<PropertiesI>()).toULong()
+    public open fun memoryUsage(): ULong = 48uL
+
+    internal fun clone(): Properties = Properties(this.value.copyProps())
 
     public companion object {
         /**
          * Returns a new set of properties that corresponds to the union of the
-         * iterator of properties given.
-         *
-         * This is useful when one has multiple `Hir` expressions and wants
-         * to combine them into a single alternation without constructing the
-         * corresponding `Hir`. This routine provides a way of combining the
-         * properties of each `Hir` expression into one set of properties
-         * representing the union of those expressions.
-         *
-         * # Example: union with HIRs that never match
-         *
-         * This example shows that unioning properties together with one that
-         * represents a regex that never matches will "poison" certain attributes,
-         * like the minimum and maximum lengths.
-         *
-         * ```kotlin
-         * import regexsyntax.parse
-         *
-         * val hir1 = parse("ab?c?").getOrElse { return Result.failure(it) }
-         * check(1 == hir1.properties().minimumLen())
-         * check(3 == hir1.properties().maximumLen())
-         * val hir2 = parse("[a&&b]").getOrElse { return Result.failure(it) }
-         * check(null == hir2.properties().minimumLen())
-         * check(null == hir2.properties().maximumLen())
-         * val hir3 = parse("wxy?z?").getOrElse { return Result.failure(it) }
-         * check(2 == hir3.properties().minimumLen())
-         * check(4 == hir3.properties().maximumLen())
-         * val unioned = Properties.union(listOf(hir1.properties(), hir2.properties(), hir3.properties()))
-         * check(null == unioned.minimumLen())
-         * check(null == unioned.maximumLen())
-         * ```
-         *
-         * The maximum length can also be "poisoned" by a pattern that has no
-         * upper bound on the length of a match. The minimum length remains
-         * unaffected:
-         *
-         * ```kotlin
-         * import regexsyntax.parse
-         *
-         * val hir1 = parse("ab?c?").getOrElse { return Result.failure(it) }
-         * check(1 == hir1.properties().minimumLen())
-         * check(3 == hir1.properties().maximumLen())
-         * val hir2 = parse("a+").getOrElse { return Result.failure(it) }
-         * check(1 == hir2.properties().minimumLen())
-         * check(null == hir2.properties().maximumLen())
-         * val hir3 = parse("wxy?z?").getOrElse { return Result.failure(it) }
-         * check(2 == hir3.properties().minimumLen())
-         * check(4 == hir3.properties().maximumLen())
-         * val unioned = Properties.union(listOf(hir1.properties(), hir2.properties(), hir3.properties()))
-         * check(1 == unioned.minimumLen())
-         * check(null == unioned.maximumLen())
-         * ```
+         * list of properties given.
          */
-        public fun <I, P> union(props: I): Properties where I : Iterable<P>, P : Borrow<Properties> {
-            val it = props.iterator().peekable()
+        public fun union(props: List<Properties>): Properties {
+            val first = props.firstOrNull()
             // While empty alternations aren't possible, we still behave as if they
             // are. When we have an empty alternate, then clearly the look-around
             // prefix and suffix is empty. Otherwise, it is the intersection of all
             // prefixes and suffixes (respectively) of the branches.
-            val fix =
-                if (it.peek() == null) {
-                    LookSet.empty()
-                } else {
-                    LookSet.full()
-                }
+            val fixPrefix = if (first == null) LookSet.empty() else LookSet.full()
+            val fixSuffix = if (first == null) LookSet.empty() else LookSet.full()
             // And also, an empty alternate means we have 0 static capture groups,
             // but we otherwise start with the number corresponding to the first
             // alternate. If any subsequent alternate has a different number of
             // static capture groups, then we overall have a variation and not a
             // static number of groups.
-            val staticExplicitCapturesLen = it.peek().andThen({ p -> p.borrow().staticExplicitCapturesLen() })
+            val staticExplicitCapturesLen = first?.staticExplicitCapturesLen()
             // The base case is an empty alternation, which matches nothing.
             // Note though that empty alternations aren't possible, because the
             // Hir.alternation smart constructor rewrites those as empty character
             // classes.
-            val props1 = PropertiesI(minimumLen = null, maximumLen = null, lookSet = LookSet.empty(), lookSetPrefix = fix, lookSetSuffix = fix, lookSetPrefixAny = LookSet.empty(), lookSetSuffixAny = LookSet.empty(), utf8 = true, explicitCapturesLen = 0, staticExplicitCapturesLen = staticExplicitCapturesLen, literal = false, alternationLiteral = true)
-            var (minPoisoned, maxPoisoned) = Pair(false, false)
+            val props1 =
+                PropertiesI(
+                    minimumLen = null,
+                    maximumLen = null,
+                    lookSet = LookSet.empty(),
+                    lookSetPrefix = fixPrefix,
+                    lookSetSuffix = fixSuffix,
+                    lookSetPrefixAny = LookSet.empty(),
+                    lookSetSuffixAny = LookSet.empty(),
+                    utf8 = true,
+                    explicitCapturesLen = 0,
+                    staticExplicitCapturesLen = staticExplicitCapturesLen,
+                    literal = false,
+                    alternationLiteral = true,
+                )
+            var minPoisoned = false
+            var maxPoisoned = false
             // Handle properties that need to visit every child hir.
-            for (prop in it) {
-                val p = prop.borrow()
+            for (p in props) {
                 props1.lookSet.setUnion(p.lookSet())
                 props1.lookSetPrefix.setIntersect(p.lookSetPrefix())
                 props1.lookSetSuffix.setIntersect(p.lookSetSuffix())
@@ -1795,28 +1841,26 @@ public open class Properties(
                 }
                 props1.alternationLiteral = props1.alternationLiteral && p.isLiteral()
                 if (!minPoisoned) {
-                    when (val matchVal = p.minimumLen()) {
+                    when (val xmin = p.minimumLen()) {
                         null -> {
                             props1.minimumLen = null
                             minPoisoned = true
                         }
                         else -> {
-                            val xmin = matchVal
-                            if ((props1.minimumLen?.let({ pmin -> xmin < pmin }) ?: true)) {
+                            if (props1.minimumLen?.let { pmin -> xmin < pmin } ?: true) {
                                 props1.minimumLen = xmin
                             }
                         }
                     }
                 }
                 if (!maxPoisoned) {
-                    when (val matchVal1 = p.maximumLen()) {
+                    when (val xmax = p.maximumLen()) {
                         null -> {
                             props1.maximumLen = null
                             maxPoisoned = true
                         }
                         else -> {
-                            val xmax = matchVal1
-                            if ((props1.maximumLen?.let({ pmax -> xmax > pmax }) ?: true)) {
+                            if (props1.maximumLen?.let { pmax -> xmax > pmax } ?: true) {
                                 props1.maximumLen = xmax
                             }
                         }
@@ -1838,7 +1882,7 @@ public open class Properties(
          * Create a new set of HIR properties for a literal regex.
          */
         public fun literal(lit: Literal): Properties {
-            val inner = PropertiesI(minimumLen = lit.value.size, maximumLen = lit.value.size, lookSet = LookSet.empty(), lookSetPrefix = LookSet.empty(), lookSetSuffix = LookSet.empty(), lookSetPrefixAny = LookSet.empty(), lookSetSuffixAny = LookSet.empty(), utf8 = String.fromUtf8(lit.value).isOk(), explicitCapturesLen = 0, staticExplicitCapturesLen = 0, literal = true, alternationLiteral = true)
+            val inner = PropertiesI(minimumLen = lit.value.size, maximumLen = lit.value.size, lookSet = LookSet.empty(), lookSetPrefix = LookSet.empty(), lookSetSuffix = LookSet.empty(), lookSetPrefixAny = LookSet.empty(), lookSetSuffixAny = LookSet.empty(), utf8 = isValidUtf8(lit.value), explicitCapturesLen = 0, staticExplicitCapturesLen = 0, literal = true, alternationLiteral = true)
             return Properties(inner)
         }
 
@@ -1864,16 +1908,22 @@ public open class Properties(
         public fun repetition(rep: Repetition): Properties {
             val p = rep.sub.properties()
             val minimumLen =
-                p.minimumLen()?.let({ childMin ->
-                    val repMin = Int.tryFrom(rep.min).unwrapOr(Int.MAX_VALUE)
+                p.minimumLen()?.let { childMin ->
+                    val repMin = if (rep.min > Int.MAX_VALUE.toUInt()) Int.MAX_VALUE else rep.min.toInt()
                     childMin.saturatingMul(repMin)
-                })
+                }
             val maximumLen =
-                rep.max?.let(closure@{ repMax ->
-                    val repMax1 = Int.tryFrom(repMax).ok().getOrElse { return@closure Result.failure(it) }
-                    val childMax = p.maximumLen().getOrElse { return@closure Result.failure(it) }
-                    ((childMax).toLong() * (repMax1).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt()
-                })
+                rep.max?.let { repMax ->
+                    if (repMax > Int.MAX_VALUE.toUInt()) {
+                        null
+                    } else {
+                        val repMax1 = repMax.toInt()
+                        p.maximumLen()?.let { childMax ->
+                            val prod = childMax.toLong() * repMax1.toLong()
+                            if (prod in Int.MIN_VALUE..Int.MAX_VALUE) prod.toInt() else null
+                        }
+                    }
+                }
             val inner = PropertiesI(minimumLen = minimumLen, maximumLen = maximumLen, lookSet = p.lookSet(), lookSetPrefix = LookSet.empty(), lookSetSuffix = LookSet.empty(), lookSetPrefixAny = p.lookSetPrefixAny(), lookSetSuffixAny = p.lookSetSuffixAny(), utf8 = p.isUtf8(), explicitCapturesLen = p.explicitCapturesLen(), staticExplicitCapturesLen = p.staticExplicitCapturesLen(), literal = false, alternationLiteral = false)
             // If the repetition operator can match the empty string, then its
             // lookset prefix and suffixes themselves remain empty since they are
@@ -1886,12 +1936,12 @@ public open class Properties(
             // is greater than zero, then it automatically propagates to the
             // repetition, regardless of the repetition. Otherwise, it might
             // change, but only when the repetition can match 0 times.
-            if (rep.min == 0u && (inner.staticExplicitCapturesLen?.let({ len -> len > 0 }) ?: false)) {
+            if (rep.min == 0u && (inner.staticExplicitCapturesLen?.let { len -> len > 0 } ?: false)) {
                 // If we require a match 0 times, then our captures len is
                 // guaranteed to be zero. Otherwise, if we *can* match the empty
                 // string, then it's impossible to know how many captures will be
                 // in the resulting match.
-                if (rep.max == 0) {
+                if (rep.max == 0u) {
                     inner.staticExplicitCapturesLen = 0
                 } else {
                     inner.staticExplicitCapturesLen = null
@@ -1905,7 +1955,14 @@ public open class Properties(
          */
         public fun capture(capture: Capture): Properties {
             val p = capture.sub.properties()
-            return Properties(p.value.clone().copy(explicitCapturesLen = p.explicitCapturesLen().saturatingAdd(1), staticExplicitCapturesLen = p.staticExplicitCapturesLen()?.let({ len -> len.saturatingAdd(1) }), literal = false, alternationLiteral = false))
+            return Properties(
+                p.value.copyProps(
+                    explicitCapturesLen = p.explicitCapturesLen().saturatingAdd(1),
+                    staticExplicitCapturesLen = p.staticExplicitCapturesLen()?.let { len -> len.saturatingAdd(1) },
+                    literal = false,
+                    alternationLiteral = false,
+                ),
+            )
         }
 
         /**
@@ -1918,24 +1975,23 @@ public open class Properties(
             // Hir.empty.
             val props = PropertiesI(minimumLen = 0, maximumLen = 0, lookSet = LookSet.empty(), lookSetPrefix = LookSet.empty(), lookSetSuffix = LookSet.empty(), lookSetPrefixAny = LookSet.empty(), lookSetSuffixAny = LookSet.empty(), utf8 = true, explicitCapturesLen = 0, staticExplicitCapturesLen = 0, literal = true, alternationLiteral = true)
             // Handle properties that need to visit every child hir.
-            for (x in concat.iter()) {
+            for (x in concat) {
                 val p = x.properties()
                 props.lookSet.setUnion(p.lookSet())
                 props.utf8 = props.utf8 && p.isUtf8()
                 props.explicitCapturesLen = props.explicitCapturesLen.saturatingAdd(p.explicitCapturesLen())
-                props.staticExplicitCapturesLen = p.staticExplicitCapturesLen().andThen(closure1@{ len1 ->
-                    Pair(len1, props.staticExplicitCapturesLen.getOrElse { return@closure1 Result.failure(it) })
-                }).andThen({ (len1, len2) -> len1.saturatingAdd(len2) })
+                props.staticExplicitCapturesLen =
+                    p.staticExplicitCapturesLen()?.let { len1 ->
+                        props.staticExplicitCapturesLen?.let { len2 -> len1.saturatingAdd(len2) }
+                    }
                 props.literal = props.literal && p.isLiteral()
                 props.alternationLiteral = props.alternationLiteral && p.isAlternationLiteral()
-                when (val matchVal = props.minimumLen) {
+                when (val minimumLen = props.minimumLen) {
                     null -> {}
                     else -> {
-                        val minimumLen = matchVal
-                        when (val matchVal1 = p.minimumLen()) {
+                        when (val len = p.minimumLen()) {
                             null -> props.minimumLen = null
                             else -> {
-                                val len = matchVal1
                                 // We use saturating arithmetic here because the
                                 // minimum is just a lower bound. We can't go any
                                 // higher than what our number types permit.
@@ -1944,15 +2000,14 @@ public open class Properties(
                         }
                     }
                 }
-                when (val matchVal2 = props.maximumLen) {
+                when (val maximumLen = props.maximumLen) {
                     null -> {}
                     else -> {
-                        val maximumLen = matchVal2
-                        when (val matchVal3 = p.maximumLen()) {
+                        when (val len1 = p.maximumLen()) {
                             null -> props.maximumLen = null
                             else -> {
-                                val len1 = matchVal3
-                                props.maximumLen = ((maximumLen).toLong() + (len1).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt()
+                                val sum = maximumLen.toLong() + len1.toLong()
+                                props.maximumLen = if (sum in Int.MIN_VALUE..Int.MAX_VALUE) sum.toInt() else null
                             }
                         }
                     }
@@ -1960,26 +2015,19 @@ public open class Properties(
             }
             // Handle the prefix properties, which only requires visiting
             // child exprs until one matches more than the empty string.
-            val it = concat.iter()
-            while (true) {
-                val matchVal4 = it.next()
-                if (matchVal4 == null) break
-                val x1 = matchVal4
+            for (x1 in concat) {
                 props.lookSetPrefix.setUnion(x1.properties().lookSetPrefix())
                 props.lookSetPrefixAny.setUnion(x1.properties().lookSetPrefixAny())
-                if (x1.properties().maximumLen().mapOr(true, { x2 -> x2 > 0 })) {
+                if (x1.properties().maximumLen()?.let { x2 -> x2 > 0 } ?: true) {
                     break
                 }
             }
             // Same thing for the suffix properties, but in reverse.
-            val it1 = concat.iter().rev()
-            while (true) {
-                val matchVal5 = it1.next()
-                if (matchVal5 == null) break
-                val x2 = matchVal5
+            for (i in concat.size - 1 downTo 0) {
+                val x2 = concat[i]
                 props.lookSetSuffix.setUnion(x2.properties().lookSetSuffix())
                 props.lookSetSuffixAny.setUnion(x2.properties().lookSetSuffixAny())
-                if (x2.properties().maximumLen().mapOr(true, { x3 -> x3 > 0 })) {
+                if (x2.properties().maximumLen()?.let { x3 -> x3 > 0 } ?: true) {
                     break
                 }
             }
@@ -1987,22 +2035,13 @@ public open class Properties(
         }
 
         /**
-         * Create a new set of HIR properties for a concatenation.
+         * Create a new set of HIR properties for an alternation.
          */
-        public fun alternation(alts: List<Hir>): Properties = Properties.union(alts.map({ hir -> hir.properties() }))
+        public fun alternation(alts: List<Hir>): Properties = Properties.union(alts.map { hir -> hir.properties() })
     }
 }
 
-/**
- * The property definition. It is split out so that we can box it, and
- * there by make `Properties` use less stack size. This is kind-of important
- * because every HIR value has a `Properties` attached to it.
- *
- * This does have the unfortunate consequence that creating any HIR value
- * always leads to at least one alloc for properties, but this is generally
- * true anyway (for pretty much all HirKinds except for look-arounds).
- */
-public open class PropertiesI(
+internal data class PropertiesI(
     public var minimumLen: Int?,
     public var maximumLen: Int?,
     public var lookSet: LookSet,
@@ -2015,7 +2054,28 @@ public open class PropertiesI(
     public var staticExplicitCapturesLen: Int?,
     public var literal: Boolean,
     public var alternationLiteral: Boolean,
-)
+) {
+    internal fun copyProps(
+        explicitCapturesLen: Int = this.explicitCapturesLen,
+        staticExplicitCapturesLen: Int? = this.staticExplicitCapturesLen,
+        literal: Boolean = this.literal,
+        alternationLiteral: Boolean = this.alternationLiteral,
+    ): PropertiesI =
+        PropertiesI(
+            minimumLen = this.minimumLen,
+            maximumLen = this.maximumLen,
+            lookSet = LookSet(bits = this.lookSet.bits),
+            lookSetPrefix = LookSet(bits = this.lookSetPrefix.bits),
+            lookSetSuffix = LookSet(bits = this.lookSetSuffix.bits),
+            lookSetPrefixAny = LookSet(bits = this.lookSetPrefixAny.bits),
+            lookSetSuffixAny = LookSet(bits = this.lookSetSuffixAny.bits),
+            utf8 = this.utf8,
+            explicitCapturesLen = explicitCapturesLen,
+            staticExplicitCapturesLen = staticExplicitCapturesLen,
+            literal = literal,
+            alternationLiteral = alternationLiteral,
+        )
+}
 
 /**
  * A set of look-around assertions.
@@ -2041,9 +2101,8 @@ public open class LookSet(
      * Returns the total number of look-around assertions in this set.
      */
     public open fun len(): Int {
-        // OK because max value always fits in a u8, which in turn always
-        // fits in a Int, regardless of target.
-        return Int.tryFrom(this.bits.countOneBits().toUInt()).unwrap()
+        // OK because max value fits in an Int on every target.
+        return this.bits.countOneBits()
     }
 
     /**
@@ -2112,7 +2171,7 @@ public open class LookSet(
     /**
      * Returns an iterator over all of the look-around assertions in this set.
      */
-    public open fun iter(): LookSetIter = LookSetIter(set = this)
+    public open fun iter(): LookSetIter = LookSetIter(set = LookSet(bits = this.bits))
 
     /**
      * Return a new set that is equivalent to the original, but with the given
@@ -2126,7 +2185,7 @@ public open class LookSet(
      * assertion into this set.
      */
     public open fun setInsert(look: Look) {
-        this = this.insert(look)
+        this.bits = this.bits or look.asRepr()
     }
 
     /**
@@ -2141,7 +2200,7 @@ public open class LookSet(
      * assertion from this set.
      */
     public open fun setRemove(look: Look) {
-        this = this.remove(look)
+        this.bits = this.bits and look.asRepr().inv()
     }
 
     /**
@@ -2155,7 +2214,7 @@ public open class LookSet(
      * from this set.
      */
     public open fun setSubtract(other: LookSet) {
-        this = this.subtract(other)
+        this.bits = this.bits and other.bits.inv()
     }
 
     /**
@@ -2168,7 +2227,7 @@ public open class LookSet(
      * given.
      */
     public open fun setUnion(other: LookSet) {
-        this = this.union(other)
+        this.bits = this.bits or other.bits
     }
 
     /**
@@ -2181,7 +2240,7 @@ public open class LookSet(
      * one given.
      */
     public open fun setIntersect(other: LookSet) {
-        this = this.intersect(other)
+        this.bits = this.bits and other.bits
     }
 
     /**
@@ -2190,40 +2249,35 @@ public open class LookSet(
      *
      * # Panics
      *
-     * This panics if `slice.len()<4`.
+     * This panics if `slice.size < 4`.
      */
-    public open fun writeRepr(slice: List<UByte>) {
-        val raw = run { val rawBits = this.bits; listOf<UByte>(rawBits.toUByte(), (rawBits shr 8).toUByte(), (rawBits shr 16).toUByte(), (rawBits shr 24).toUByte()) }
-        slice[0] = raw[0]
-        slice[1] = raw[1]
-        slice[2] = raw[2]
-        slice[3] = raw[3]
+    public open fun writeRepr(slice: MutableList<UByte>) {
+        require(slice.size >= 4) { "slice too short for LookSet.writeRepr" }
+        val rawBits = this.bits
+        slice[0] = rawBits.toUByte()
+        slice[1] = (rawBits shr 8).toUByte()
+        slice[2] = (rawBits shr 16).toUByte()
+        slice[3] = (rawBits shr 24).toUByte()
     }
 
     public open fun fmt(f: StringBuilder) {
         if (this.isEmpty()) {
-            return f.append("∅")
+            f.append("∅")
+            return
         }
         for (look in this.iter()) {
-            f.append("${look.asChar()}").getOrElse { return Result.failure(it) }
+            f.appendScalar(look.asChar())
         }
-        Result.success(Unit)
     }
 
-    public companion object {
-        public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<LookSet> =
-            object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<LookSet> {
-                override val alignBytes: Long = 4L
-                override val sizeBytes: Long = 4L
-                override fun readNative(addr: Long): LookSet =
-                    LookSet(
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U32).readNative(addr),
-                    )
-                override fun writeNative(addr: Long, value: LookSet) {
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U32).writeNative(addr, value.bits)
-                }
-            }
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is LookSet && this.bits == other.bits)
 
+    override fun hashCode(): Int = this.bits.hashCode()
+
+    override fun toString(): String = buildString { fmt(this) }
+
+    public companion object {
         /**
          * Create an empty set of look-around assertions.
          */
@@ -2250,10 +2304,15 @@ public open class LookSet(
          *
          * # Panics
          *
-         * This panics if `slice.len()<4`.
+         * This panics if `slice.size < 4`.
          */
         public fun readRepr(slice: List<UByte>): LookSet {
-            val bits = UInt.fromNeBytes(slice[0 until 4].tryInto().unwrap())
+            require(slice.size >= 4) { "slice too short for LookSet.readRepr" }
+            val bits =
+                slice[0].toUInt() or
+                    (slice[1].toUInt() shl 8) or
+                    (slice[2].toUInt() shl 16) or
+                    (slice[3].toUInt() shl 24)
             return LookSet(bits = bits)
         }
     }
@@ -2267,39 +2326,43 @@ public open class LookSet(
 public open class LookSetIter(
     public var set: LookSet,
 ) : Iterable<Look> {
-    override fun iterator(): kotlin.collections.Iterator<Look> = object : AbstractIterator<Look>() {
-        override fun computeNext() {
-            when (val v = this@LookSetIter.next()) {
-                null -> done()
-                else -> setNext(v)
+    override fun iterator(): kotlin.collections.Iterator<Look> =
+        object : AbstractIterator<Look>() {
+            override fun computeNext() {
+                when (val v = this@LookSetIter.next()) {
+                    null -> done()
+                    else -> setNext(v)
+                }
             }
         }
-    }
 
     public open fun next(): Look? {
         if (this.set.isEmpty()) {
             return null
         }
-        // We'll never have more than u8.Max distinct look-around assertions,
-        // so 'bit' will always fit into a u16.
-        val bit = UShort.tryFrom(this.set.bits.trailingZeros()).unwrap()
-        val look = (Look.fromRepr(1u shl bit.toInt()) ?: return null)
+        // We will never have more than 255 distinct look-around
+        // assertions, so `bit` will always fit cleanly.
+        val bit = this.set.bits.countTrailingZeroBits()
+        val look = Look.fromRepr(1u shl bit) ?: return null
         this.set = this.set.remove(look)
         return look
     }
+}
 
-    public companion object {
-        public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<LookSetIter> =
-            object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<LookSetIter> {
-                override val alignBytes: Long = 4L
-                override val sizeBytes: Long = 4L
-                override fun readNative(addr: Long): LookSetIter =
-                    LookSetIter(
-                        (LookSet.typeLayout()).readNative(addr),
-                    )
-                override fun writeNative(addr: Long, value: LookSetIter) {
-                    (LookSet.typeLayout()).writeNative(addr, value.set)
-                }
-            }
+private fun Int.saturatingAdd(other: Int): Int {
+    val sum = this.toLong() + other.toLong()
+    return when {
+        sum > Int.MAX_VALUE.toLong() -> Int.MAX_VALUE
+        sum < Int.MIN_VALUE.toLong() -> Int.MIN_VALUE
+        else -> sum.toInt()
+    }
+}
+
+private fun Int.saturatingMul(other: Int): Int {
+    val prod = this.toLong() * other.toLong()
+    return when {
+        prod > Int.MAX_VALUE.toLong() -> Int.MAX_VALUE
+        prod < Int.MIN_VALUE.toLong() -> Int.MIN_VALUE
+        else -> prod.toInt()
     }
 }

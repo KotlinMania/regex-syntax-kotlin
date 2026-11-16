@@ -2,7 +2,7 @@
 
 **Generated:** 2026-11-16
 **Source:** tmp/regex-syntax/src
-**Target:** src/common/commonMain/kotlin/io/github/kotlinmania/regexsyntax
+**Target:** src/common/commonMain/kotlin
 
 These are review proposals only. They are emitted when a Rust -> Kotlin pair matches only after fallback normalization, so the existing `port-lint` header is not an exact provenance match.
 

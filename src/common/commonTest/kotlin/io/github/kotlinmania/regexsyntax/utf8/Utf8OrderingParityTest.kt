@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class Utf8OrderingParityTest {
-    private fun range(start: Int, end: Int = start): Utf8Range = Utf8Range(start.toByte(), end.toByte())
+    private fun range(start: Int, end: Int = start): Utf8Range = Utf8Range(start.toUByte(), end.toUByte())
 
     @Test
     fun variantsOrderBeforeTheirByteRanges() {

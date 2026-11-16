@@ -6,7 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class Utf8ReverseParityTest {
-    private fun range(value: Int): Utf8Range = Utf8Range(value.toByte(), value.toByte())
+    private fun range(value: Int): Utf8Range = Utf8Range(value.toUByte(), value.toUByte())
 
     @Test
     fun reverseMutatesEveryVariantAndReturnsUnit() {
@@ -41,15 +41,15 @@ class Utf8ReverseParityTest {
 
     @Test
     fun matchingUsesTheMutatedRangesAndStillAcceptsPrefixes() {
-        val sequence = Utf8Sequence.Two(listOf(Utf8Range(0xd0.toByte(), 0xd3.toByte()), Utf8Range(0x80.toByte(), 0xbf.toByte())))
-        val forward = byteArrayOf(0xd1.toByte(), 0x90.toByte())
-        val backward = forward.reversedArray()
+        val sequence = Utf8Sequence.Two(listOf(Utf8Range(0xd0u, 0xd3u), Utf8Range(0x80u, 0xbfu)))
+        val forward = listOf(0xd1u.toUByte(), 0x90u.toUByte())
+        val backward = forward.reversed()
         assertTrue(sequence.matches(forward))
         assertFalse(sequence.matches(backward))
         sequence.reverse()
         assertTrue(sequence.matches(backward))
-        assertTrue(sequence.matches(backward + byteArrayOf(0)))
+        assertTrue(sequence.matches(backward + 0u.toUByte()))
         assertFalse(sequence.matches(forward))
-        assertFalse(sequence.matches(byteArrayOf(0x90.toByte())))
+        assertFalse(sequence.matches(listOf(0x90u.toUByte())))
     }
 }

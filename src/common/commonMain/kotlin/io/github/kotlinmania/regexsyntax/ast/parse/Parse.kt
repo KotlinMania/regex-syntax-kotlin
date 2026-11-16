@@ -1551,7 +1551,7 @@ internal class ParserI(
      *
      * This is similar to `maybeParseAsciiClass` in that, in most cases,
      * if it fails it will just return `None` with no error. This is done
-     * because `\b{5}` is a valid expression and we want to let that be parsed
+     * because `\b{5}` is a valid expression and we want to allow that to be parsed
      * by the existing counted repetition parsing code. (I thought about just
      * invoking the counted repetition code from here, but it seemed a little
      * ham-fisted.)
@@ -1578,7 +1578,7 @@ internal class ParserI(
         val startContents = this.pos()
         // This is one of the critical bits: if the first non-whitespace
         // character isn't in [-A-Za-z] (i.e., this can't be a special word
-        // boundary), then we bail and let the counted repetition parser deal
+        // boundary), then we bail and allow the counted repetition parser to deal
         // with this.
         if (!isValidChar(this.char())) {
             this.parser().pos.set(start)

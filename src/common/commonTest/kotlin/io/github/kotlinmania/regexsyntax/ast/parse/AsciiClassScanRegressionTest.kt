@@ -10,13 +10,13 @@ import kotlin.test.assertNull
 class AsciiClassScanRegressionTest {
     @Test
     fun scanStopsAtTerminatorAndRestoresPositionOnEof() {
-        val terminated = ParserI(Parser(), "[:alpha:]tail")
+        val terminated = ParserI.new(Parser.new(), "[:alpha:]tail")
         val parsed = assertNotNull(terminated.maybeParseAsciiClass())
         assertEquals(ClassAsciiKind.Alpha, parsed.kind)
         assertFalse(parsed.negated)
         assertEquals("[:alpha:]".length, terminated.offset())
 
-        val incomplete = ParserI(Parser(), "[:" + "x".repeat(4096))
+        val incomplete = ParserI.new(Parser.new(), "[:" + "x".repeat(4096))
         assertNull(incomplete.maybeParseAsciiClass())
         assertEquals(0, incomplete.offset())
     }

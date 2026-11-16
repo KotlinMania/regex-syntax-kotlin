@@ -1,8 +1,13 @@
 // port-lint: source parser.rs
 package io.github.kotlinmania.regexsyntax.parser
 
-import io.github.kotlinmania.regexsyntax.ast.Ast
+import io.github.kotlinmania.regexsyntax.ast.parse.Parser as AstParser
+import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder as AstParserBuilder
+import io.github.kotlinmania.regexsyntax.error.Error
 import io.github.kotlinmania.regexsyntax.hir.Hir
+import io.github.kotlinmania.regexsyntax.hir.translate.Translator
+import io.github.kotlinmania.regexsyntax.hir.translate.TranslatorBuilder
+import io.github.kotlinmania.rustlang.core.result.Result as RustResult
 
 /**
  * A convenience routine for parsing a regex using default options.
@@ -11,10 +16,10 @@ import io.github.kotlinmania.regexsyntax.hir.Hir
  *
  * If you need to set non-default options, then use a [ParserBuilder].
  *
- * This routine returns an [`Hir`](hir.Hir) value. Namely, it automatically
- * parses the pattern as an [`Ast`](ast.Ast) and then invokes the translator
- * to convert the `Ast` into an `Hir`. If you need access to the `Ast`, then
- * you should use a [ast.parse.Parser].
+ * This routine returns an [Hir] value. Namely, it automatically
+ * parses the pattern as an [io.github.kotlinmania.regexsyntax.ast.Ast] and
+ * then invokes the translator to convert the `Ast` into an `Hir`. If you
+ * need access to the `Ast`, then you should use [AstParser].
  */
 public fun parse(pattern: String): Result<Hir> = Parser.new().parse(pattern)
 
@@ -24,12 +29,12 @@ public fun parse(pattern: String): Result<Hir> = Parser.new().parse(pattern)
  * This builder permits modifying configuration options for the parser.
  *
  * This type combines the builder options for both the [AST
- * `ParserBuilder`](ast.parse.ParserBuilder) and the [HIR
- * `TranslatorBuilder`](hir.translate.TranslatorBuilder).
+ * `ParserBuilder`](io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder)
+ * and the [HIR `TranslatorBuilder`](TranslatorBuilder).
  */
 public open class ParserBuilder(
-    public var ast: ParserBuilder,
-    public var hir: TranslatorBuilder,
+    internal var ast: AstParserBuilder,
+    internal var hir: TranslatorBuilder,
 ) {
     /**
      * Build a parser from this configuration with the given pattern.
@@ -180,7 +185,7 @@ public open class ParserBuilder(
     }
 
     /**
-     * Sets the line terminator for use with `(? u - s:.)` and `(? - us:.)`.
+     * Sets the line terminator for use with `(?u-s:.)` and `(?-us:.)`.
      *
      * Namely, instead of `.` (by default) matching everything except for `\n`,
      * this will cause `.` to match everything except for the byte given.
@@ -198,7 +203,7 @@ public open class ParserBuilder(
      * the line terminator will be treated as `\r` and `\n` simultaneously.
      *
      * Note also that this *doesn't* impact the look-around assertions
-     * `(? m: ^)` and `(? m: $)`. That's usually controlled by additional
+     * `(?m:^)` and `(?m:$)`. That's usually controlled by additional
      * configuration in the regex engine itself.
      */
     public open fun lineTerminator(byte: UByte): ParserBuilder {
@@ -236,7 +241,13 @@ public open class ParserBuilder(
         /**
          * Create a new parser builder with a default configuration.
          */
-        public fun new(): ParserBuilder = ParserBuilder.default()
+        public fun new(): ParserBuilder = default()
+
+        /**
+         * Create a new parser builder with a default configuration.
+         */
+        public fun default(): ParserBuilder =
+            ParserBuilder(ast = AstParserBuilder.new(), hir = TranslatorBuilder.new())
     }
 }
 
@@ -251,21 +262,29 @@ public open class ParserBuilder(
  * convenience for never having to deal with it at all.
  *
  * If callers have more fine grained use cases that need an AST, then please
- * see the [ast.parse] module.
+ * see [AstParser].
  *
  * A `Parser` can be configured in more detail via a [ParserBuilder].
  */
 public open class Parser(
-    public var ast: Parser,
-    public var hir: Translator,
+    internal var ast: AstParser,
+    internal var hir: Translator,
 ) {
     /**
      * Parse the regular expression into a high level intermediate
      * representation.
      */
     public open fun parse(pattern: String): Result<Hir> {
-        val ast = this.ast.parse(pattern).getOrElse { return Result.failure(it) }
-        val hir = this.hir.translate(pattern, ast).getOrElse { return Result.failure(it) }
+        val ast =
+            when (val r = this.ast.parse(pattern)) {
+                is RustResult.Ok -> r.value
+                is RustResult.Err -> return Result.failure(Error.from(r.error))
+            }
+        val hir =
+            when (val r = this.hir.translate(pattern, ast)) {
+                is RustResult.Ok -> r.value
+                is RustResult.Err -> return Result.failure(Error.from(r.error))
+            }
         return Result.success(hir)
     }
 
@@ -273,7 +292,7 @@ public open class Parser(
         /**
          * Create a new parser with a default configuration.
          *
-         * The parser can be run with `parse` method. The parse method returns
+         * The parser can be run with [Parser.parse] method. The parse method returns
          * a high level intermediate representation of the given regular
          * expression.
          *

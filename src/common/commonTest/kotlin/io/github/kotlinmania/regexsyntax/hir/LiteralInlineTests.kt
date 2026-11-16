@@ -3,6 +3,7 @@ package io.github.kotlinmania.regexsyntax.hir.literal
 
 import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.parser.ParserBuilder
+import io.github.kotlinmania.regexsyntax.unwrap
 
 // Provides literal extraction from `Hir` expressions.
 //
@@ -63,22 +64,34 @@ public fun suffixes(pattern: String): Seq = Extractor.new().kind(ExtractKind.Suf
 
 public fun e(pattern: String): Pair<Seq, Seq> = Pair(prefixes(pattern), suffixes(pattern))
 
+public fun eLit(x: String): Literal = Literal.exact(x.encodeToByteArray().map { it.toUByte() })
+
+public fun E(x: String): Literal = eLit(x)
+
 public fun i(x: String): Literal = Literal.inexact(x.encodeToByteArray().map { it.toUByte() })
 
-public fun <I : Iterable<Literal>> seq(it: I): Seq = Seq.fromIter(it)
+public fun I(x: String): Literal = i(x)
+
+public fun seq(it: List<Literal>): Seq = Seq.fromIter(it)
 
 public fun infinite(): Pair<Seq, Seq> = Pair(Seq.infinite(), Seq.infinite())
 
-public fun <I1, I2> inexact(it1: I1, it2: I2): Pair<Seq, Seq> where I1 : Iterable<Literal>, I2 : Iterable<Literal> = Pair(Seq.fromIter(it1), Seq.fromIter(it2))
+public fun inexact(it1: List<Literal>, it2: List<Literal>): Pair<Seq, Seq> = Pair(Seq.fromIter(it1), Seq.fromIter(it2))
 
-public fun <B : AsRef<List<UByte>>, I : Iterable<B>> exact(it: I): Pair<Seq, Seq> {
+public fun exact(it: List<String>): Pair<Seq, Seq> {
+    val s1 = Seq.fromStrings(it)
+    val s2 = s1.clone()
+    return Pair(s1, s2)
+}
+
+public fun exactBytes(it: List<List<UByte>>): Pair<Seq, Seq> {
     val s1 = Seq.new(it)
     val s2 = s1.clone()
     return Pair(s1, s2)
 }
 
-public fun <B : AsRef<List<UByte>>, I : Iterable<B>> opt(it: I): Pair<Seq, Seq> {
-    var (p, s) = exact(it)
+public fun opt(it: List<String>): Pair<Seq, Seq> {
+    val (p, s) = exact(it)
     p.optimizeForPrefixByPreference()
     s.optimizeForSuffixByPreference()
     return Pair(p, s)
@@ -91,7 +104,7 @@ public fun literal() {
     check(exact(listOf("A", "a")) == e("(?i-u)a"))
     check(exact(listOf("AB", "Ab", "aB", "ab")) == e("(?i-u)ab"))
     check(exact(listOf("abC", "abc")) == e("ab(?i-u)c"))
-    check(exact(listOf("ÿ".encodeToByteArray())) == e("(?-u:\\xFF)"))
+    check(exactBytes(listOf(listOf(0xFFu.toUByte()))) == e("(?-u:\\xFF)"))
     run {
         check(exact(listOf("☃")) == e("☃"))
         check(exact(listOf("☃")) == e("(?i)☃"))
@@ -320,9 +333,9 @@ public fun oddsAndEnds() {
     check(infinite() == e("a|."))
     check(infinite() == e(".|a"))
     val pat = "M[ou]'?am+[ae]r .*([AEae]l[- ])?[GKQ]h?[aeu]+([dtz][dhz]?)+af[iy]"
-    val expected = inexact(listOf("Mo'am", "Moam", "Mu'am", "Muam").map(I), listOf("ddafi", "ddafy", "dhafi", "dhafy", "dzafi", "dzafy", "dafi", "dafy", "tdafi", "tdafy", "thafi", "thafy", "tzafi", "tzafy", "tafi", "tafy", "zdafi", "zdafy", "zhafi", "zhafy", "zzafi", "zzafy", "zafi", "zafy").map(I))
+    val expected = inexact(listOf("Mo'am", "Moam", "Mu'am", "Muam").map(::i), listOf("ddafi", "ddafy", "dhafi", "dhafy", "dzafi", "dzafy", "dafi", "dafy", "tdafi", "tdafy", "thafi", "thafy", "tzafi", "tzafy", "tafi", "tafy", "zdafi", "zdafy", "zhafi", "zhafy", "zzafi", "zzafy", "zafi", "zafy").map(::i))
     check(expected == e(pat))
-    check(Pair(seq(listOf("fn is_", "fn as_").map(I)), Seq.infinite()) == e("fn is_([A-Z]+)|fn as_([A-Z]+)"))
+    check(Pair(seq(listOf("fn is_", "fn as_").map(::i)), Seq.infinite()) == e("fn is_([A-Z]+)|fn as_([A-Z]+)"))
     check(inexact(listOf(I("foo")), listOf(I("quux"))) == e("foo[A-Z]+bar[A-Z]+quux"))
     check(infinite() == e("[A-Z]+bar[A-Z]+"))
     check(exact(listOf("Sherlock Holmes")) == e("(?m)^Sherlock Holmes|Sherlock Holmes\$"))
@@ -337,7 +350,7 @@ public fun oddsAndEnds() {
 // matches from short literals.")
 @kotlin.test.Test
 public fun holmes() {
-    val expected = inexact(listOf("HOL", "HOl", "HoL", "Hol", "hOL", "hOl", "hoL", "hol").map(I), listOf("MES", "MEs", "Eſ", "MeS", "Mes", "eſ", "mES", "mEs", "meS", "mes").map(I))
+    val expected = inexact(listOf("HOL", "HOl", "HoL", "Hol", "hOL", "hOl", "hoL", "hol").map(::i), listOf("MES", "MEs", "Eſ", "MeS", "Mes", "eſ", "mES", "mEs", "meS", "mes").map(::i))
     var (prefixes, suffixes) = e("(?i)Holmes")
     prefixes.keepFirstBytes(3)
     suffixes.keepLastBytes(3)
@@ -354,9 +367,9 @@ public fun holmes() {
 @kotlin.test.Test
 public fun holmesAlt() {
     val pre = prefixes("(?i)Sherlock|Holmes|Watson|Irene|Adler|John|Baker")
-    check(pre.len().unwrap() > 0)
+    check(pre.len()!! > 0)
     pre.optimizeForPrefixByPreference()
-    check(pre.len().unwrap() > 0)
+    check(pre.len()!! > 0)
 }
 
 // See: https://github.com/rust-lang/regex/security/advisories/GHSA-m5pq-gvj9-9vr8

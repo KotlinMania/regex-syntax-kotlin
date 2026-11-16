@@ -2,6 +2,7 @@
 package io.github.kotlinmania.regexsyntax.ast.print
 
 import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder
+import io.github.kotlinmania.regexsyntax.unwrap
 
 // This module provides a regular expression printer for `Ast`.
 
@@ -14,9 +15,9 @@ public fun roundtripWith(f: (ParserBuilder) -> ParserBuilder, given: String) {
     f(builder)
     val ast = builder.build().parse(given).unwrap()
     val printer = Printer.new()
-    val dst = String.new()
+    val dst = StringBuilder()
     printer.print(ast, dst).unwrap()
-    check(given == dst)
+    check(given == dst.toString())
 }
 
 @kotlin.test.Test

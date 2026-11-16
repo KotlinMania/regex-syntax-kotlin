@@ -60,7 +60,7 @@ import io.github.kotlinmania.rustlang.core.mem.TypeLayout
 // [EE-EF][80-BF][80-BF]
 // ```
 //
-// Note that the byte ranges above will *not* match any erroneous encoding of
+// Note that the byte ranges above will *not* accept any erroneous encoding of
 // UTF-8, including encodings of surrogate codepoints.
 //
 // And, of course, for all of Unicode (`[000000 - 10FFFF]`):
@@ -94,11 +94,11 @@ public val MAX_UTF8_BYTES: Int = 4
 /**
  * Utf8Sequence represents a sequence of byte ranges.
  *
- * To match a Utf8Sequence, a candidate byte sequence must match each
+ * To satisfy a Utf8Sequence, a candidate byte sequence must satisfy each
  * successive range.
  *
  * For example, if there are two ranges, `[C2 - DF][80 - BF]`, then the byte
- * sequence `\xDD\x61` would not match because `0x61<0x80`.
+ * sequence `\xDD\x61` would not be accepted because `0x61<0x80`.
  */
 public sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
     /**
@@ -183,7 +183,7 @@ public sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range>
      * [80-BF][D0-D3]
      * ```
      *
-     * This is useful when one is constructing a UTF-8 automaton to match
+     * This is useful when one is constructing a UTF-8 automaton to accept
      * character classes in reverse.
      */
     public open fun reverse() {
@@ -293,21 +293,6 @@ public data class Utf8Range(
     override fun toString(): String = buildString { fmt(this) }
 
     public companion object {
-        public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<Utf8Range> =
-            object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<Utf8Range> {
-                override val alignBytes: Long = 1L
-                override val sizeBytes: Long = 2L
-                override fun readNative(addr: Long): Utf8Range =
-                    Utf8Range(
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U8).readNative(addr),
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U8).readNative(addr + 1L),
-                    )
-                override fun writeNative(addr: Long, value: Utf8Range) {
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U8).writeNative(addr, value.start)
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U8).writeNative(addr + 1L, value.end)
-                }
-            }
-
         public fun new(start: UByte, end: UByte): Utf8Range = Utf8Range(start = start, end = end)
     }
 }
@@ -316,18 +301,18 @@ public data class Utf8Range(
  * An iterator over ranges of matching UTF-8 byte sequences.
  *
  * The iteration represents an alternation of comprehensive byte sequences
- * that match precisely the set of UTF-8 encoded scalar values.
+ * that cover precisely the set of UTF-8 encoded scalar values.
  *
  * A byte sequence corresponds to one of the scalar values in the range given
- * if and only if it completely matches exactly one of the sequences of byte
+ * if and only if it completely satisfies exactly one of the sequences of byte
  * ranges produced by this iterator.
  *
- * Each sequence of byte ranges matches a unique set of bytes. That is, no two
- * sequences will match the same bytes.
+ * Each sequence of byte ranges accepts a unique set of bytes. That is, no two
+ * sequences will accept the same bytes.
  *
  * # Example
  *
- * This shows how to match an arbitrary byte sequence against a range of
+ * This shows how to test an arbitrary byte sequence against a range of
  * scalar values.
  *
  * ```kotlin
@@ -343,14 +328,14 @@ public data class Utf8Range(
  *     return false
  * }
  * // Test the basic multilingual plane.
- * val seqs: Vec = Utf8Sequences.new('\u0000', '\uffff').collect()
- * // UTF-8 encoding of 'a'.
- * check(matches(seqs, listOf(0x61)))
- * // UTF-8 encoding of '☃' (`\u{2603}`).
- * check(matches(seqs, listOf(0xE2, 0x98, 0x83)))
+ * val seqs = Utf8Sequences.new(0x0000u, 0xFFFFu).toList()
+ * // UTF-8 encoding of `a`.
+ * check(matches(seqs, listOf(0x61u)))
+ * // UTF-8 encoding of snowman (`\u{2603}`).
+ * check(matches(seqs, listOf(0xE2u, 0x98u, 0x83u)))
  * // UTF-8 encoding of `\u{10348}` (outside the BMP).
- * check(!matches(seqs, listOf(0xF0, 0x90, 0x8D, 0x88)))
- * // Tries to match against a UTF-8 encoding of a surrogate codepoint,
+ * check(!matches(seqs, listOf(0xF0u, 0x90u, 0x8Du, 0x88u)))
+ * // Tries to test against a UTF-8 encoding of a surrogate codepoint,
  * // which is invalid UTF-8, and therefore fails, despite the fact that
  * // the corresponding codepoint (0xD800) falls in the range given.
  * check(!matches(seqs, listOf(0xED, 0xA0, 0x80)))
@@ -505,7 +490,7 @@ internal data class ScalarRange(
      * to the corresponding destination slices, and returns the number of
      * bytes written.
      *
-     * The slices should have room for at least `MAX_UTF8_BYTES`.
+     * The slices should have room for at least 4 bytes.
      */
     internal fun encode(start: UByteArray, end: UByteArray): Int {
         val cs = scalarFromU32(this.start)!!
@@ -514,23 +499,6 @@ internal data class ScalarRange(
         val se = encodeScalarUtf8(ce, end)
         check(ss == se)
         return ss
-    }
-
-    internal companion object {
-        internal fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<ScalarRange> =
-            object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<ScalarRange> {
-                override val alignBytes: Long = 4L
-                override val sizeBytes: Long = 8L
-                override fun readNative(addr: Long): ScalarRange =
-                    ScalarRange(
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U32).readNative(addr),
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U32).readNative(addr + 4L),
-                    )
-                override fun writeNative(addr: Long, value: ScalarRange) {
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U32).writeNative(addr, value.start)
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.U32).writeNative(addr + 4L, value.end)
-                }
-            }
     }
 }
 

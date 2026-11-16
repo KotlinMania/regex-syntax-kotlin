@@ -2,6 +2,7 @@
 package io.github.kotlinmania.regexsyntax.error
 
 import io.github.kotlinmania.regexsyntax.ast.parse.Parser
+import io.github.kotlinmania.regexsyntax.unwrapErr
 
 public fun assertPanicMessage(pattern: String, expectedMsg: String) {
     val result = Parser.new().parse(pattern)

@@ -11,6 +11,7 @@ import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder
 import io.github.kotlinmania.regexsyntax.debug.Bytes
 import io.github.kotlinmania.regexsyntax.hir.Capture
 import io.github.kotlinmania.regexsyntax.hir.Class
+import io.github.kotlinmania.regexsyntax.hir.Class.Bytes
 import io.github.kotlinmania.regexsyntax.hir.Class.Unicode
 import io.github.kotlinmania.regexsyntax.hir.ClassBytes
 import io.github.kotlinmania.regexsyntax.hir.ClassBytesRange
@@ -27,6 +28,9 @@ import io.github.kotlinmania.regexsyntax.hir.Repetition
 import io.github.kotlinmania.regexsyntax.unicode.ClassQuery
 import io.github.kotlinmania.regexsyntax.unicode.cls
 import io.github.kotlinmania.regexsyntax.unicode.perlWord
+import io.github.kotlinmania.regexsyntax.unwrap
+import io.github.kotlinmania.regexsyntax.unwrapErr
+import io.github.kotlinmania.rustlang.core.result.Result
 
 // Defines a translator that converts an `Ast` to an `Hir`.
 
@@ -58,11 +62,17 @@ public fun hirLit(s: String): Hir = hirBlit(s.encodeToByteArray().map { it.toUBy
 
 public fun hirBlit(s: List<UByte>): Hir = Hir.literal(s)
 
+public fun up(start: Char, end: Char): Pair<UInt, UInt> = Pair(start.code.toUInt(), end.code.toUInt())
+
+public fun up(start: Char, end: UInt): Pair<UInt, UInt> = Pair(start.code.toUInt(), end)
+
+public fun up(start: UInt, end: UInt): Pair<UInt, UInt> = Pair(start, end)
+
 public fun hirCapture(index: UInt, expr: Hir): Hir = Hir.capture(Capture(index = index, name = null, sub = expr))
 
-public fun hirCaptureName(index: UInt, name: String, expr: Hir): Hir = Hir.capture(Capture(index = index, name = name.into(), sub = expr))
+public fun hirCaptureName(index: UInt, name: String, expr: Hir): Hir = Hir.capture(Capture(index = index, name = name, sub = expr))
 
-public fun hirQuest(greedy: Boolean, expr: Hir): Hir = Hir.repetition(Repetition(min = 0u, max = 1, greedy = greedy, sub = expr))
+public fun hirQuest(greedy: Boolean, expr: Hir): Hir = Hir.repetition(Repetition(min = 0u, max = 1u, greedy = greedy, sub = expr))
 
 public fun hirStar(greedy: Boolean, expr: Hir): Hir = Hir.repetition(Repetition(min = 0u, max = null, greedy = greedy, sub = expr))
 
@@ -78,13 +88,13 @@ public fun hirUclassQuery(query: ClassQuery): Hir = Hir.cls(Class.Unicode(cls(qu
 
 public fun hirUclassPerlWord(): Hir = Hir.cls(Class.Unicode(perlWord().unwrap()))
 
-public fun hirAsciiUclass(kind: ClassAsciiKind): Hir = Hir.cls(Class.Unicode(ClassUnicode.new(asciiClassAsChars(kind).map({ (s, e) -> ClassUnicodeRange.new(s, e) }))))
+public fun hirAsciiUclass(kind: ClassAsciiKind): Hir = Hir.cls(Class.Unicode(ClassUnicode.new(asciiClassAsChars(kind).map { (s, e) -> ClassUnicodeRange.new(s, e) })))
 
-public fun hirAsciiBclass(kind: ClassAsciiKind): Hir = Hir.cls(Class.Bytes(ClassBytes.new(asciiClass(kind).map({ (s, e) -> ClassBytesRange.new(s, e) }))))
+public fun hirAsciiBclass(kind: ClassAsciiKind): Hir = Hir.cls(Class.Bytes(ClassBytes.new(asciiClass(kind).map { (s, e) -> ClassBytesRange.new(s, e) })))
 
-public fun hirUclass(ranges: List<Pair<Char, Char>>): Hir = Hir.cls(uclass(ranges))
+public fun hirUclass(ranges: List<Pair<UInt, UInt>>): Hir = Hir.cls(uclass(ranges))
 
-public fun hirBclass(ranges: List<Pair<UByte, UByte>>): Hir = Hir.cls(bclass(ranges))
+public fun hirBclass(ranges: List<Pair<UInt, UInt>>): Hir = Hir.cls(bclass(ranges))
 
 public fun hirCaseFold(expr: Hir): Hir =
     when (val matchVal = expr.intoKind()) {
@@ -106,13 +116,13 @@ public fun hirNegate(expr: Hir): Hir =
         else -> error("cannot negate non-class Hir expr")
     }
 
-public fun uclass(ranges: List<Pair<Char, Char>>): Class {
-    val ranges1: List<ClassUnicodeRange> = ranges.map({ (s, e) -> ClassUnicodeRange.new(s, e) }).collect()
+public fun uclass(ranges: List<Pair<UInt, UInt>>): Class {
+    val ranges1: List<ClassUnicodeRange> = ranges.map { (s, e) -> ClassUnicodeRange.new(s, e) }
     return Class.Unicode(ClassUnicode.new(ranges1))
 }
 
-public fun bclass(ranges: List<Pair<UByte, UByte>>): Class {
-    val ranges1: List<ClassBytesRange> = ranges.map({ (s, e) -> ClassBytesRange.new(s, e) }).collect()
+public fun bclass(ranges: List<Pair<UInt, UInt>>): Class {
+    val ranges1: List<ClassBytesRange> = ranges.map { (s, e) -> ClassBytesRange.new(s.toUByte(), e.toUByte()) }
     return Class.Bytes(ClassBytes.new(ranges1))
 }
 
@@ -172,15 +182,15 @@ public fun hirLook(look: Look): Hir = Hir.look(look)
 public fun empty() {
     check(t("") == Hir.empty())
     check(t("(?i)") == Hir.empty())
-    check(t("()") == hirCapture(1, Hir.empty()))
+    check(t("()") == hirCapture(1u, Hir.empty()))
     check(t("(?:)") == Hir.empty())
-    check(t("(?P<wat>)") == hirCaptureName(1, "wat", Hir.empty()))
+    check(t("(?P<wat>)") == hirCaptureName(1u, "wat", Hir.empty()))
     check(t("|") == hirAlt(mutableListOf(Hir.empty(), Hir.empty())))
-    check(t("()|()") == hirAlt(mutableListOf(hirCapture(1, Hir.empty()), hirCapture(2, Hir.empty()))))
-    check(t("(|b)") == hirCapture(1, hirAlt(mutableListOf(Hir.empty(), hirLit("b")))))
-    check(t("(a|)") == hirCapture(1, hirAlt(mutableListOf(hirLit("a"), Hir.empty()))))
-    check(t("(a||c)") == hirCapture(1, hirAlt(mutableListOf(hirLit("a"), Hir.empty(), hirLit("c")))))
-    check(t("(||)") == hirCapture(1, hirAlt(mutableListOf(Hir.empty(), Hir.empty(), Hir.empty()))))
+    check(t("()|()") == hirAlt(mutableListOf(hirCapture(1u, Hir.empty()), hirCapture(2u, Hir.empty()))))
+    check(t("(|b)") == hirCapture(1u, hirAlt(mutableListOf(Hir.empty(), hirLit("b")))))
+    check(t("(a|)") == hirCapture(1u, hirAlt(mutableListOf(hirLit("a"), Hir.empty()))))
+    check(t("(a||c)") == hirCapture(1u, hirAlt(mutableListOf(hirLit("a"), Hir.empty(), hirLit("c")))))
+    check(t("(||)") == hirCapture(1u, hirAlt(mutableListOf(Hir.empty(), Hir.empty(), Hir.empty()))))
 }
 
 @kotlin.test.Test
@@ -192,43 +202,43 @@ public fun literal() {
     check(tBytes("(?-u)a") == hirLit("a"))
     check(tBytes("(?-u)a") == hirLit("a"))
     check(tBytes("(?-u)\\x61") == hirLit("a"))
-    check(tBytes("(?-u)\\xFF") == hirBlit("ÿ".encodeToByteArray()))
+    check(tBytes("(?-u)\\xFF") == hirBlit(listOf(0xFFu.toUByte())))
     check(t("(?-u)☃") == hirLit("☃"))
-    check(tErr("(?-u)\\xFF") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(9, 1, 10))))
+    check(tErr("(?-u)\\xFF").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(9, 1, 10)))))
 }
 
 @kotlin.test.Test
 public fun literalCaseInsensitive() {
-    check(t("(?i)a") == hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))))
-    check(t("(?i:a)") == hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))))
-    check(t("a(?i)a(?-i)a") == hirCat(mutableListOf(hirLit("a"), hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))), hirLit("a"))))
-    check(t("(?i)ab@c") == hirCat(mutableListOf(hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))), hirUclass(listOf(Pair('B', 'B'), Pair('b', 'b'))), hirLit("@"), hirUclass(listOf(Pair('C', 'C'), Pair('c', 'c'))))))
-    check(t("(?i)β") == hirUclass(listOf(Pair('\u0392', '\u0392'), Pair('\u03b2', '\u03b2'), Pair('\u03d0', '\u03d0'))))
+    check(t("(?i)a") == hirUclass(listOf(up('A', 'A'), up('a', 'a'))))
+    check(t("(?i:a)") == hirUclass(listOf(up('A', 'A'), up('a', 'a'))))
+    check(t("a(?i)a(?-i)a") == hirCat(mutableListOf(hirLit("a"), hirUclass(listOf(up('A', 'A'), up('a', 'a'))), hirLit("a"))))
+    check(t("(?i)ab@c") == hirCat(mutableListOf(hirUclass(listOf(up('A', 'A'), up('a', 'a'))), hirUclass(listOf(up('B', 'B'), up('b', 'b'))), hirLit("@"), hirUclass(listOf(up('C', 'C'), up('c', 'c'))))))
+    check(t("(?i)β") == hirUclass(listOf(up('\u0392', '\u0392'), up('\u03b2', '\u03b2'), up('\u03d0', '\u03d0'))))
     check(t("(?i-u)a") == hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u))))
     check(t("(?-u)a(?i)a(?-i)a") == hirCat(mutableListOf(hirLit("a"), hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u))), hirLit("a"))))
     check(t("(?i-u)ab@c") == hirCat(mutableListOf(hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u))), hirBclass(listOf(Pair(66u, 66u), Pair(98u, 98u))), hirLit("@"), hirBclass(listOf(Pair(67u, 67u), Pair(99u, 99u))))))
     check(tBytes("(?i-u)a") == hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u))))
     check(tBytes("(?i-u)a") == hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u))))
     check(tBytes("(?i-u)\\x61") == hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u))))
-    check(tBytes("(?i-u)\\xFF") == hirBlit("ÿ".encodeToByteArray()))
+    check(tBytes("(?i-u)\\xFF") == hirBlit(listOf(0xFFu.toUByte())))
     check(t("(?i-u)β") == hirLit("β"))
 }
 
 @kotlin.test.Test
 public fun dot() {
-    check(t(".") == hirUclass(listOf(Pair('\u0000', '\t'), Pair('\u000b', 0x10ffff))))
-    check(t("(?R).") == hirUclass(listOf(Pair('\u0000', '\t'), Pair('\u000b', '\u000c'), Pair('\u000e', 0x10ffff))))
-    check(t("(?s).") == hirUclass(listOf(Pair('\u0000', 0x10ffff))))
-    check(t("(?Rs).") == hirUclass(listOf(Pair('\u0000', 0x10ffff))))
+    check(t(".") == hirUclass(listOf(up('\u0000', '\t'), up('\u000b', 0x10ffffu))))
+    check(t("(?R).") == hirUclass(listOf(up('\u0000', '\t'), up('\u000b', '\u000c'), up('\u000e', 0x10ffffu))))
+    check(t("(?s).") == hirUclass(listOf(up('\u0000', 0x10ffffu))))
+    check(t("(?Rs).") == hirUclass(listOf(up('\u0000', 0x10ffffu))))
     check(tBytes("(?-u).") == hirBclass(listOf(Pair(0u, 9u), Pair(11u, 255u))))
     check(tBytes("(?R-u).") == hirBclass(listOf(Pair(0u, 9u), Pair(11u, 12u), Pair(14u, 255u))))
     check(tBytes("(?s-u).") == hirBclass(listOf(Pair(0u, 255u))))
     check(tBytes("(?Rs-u).") == hirBclass(listOf(Pair(0u, 255u))))
     // If invalid UTF-8 isn't allowed, then non-Unicode `.` isn't allowed.
-    check(tErr("(?-u).") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(6, 1, 7))))
-    check(tErr("(?R-u).") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(7, 1, 8))))
-    check(tErr("(?s-u).") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(7, 1, 8))))
-    check(tErr("(?Rs-u).") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(7, 1, 8), Position.new(8, 1, 9))))
+    check(tErr("(?-u).").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(6, 1, 7)))))
+    check(tErr("(?R-u).").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(7, 1, 8)))))
+    check(tErr("(?s-u).").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(7, 1, 8)))))
+    check(tErr("(?Rs-u).").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(7, 1, 8), Position.new(8, 1, 9)))))
 }
 
 @kotlin.test.Test
@@ -249,21 +259,21 @@ public fun assertions() {
 
 @kotlin.test.Test
 public fun group() {
-    check(t("(a)") == hirCapture(1, hirLit("a")))
-    check(t("(a)(b)") == hirCat(mutableListOf(hirCapture(1, hirLit("a")), hirCapture(2, hirLit("b")))))
-    check(t("(a)|(b)") == hirAlt(mutableListOf(hirCapture(1, hirLit("a")), hirCapture(2, hirLit("b")))))
-    check(t("(?P<foo>)") == hirCaptureName(1, "foo", Hir.empty()))
-    check(t("(?P<foo>a)") == hirCaptureName(1, "foo", hirLit("a")))
-    check(t("(?P<foo>a)(?P<bar>b)") == hirCat(mutableListOf(hirCaptureName(1, "foo", hirLit("a")), hirCaptureName(2, "bar", hirLit("b")))))
+    check(t("(a)") == hirCapture(1u, hirLit("a")))
+    check(t("(a)(b)") == hirCat(mutableListOf(hirCapture(1u, hirLit("a")), hirCapture(2u, hirLit("b")))))
+    check(t("(a)|(b)") == hirAlt(mutableListOf(hirCapture(1u, hirLit("a")), hirCapture(2u, hirLit("b")))))
+    check(t("(?P<foo>)") == hirCaptureName(1u, "foo", Hir.empty()))
+    check(t("(?P<foo>a)") == hirCaptureName(1u, "foo", hirLit("a")))
+    check(t("(?P<foo>a)(?P<bar>b)") == hirCat(mutableListOf(hirCaptureName(1u, "foo", hirLit("a")), hirCaptureName(2u, "bar", hirLit("b")))))
     check(t("(?:)") == Hir.empty())
     check(t("(?:a)") == hirLit("a"))
-    check(t("(?:a)(b)") == hirCat(mutableListOf(hirLit("a"), hirCapture(1, hirLit("b")))))
-    check(t("(a)(?:b)(c)") == hirCat(mutableListOf(hirCapture(1, hirLit("a")), hirLit("b"), hirCapture(2, hirLit("c")))))
-    check(t("(a)(?P<foo>b)(c)") == hirCat(mutableListOf(hirCapture(1, hirLit("a")), hirCaptureName(2, "foo", hirLit("b")), hirCapture(3, hirLit("c")))))
-    check(t("()") == hirCapture(1, Hir.empty()))
-    check(t("((?i))") == hirCapture(1, Hir.empty()))
-    check(t("((?x))") == hirCapture(1, Hir.empty()))
-    check(t("(((?x)))") == hirCapture(1, hirCapture(2, Hir.empty())))
+    check(t("(?:a)(b)") == hirCat(mutableListOf(hirLit("a"), hirCapture(1u, hirLit("b")))))
+    check(t("(a)(?:b)(c)") == hirCat(mutableListOf(hirCapture(1u, hirLit("a")), hirLit("b"), hirCapture(2u, hirLit("c")))))
+    check(t("(a)(?P<foo>b)(c)") == hirCat(mutableListOf(hirCapture(1u, hirLit("a")), hirCaptureName(2u, "foo", hirLit("b")), hirCapture(3u, hirLit("c")))))
+    check(t("()") == hirCapture(1u, Hir.empty()))
+    check(t("((?i))") == hirCapture(1u, Hir.empty()))
+    check(t("((?x))") == hirCapture(1u, Hir.empty()))
+    check(t("(((?x)))") == hirCapture(1u, hirCapture(2u, Hir.empty())))
 }
 
 @kotlin.test.Test
@@ -288,16 +298,16 @@ public fun lineAnchors() {
 
 @kotlin.test.Test
 public fun flags() {
-    check(t("(?i:a)a") == hirCat(mutableListOf(hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))), hirLit("a"))))
+    check(t("(?i:a)a") == hirCat(mutableListOf(hirUclass(listOf(up('A', 'A'), up('a', 'a'))), hirLit("a"))))
     check(t("(?i-u:a)β") == hirCat(mutableListOf(hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u))), hirLit("β"))))
     check(t("(?:(?i-u)a)b") == hirCat(mutableListOf(hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u))), hirLit("b"))))
-    check(t("((?i-u)a)b") == hirCat(mutableListOf(hirCapture(1, hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u)))), hirLit("b"))))
-    check(t("(?i)(?-i:a)a") == hirCat(mutableListOf(hirLit("a"), hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))))))
-    check(t("(?im)a^") == hirCat(mutableListOf(hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))), hirLook(Look.StartLF))))
-    check(t("(?im)a^(?i-m)a^") == hirCat(mutableListOf(hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))), hirLook(Look.StartLF), hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))), hirLook(Look.Start))))
+    check(t("((?i-u)a)b") == hirCat(mutableListOf(hirCapture(1u, hirBclass(listOf(Pair(65u, 65u), Pair(97u, 97u)))), hirLit("b"))))
+    check(t("(?i)(?-i:a)a") == hirCat(mutableListOf(hirLit("a"), hirUclass(listOf(up('A', 'A'), up('a', 'a'))))))
+    check(t("(?im)a^") == hirCat(mutableListOf(hirUclass(listOf(up('A', 'A'), up('a', 'a'))), hirLook(Look.StartLF))))
+    check(t("(?im)a^(?i-m)a^") == hirCat(mutableListOf(hirUclass(listOf(up('A', 'A'), up('a', 'a'))), hirLook(Look.StartLF), hirUclass(listOf(up('A', 'A'), up('a', 'a'))), hirLook(Look.Start))))
     check(t("(?U)a*a*?(?-U)a*a*?") == hirCat(mutableListOf(hirStar(false, hirLit("a")), hirStar(true, hirLit("a")), hirStar(true, hirLit("a")), hirStar(false, hirLit("a")))))
-    check(t("(?:a(?i)a)a") == hirCat(mutableListOf(hirCat(mutableListOf(hirLit("a"), hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))))), hirLit("a"))))
-    check(t("(?i)(?:a(?-i)a)a") == hirCat(mutableListOf(hirCat(mutableListOf(hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))), hirLit("a"))), hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))))))
+    check(t("(?:a(?i)a)a") == hirCat(mutableListOf(hirCat(mutableListOf(hirLit("a"), hirUclass(listOf(up('A', 'A'), up('a', 'a'))))), hirLit("a"))))
+    check(t("(?i)(?:a(?-i)a)a") == hirCat(mutableListOf(hirCat(mutableListOf(hirUclass(listOf(up('A', 'A'), up('a', 'a'))), hirLit("a"))), hirUclass(listOf(up('A', 'A'), up('a', 'a'))))))
 }
 
 @kotlin.test.Test
@@ -313,14 +323,14 @@ public fun repetition() {
     check(t("a??") == hirQuest(false, hirLit("a")))
     check(t("a*?") == hirStar(false, hirLit("a")))
     check(t("a+?") == hirPlus(false, hirLit("a")))
-    check(t("a{1}") == hirRange(true, 1, 1, hirLit("a")))
-    check(t("a{1,}") == hirRange(true, 1, null, hirLit("a")))
-    check(t("a{1,2}") == hirRange(true, 1, 2, hirLit("a")))
-    check(t("a{1}?") == hirRange(false, 1, 1, hirLit("a")))
-    check(t("a{1,}?") == hirRange(false, 1, null, hirLit("a")))
-    check(t("a{1,2}?") == hirRange(false, 1, 2, hirLit("a")))
+    check(t("a{1}") == hirRange(true, 1u, 1u, hirLit("a")))
+    check(t("a{1,}") == hirRange(true, 1u, null, hirLit("a")))
+    check(t("a{1,2}") == hirRange(true, 1u, 2u, hirLit("a")))
+    check(t("a{1}?") == hirRange(false, 1u, 1u, hirLit("a")))
+    check(t("a{1,}?") == hirRange(false, 1u, null, hirLit("a")))
+    check(t("a{1,2}?") == hirRange(false, 1u, 2u, hirLit("a")))
     check(t("ab?") == hirCat(mutableListOf(hirLit("a"), hirQuest(true, hirLit("b")))))
-    check(t("(ab)?") == hirQuest(true, hirCapture(1, hirLit("ab"))))
+    check(t("(ab)?") == hirQuest(true, hirCapture(1u, hirLit("ab"))))
     check(t("a|b?") == hirAlt(mutableListOf(hirLit("a"), hirQuest(true, hirLit("b")))))
 }
 
@@ -330,14 +340,14 @@ public fun catAlt() {
     val b = { hirLook(Look.End) }
     val c = { hirLook(Look.WordUnicode) }
     val d = { hirLook(Look.WordUnicodeNegate) }
-    check(t("(^\$)") == hirCapture(1, hirCat(mutableListOf(a(), b()))))
+    check(t("(^\$)") == hirCapture(1u, hirCat(mutableListOf(a(), b()))))
     check(t("^|\$") == hirAlt(mutableListOf(a(), b())))
     check(t("^|\$|\\b") == hirAlt(mutableListOf(a(), b(), c())))
     check(t("^\$|\$\\b|\\b\\B") == hirAlt(mutableListOf(hirCat(mutableListOf(a(), b())), hirCat(mutableListOf(b(), c())), hirCat(mutableListOf(c(), d())))))
-    check(t("(^|\$)") == hirCapture(1, hirAlt(mutableListOf(a(), b()))))
-    check(t("(^|\$|\\b)") == hirCapture(1, hirAlt(mutableListOf(a(), b(), c()))))
-    check(t("(^\$|\$\\b|\\b\\B)") == hirCapture(1, hirAlt(mutableListOf(hirCat(mutableListOf(a(), b())), hirCat(mutableListOf(b(), c())), hirCat(mutableListOf(c(), d()))))))
-    check(t("(^\$|(\$\\b|(\\b\\B)))") == hirCapture(1, hirAlt(mutableListOf(hirCat(mutableListOf(a(), b())), hirCapture(2, hirAlt(mutableListOf(hirCat(mutableListOf(b(), c())), hirCapture(3, hirCat(mutableListOf(c(), d()))))))))))
+    check(t("(^|\$)") == hirCapture(1u, hirAlt(mutableListOf(a(), b()))))
+    check(t("(^|\$|\\b)") == hirCapture(1u, hirAlt(mutableListOf(a(), b(), c()))))
+    check(t("(^\$|\$\\b|\\b\\B)") == hirCapture(1u, hirAlt(mutableListOf(hirCat(mutableListOf(a(), b())), hirCat(mutableListOf(b(), c())), hirCat(mutableListOf(c(), d()))))))
+    check(t("(^\$|(\$\\b|(\\b\\B)))") == hirCapture(1u, hirAlt(mutableListOf(hirCat(mutableListOf(a(), b())), hirCapture(2u, hirAlt(mutableListOf(hirCat(mutableListOf(b(), c())), hirCapture(3u, hirCat(mutableListOf(c(), d()))))))))))
 }
 
 // Tests the HIR transformation of things like '[a-z]|[A-Z]' into
@@ -347,13 +357,13 @@ public fun catAlt() {
 // match non-ASCII Unicode.)
 @kotlin.test.Test
 public fun catClassFlattened() {
-    check(t("[a-z]|[A-Z]") == hirUclass(listOf(Pair('A', 'Z'), Pair('a', 'z'))))
+    check(t("[a-z]|[A-Z]") == hirUclass(listOf(up('A', 'Z'), up('a', 'z'))))
     // Combining all of the letter properties should give us the one giant
     // letter property.
     check(t("(?x)\n                \\p{Lowercase_Letter}\n                |\\p{Uppercase_Letter}\n                |\\p{Titlecase_Letter}\n                |\\p{Modifier_Letter}\n                |\\p{Other_Letter}\n            ") == hirUclassQuery(ClassQuery.Binary("letter")))
     // Byte classes that can truly match invalid UTF-8 cannot be combined
     // with Unicode classes.
-    check(tBytes("[Δδ]|(?-u:[\\x90-\\xFF])|[Λλ]") == hirAlt(mutableListOf(hirUclass(listOf(Pair('\u0394', '\u0394'), Pair('\u03b4', '\u03b4'))), hirBclass(listOf(Pair(144u, 255u))), hirUclass(listOf(Pair('\u039b', '\u039b'), Pair('\u03bb', '\u03bb'))))))
+    check(tBytes("[Δδ]|(?-u:[\\x90-\\xFF])|[Λλ]") == hirAlt(mutableListOf(hirUclass(listOf(up('\u0394', '\u0394'), up('\u03b4', '\u03b4'))), hirBclass(listOf(up(144u, 255u))), hirUclass(listOf(up('\u039b', '\u039b'), up('\u03bb', '\u03bb'))))))
     // Byte classes on their own can be combined, even if some are ASCII
     // and others are invalid UTF-8.
     check(tBytes("[a-z]|(?-u:[\\x90-\\xFF])|[A-Z]") == hirBclass(listOf(Pair(65u, 90u), Pair(97u, 122u), Pair(144u, 255u))))
@@ -376,18 +386,18 @@ public fun classAscii() {
     check(t("[[:word:]]") == hirAsciiUclass(ClassAsciiKind.Word))
     check(t("[[:xdigit:]]") == hirAsciiUclass(ClassAsciiKind.Xdigit))
     check(t("[[:^lower:]]") == hirNegate(hirAsciiUclass(ClassAsciiKind.Lower)))
-    check(t("(?i)[[:lower:]]") == hirUclass(listOf(Pair('A', 'Z'), Pair('a', 'z'), Pair('\u017f', '\u017f'), Pair('\u212a', '\u212a'))))
+    check(t("(?i)[[:lower:]]") == hirUclass(listOf(up('A', 'Z'), up('a', 'z'), up('\u017f', '\u017f'), up('\u212a', '\u212a'))))
     check(t("(?-u)[[:lower:]]") == hirAsciiBclass(ClassAsciiKind.Lower))
     check(t("(?i-u)[[:lower:]]") == hirCaseFold(hirAsciiBclass(ClassAsciiKind.Lower)))
-    check(tErr("(?-u)[[:^lower:]]") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(16, 1, 17))))
-    check(tErr("(?i-u)[[:^lower:]]") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(7, 1, 8), Position.new(17, 1, 18))))
+    check(tErr("(?-u)[[:^lower:]]").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(16, 1, 17)))))
+    check(tErr("(?i-u)[[:^lower:]]").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(7, 1, 8), Position.new(17, 1, 18)))))
 }
 
 @kotlin.test.Test
 public fun classAsciiMultiple() {
     // See: https://github.com/rust-lang/regex/issues/680
-    check(t("[[:alnum:][:^ascii:]]") == hirUnion(hirAsciiUclass(ClassAsciiKind.Alnum), hirUclass(listOf(Pair('\u0080', 0x10ffff)))))
-    check(tBytes("(?-u)[[:alnum:][:^ascii:]]") == hirUnion(hirAsciiBclass(ClassAsciiKind.Alnum), hirBclass(listOf(Pair(0x80, 0xFF)))))
+    check(t("[[:alnum:][:^ascii:]]") == hirUnion(hirAsciiUclass(ClassAsciiKind.Alnum), hirUclass(listOf(up('\u0080', 0x10ffffu)))))
+    check(tBytes("(?-u)[[:alnum:][:^ascii:]]") == hirUnion(hirAsciiBclass(ClassAsciiKind.Alnum), hirBclass(listOf(Pair(0x80u, 0xFFu)))))
 }
 
 @kotlin.test.Test
@@ -427,12 +437,12 @@ public fun classPerlAscii() {
     // ASCII only, negated, with UTF-8 mode enabled.
     // In this case, negating any Perl class results in an error because
     // all such classes can match invalid UTF-8.
-    check(tErr("(?-u)\\D") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(7, 1, 8))))
-    check(tErr("(?-u)\\S") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(7, 1, 8))))
-    check(tErr("(?-u)\\W") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(7, 1, 8))))
-    check(tErr("(?i-u)\\D") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(8, 1, 9))))
-    check(tErr("(?i-u)\\S") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(8, 1, 9))))
-    check(tErr("(?i-u)\\W") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(8, 1, 9))))
+    check(tErr("(?-u)\\D").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(7, 1, 8)))))
+    check(tErr("(?-u)\\S").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(7, 1, 8)))))
+    check(tErr("(?-u)\\W").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(7, 1, 8)))))
+    check(tErr("(?i-u)\\D").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(8, 1, 9)))))
+    check(tErr("(?i-u)\\S").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(8, 1, 9)))))
+    check(tErr("(?i-u)\\W").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(6, 1, 7), Position.new(8, 1, 9)))))
 }
 
 @kotlin.test.Test
@@ -455,11 +465,11 @@ public fun classUnicodeGencat() {
     check(t("\\p{gc:any}") == hirUclassQuery(ClassQuery.Binary("Any")))
     check(t("\\p{gc:assigned}") == hirUclassQuery(ClassQuery.Binary("Assigned")))
     check(t("\\p{gc:ascii}") == hirUclassQuery(ClassQuery.Binary("ASCII")))
-    check(tErr("(?-u)\\pZ") == TestError(kind = ErrorKind.UnicodeNotAllowed, span = Span.new(Position.new(5, 1, 6), Position.new(8, 1, 9))))
-    check(tErr("(?-u)\\p{Separator}") == TestError(kind = ErrorKind.UnicodeNotAllowed, span = Span.new(Position.new(5, 1, 6), Position.new(18, 1, 19))))
-    check(tErr("\\pE") == TestError(kind = ErrorKind.UnicodePropertyNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(3, 1, 4))))
-    check(tErr("\\p{Foo}") == TestError(kind = ErrorKind.UnicodePropertyNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(7, 1, 8))))
-    check(tErr("\\p{gc:Foo}") == TestError(kind = ErrorKind.UnicodePropertyValueNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(10, 1, 11))))
+    check(tErr("(?-u)\\pZ").eq(TestError(kind = ErrorKind.UnicodeNotAllowed, span = Span.new(Position.new(5, 1, 6), Position.new(8, 1, 9)))))
+    check(tErr("(?-u)\\p{Separator}").eq(TestError(kind = ErrorKind.UnicodeNotAllowed, span = Span.new(Position.new(5, 1, 6), Position.new(18, 1, 19)))))
+    check(tErr("\\pE").eq(TestError(kind = ErrorKind.UnicodePropertyNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(3, 1, 4)))))
+    check(tErr("\\p{Foo}").eq(TestError(kind = ErrorKind.UnicodePropertyNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(7, 1, 8)))))
+    check(tErr("\\p{gc:Foo}").eq(TestError(kind = ErrorKind.UnicodePropertyValueNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(10, 1, 11)))))
 }
 
 @kotlin.test.Test
@@ -467,13 +477,13 @@ public fun classUnicodeScript() {
     check(t("\\p{Greek}") == hirUclassQuery(ClassQuery.Binary("Greek")))
     check(t("(?i)\\p{Greek}") == hirCaseFold(hirUclassQuery(ClassQuery.Binary("Greek"))))
     check(t("(?i)\\P{Greek}") == hirNegate(hirCaseFold(hirUclassQuery(ClassQuery.Binary("Greek")))))
-    check(tErr("\\p{sc:Foo}") == TestError(kind = ErrorKind.UnicodePropertyValueNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(10, 1, 11))))
-    check(tErr("\\p{scx:Foo}") == TestError(kind = ErrorKind.UnicodePropertyValueNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(11, 1, 12))))
+    check(tErr("\\p{sc:Foo}").eq(TestError(kind = ErrorKind.UnicodePropertyValueNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(10, 1, 11)))))
+    check(tErr("\\p{scx:Foo}").eq(TestError(kind = ErrorKind.UnicodePropertyValueNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(11, 1, 12)))))
 }
 
 @kotlin.test.Test
 public fun classUnicodeAge() {
-    check(tErr("\\p{age:Foo}") == TestError(kind = ErrorKind.UnicodePropertyValueNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(11, 1, 12))))
+    check(tErr("\\p{age:Foo}").eq(TestError(kind = ErrorKind.UnicodePropertyValueNotFound, span = Span.new(Position.new(0, 1, 1), Position.new(11, 1, 12)))))
 }
 
 @kotlin.test.Test
@@ -484,14 +494,14 @@ public fun classUnicodeAnyEmpty() {
 @kotlin.test.Test
 public fun classBracketed() {
     check(t("[a]") == hirLit("a"))
-    check(t("[ab]") == hirUclass(listOf(Pair('a', 'b'))))
-    check(t("[^[a]]") == classNegate(uclass(listOf(Pair('a', 'a')))))
-    check(t("[a-z]") == hirUclass(listOf(Pair('a', 'z'))))
-    check(t("[a-fd-h]") == hirUclass(listOf(Pair('a', 'h'))))
-    check(t("[a-fg-m]") == hirUclass(listOf(Pair('a', 'm'))))
-    check(t("[\\x00]") == hirUclass(listOf(Pair('\u0000', '\u0000'))))
-    check(t("[\\n]") == hirUclass(listOf(Pair('\n', '\n'))))
-    check(t("[\n]") == hirUclass(listOf(Pair('\n', '\n'))))
+    check(t("[ab]") == hirUclass(listOf(up('a', 'b'))))
+    check(t("[^[a]]") == classNegate(uclass(listOf(up('a', 'a')))))
+    check(t("[a-z]") == hirUclass(listOf(up('a', 'z'))))
+    check(t("[a-fd-h]") == hirUclass(listOf(up('a', 'h'))))
+    check(t("[a-fg-m]") == hirUclass(listOf(up('a', 'm'))))
+    check(t("[\\x00]") == hirUclass(listOf(up('\u0000', '\u0000'))))
+    check(t("[\\n]") == hirUclass(listOf(up('\n', '\n'))))
+    check(t("[\n]") == hirUclass(listOf(up('\n', '\n'))))
     check(t("[\\d]") == hirUclassQuery(ClassQuery.Binary("digit")))
     check(t("[\\pZ]") == hirUclassQuery(ClassQuery.Binary("separator")))
     check(t("[\\p{separator}]") == hirUclassQuery(ClassQuery.Binary("separator")))
@@ -503,12 +513,12 @@ public fun classBracketed() {
     check(t("(?-u)[a]") == hirBclass(listOf(Pair(97u, 97u))))
     check(t("(?-u)[\\x00]") == hirBclass(listOf(Pair(0u, 0u))))
     check(tBytes("(?-u)[\\xFF]") == hirBclass(listOf(Pair(255u, 255u))))
-    check(t("(?i)[a]") == hirUclass(listOf(Pair('A', 'A'), Pair('a', 'a'))))
-    check(t("(?i)[k]") == hirUclass(listOf(Pair('K', 'K'), Pair('k', 'k'), Pair('\u212a', '\u212a'))))
-    check(t("(?i)[β]") == hirUclass(listOf(Pair('\u0392', '\u0392'), Pair('\u03b2', '\u03b2'), Pair('\u03d0', '\u03d0'))))
+    check(t("(?i)[a]") == hirUclass(listOf(up('A', 'A'), up('a', 'a'))))
+    check(t("(?i)[k]") == hirUclass(listOf(up('K', 'K'), up('k', 'k'), up('\u212a', '\u212a'))))
+    check(t("(?i)[β]") == hirUclass(listOf(up('\u0392', '\u0392'), up('\u03b2', '\u03b2'), up('\u03d0', '\u03d0'))))
     check(t("(?i-u)[k]") == hirBclass(listOf(Pair(75u, 75u), Pair(107u, 107u))))
-    check(t("[^a]") == classNegate(uclass(listOf(Pair('a', 'a')))))
-    check(t("[^\\x00]") == classNegate(uclass(listOf(Pair('\u0000', '\u0000')))))
+    check(t("[^a]") == classNegate(uclass(listOf(up('a', 'a')))))
+    check(t("[^\\x00]") == classNegate(uclass(listOf(up('\u0000', '\u0000')))))
     check(tBytes("(?-u)[^a]") == classNegate(bclass(listOf(Pair(97u, 97u)))))
     check(t("[^\\d]") == hirNegate(hirUclassQuery(ClassQuery.Binary("digit"))))
     check(t("[^\\pZ]") == hirNegate(hirUclassQuery(ClassQuery.Binary("separator"))))
@@ -516,30 +526,30 @@ public fun classBracketed() {
     check(t("(?i)[^\\p{greek}]") == hirNegate(hirCaseFold(hirUclassQuery(ClassQuery.Binary("greek")))))
     check(t("(?i)[\\P{greek}]") == hirNegate(hirCaseFold(hirUclassQuery(ClassQuery.Binary("greek")))))
     // Test some weird cases.
-    check(t("[\\[]") == hirUclass(listOf(Pair('[', '['))))
-    check(t("[&]") == hirUclass(listOf(Pair('&', '&'))))
-    check(t("[\\&]") == hirUclass(listOf(Pair('&', '&'))))
-    check(t("[\\&\\&]") == hirUclass(listOf(Pair('&', '&'))))
-    check(t("[\\x00-&]") == hirUclass(listOf(Pair('\u0000', '&'))))
-    check(t("[&-\\xFF]") == hirUclass(listOf(Pair('&', '\u00ff'))))
-    check(t("[~]") == hirUclass(listOf(Pair('~', '~'))))
-    check(t("[\\~]") == hirUclass(listOf(Pair('~', '~'))))
-    check(t("[\\~\\~]") == hirUclass(listOf(Pair('~', '~'))))
-    check(t("[\\x00-~]") == hirUclass(listOf(Pair('\u0000', '~'))))
-    check(t("[~-\\xFF]") == hirUclass(listOf(Pair('~', '\u00ff'))))
-    check(t("[-]") == hirUclass(listOf(Pair('-', '-'))))
-    check(t("[\\-]") == hirUclass(listOf(Pair('-', '-'))))
-    check(t("[\\-\\-]") == hirUclass(listOf(Pair('-', '-'))))
-    check(t("[\\x00-\\-]") == hirUclass(listOf(Pair('\u0000', '-'))))
-    check(t("[\\--\\xFF]") == hirUclass(listOf(Pair('-', '\u00ff'))))
-    check(tErr("(?-u)[^a]") == TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(9, 1, 10))))
+    check(t("[\\[]") == hirUclass(listOf(up('[', '['))))
+    check(t("[&]") == hirUclass(listOf(up('&', '&'))))
+    check(t("[\\&]") == hirUclass(listOf(up('&', '&'))))
+    check(t("[\\&\\&]") == hirUclass(listOf(up('&', '&'))))
+    check(t("[\\x00-&]") == hirUclass(listOf(up('\u0000', '&'))))
+    check(t("[&-\\xFF]") == hirUclass(listOf(up('&', '\u00ff'))))
+    check(t("[~]") == hirUclass(listOf(up('~', '~'))))
+    check(t("[\\~]") == hirUclass(listOf(up('~', '~'))))
+    check(t("[\\~\\~]") == hirUclass(listOf(up('~', '~'))))
+    check(t("[\\x00-~]") == hirUclass(listOf(up('\u0000', '~'))))
+    check(t("[~-\\xFF]") == hirUclass(listOf(up('~', '\u00ff'))))
+    check(t("[-]") == hirUclass(listOf(up('-', '-'))))
+    check(t("[\\-]") == hirUclass(listOf(up('-', '-'))))
+    check(t("[\\-\\-]") == hirUclass(listOf(up('-', '-'))))
+    check(t("[\\x00-\\-]") == hirUclass(listOf(up('\u0000', '-'))))
+    check(t("[\\--\\xFF]") == hirUclass(listOf(up('-', '\u00ff'))))
+    check(tErr("(?-u)[^a]").eq(TestError(kind = ErrorKind.InvalidUtf8, span = Span.new(Position.new(5, 1, 6), Position.new(9, 1, 10)))))
     check(t("[^\\s\\S]") == hirUclass(listOf()))
     check(tBytes("(?-u)[^\\s\\S]") == hirBclass(listOf()))
 }
 
 @kotlin.test.Test
 public fun classBracketedUnion() {
-    check(t("[a-zA-Z]") == hirUclass(listOf(Pair('A', 'Z'), Pair('a', 'z'))))
+    check(t("[a-zA-Z]") == hirUclass(listOf(up('A', 'Z'), up('a', 'z'))))
     check(t("[a\\pZb]") == hirUnion(hirUclass(listOf(Pair('a', 'b'))), hirUclassQuery(ClassQuery.Binary("separator"))))
     check(t("[\\pZ\\p{Greek}]") == hirUnion(hirUclassQuery(ClassQuery.Binary("greek")), hirUclassQuery(ClassQuery.Binary("separator"))))
     check(t("[\\p{age:3.0}\\pZ\\p{Greek}]") == hirUnion(hirUclassQuery(ClassQuery.ByValue(propertyName = "age", propertyValue = "3.0")), hirUnion(hirUclassQuery(ClassQuery.Binary("greek")), hirUclassQuery(ClassQuery.Binary("separator")))))
@@ -551,42 +561,42 @@ public fun classBracketedUnion() {
 
 @kotlin.test.Test
 public fun classBracketedNested() {
-    check(t("[a[^c]]") == classNegate(uclass(listOf(Pair('c', 'c')))))
-    check(t("[a-b[^c]]") == classNegate(uclass(listOf(Pair('c', 'c')))))
+    check(t("[a[^c]]") == classNegate(uclass(listOf(up('c', 'c')))))
+    check(t("[a-b[^c]]") == classNegate(uclass(listOf(up('c', 'c')))))
     check(t("[a-c[^c]]") == classNegate(uclass(listOf())))
-    check(t("[^a[^c]]") == hirUclass(listOf(Pair('c', 'c'))))
-    check(t("[^a-b[^c]]") == hirUclass(listOf(Pair('c', 'c'))))
-    check(t("(?i)[a[^c]]") == hirNegate(classCaseFold(uclass(listOf(Pair('c', 'c'))))))
-    check(t("(?i)[a-b[^c]]") == hirNegate(classCaseFold(uclass(listOf(Pair('c', 'c'))))))
-    check(t("(?i)[^a[^c]]") == hirUclass(listOf(Pair('C', 'C'), Pair('c', 'c'))))
-    check(t("(?i)[^a-b[^c]]") == hirUclass(listOf(Pair('C', 'C'), Pair('c', 'c'))))
+    check(t("[^a[^c]]") == hirUclass(listOf(up('c', 'c'))))
+    check(t("[^a-b[^c]]") == hirUclass(listOf(up('c', 'c'))))
+    check(t("(?i)[a[^c]]") == hirNegate(classCaseFold(uclass(listOf(up('c', 'c'))))))
+    check(t("(?i)[a-b[^c]]") == hirNegate(classCaseFold(uclass(listOf(up('c', 'c'))))))
+    check(t("(?i)[^a[^c]]") == hirUclass(listOf(up('C', 'C'), up('c', 'c'))))
+    check(t("(?i)[^a-b[^c]]") == hirUclass(listOf(up('C', 'C'), up('c', 'c'))))
     check(t("[^a-c[^c]]") == hirUclass(listOf()))
     check(t("(?i)[^a-c[^c]]") == hirUclass(listOf()))
 }
 
 @kotlin.test.Test
 public fun classBracketedIntersect() {
-    check(t("[abc&&b-c]") == hirUclass(listOf(Pair('b', 'c'))))
-    check(t("[abc&&[b-c]]") == hirUclass(listOf(Pair('b', 'c'))))
-    check(t("[[abc]&&[b-c]]") == hirUclass(listOf(Pair('b', 'c'))))
-    check(t("[a-z&&b-y&&c-x]") == hirUclass(listOf(Pair('c', 'x'))))
-    check(t("[c-da-b&&a-d]") == hirUclass(listOf(Pair('a', 'd'))))
-    check(t("[a-d&&c-da-b]") == hirUclass(listOf(Pair('a', 'd'))))
-    check(t("[a-z&&a-c]") == hirUclass(listOf(Pair('a', 'c'))))
-    check(t("[[a-z&&a-c]]") == hirUclass(listOf(Pair('a', 'c'))))
-    check(t("[^[a-z&&a-c]]") == hirNegate(hirUclass(listOf(Pair('a', 'c')))))
+    check(t("[abc&&b-c]") == hirUclass(listOf(up('b', 'c'))))
+    check(t("[abc&&[b-c]]") == hirUclass(listOf(up('b', 'c'))))
+    check(t("[[abc]&&[b-c]]") == hirUclass(listOf(up('b', 'c'))))
+    check(t("[a-z&&b-y&&c-x]") == hirUclass(listOf(up('c', 'x'))))
+    check(t("[c-da-b&&a-d]") == hirUclass(listOf(up('a', 'd'))))
+    check(t("[a-d&&c-da-b]") == hirUclass(listOf(up('a', 'd'))))
+    check(t("[a-z&&a-c]") == hirUclass(listOf(up('a', 'c'))))
+    check(t("[[a-z&&a-c]]") == hirUclass(listOf(up('a', 'c'))))
+    check(t("[^[a-z&&a-c]]") == hirNegate(hirUclass(listOf(up('a', 'c')))))
     check(t("(?-u)[abc&&b-c]") == hirBclass(listOf(Pair(98u, 99u))))
     check(t("(?-u)[abc&&[b-c]]") == hirBclass(listOf(Pair(98u, 99u))))
     check(t("(?-u)[[abc]&&[b-c]]") == hirBclass(listOf(Pair(98u, 99u))))
     check(t("(?-u)[a-z&&b-y&&c-x]") == hirBclass(listOf(Pair(99u, 120u))))
     check(t("(?-u)[c-da-b&&a-d]") == hirBclass(listOf(Pair(97u, 100u))))
     check(t("(?-u)[a-d&&c-da-b]") == hirBclass(listOf(Pair(97u, 100u))))
-    check(t("(?i)[abc&&b-c]") == hirCaseFold(hirUclass(listOf(Pair('b', 'c')))))
-    check(t("(?i)[abc&&[b-c]]") == hirCaseFold(hirUclass(listOf(Pair('b', 'c')))))
-    check(t("(?i)[[abc]&&[b-c]]") == hirCaseFold(hirUclass(listOf(Pair('b', 'c')))))
-    check(t("(?i)[a-z&&b-y&&c-x]") == hirCaseFold(hirUclass(listOf(Pair('c', 'x')))))
-    check(t("(?i)[c-da-b&&a-d]") == hirCaseFold(hirUclass(listOf(Pair('a', 'd')))))
-    check(t("(?i)[a-d&&c-da-b]") == hirCaseFold(hirUclass(listOf(Pair('a', 'd')))))
+    check(t("(?i)[abc&&b-c]") == hirCaseFold(hirUclass(listOf(up('b', 'c')))))
+    check(t("(?i)[abc&&[b-c]]") == hirCaseFold(hirUclass(listOf(up('b', 'c')))))
+    check(t("(?i)[[abc]&&[b-c]]") == hirCaseFold(hirUclass(listOf(up('b', 'c')))))
+    check(t("(?i)[a-z&&b-y&&c-x]") == hirCaseFold(hirUclass(listOf(up('c', 'x')))))
+    check(t("(?i)[c-da-b&&a-d]") == hirCaseFold(hirUclass(listOf(up('a', 'd')))))
+    check(t("(?i)[a-d&&c-da-b]") == hirCaseFold(hirUclass(listOf(up('a', 'd')))))
     check(t("(?i-u)[abc&&b-c]") == hirCaseFold(hirBclass(listOf(Pair(98u, 99u)))))
     check(t("(?i-u)[abc&&[b-c]]") == hirCaseFold(hirBclass(listOf(Pair(98u, 99u)))))
     check(t("(?i-u)[[abc]&&[b-c]]") == hirCaseFold(hirBclass(listOf(Pair(98u, 99u)))))
@@ -595,20 +605,20 @@ public fun classBracketedIntersect() {
     check(t("(?i-u)[a-d&&c-da-b]") == hirCaseFold(hirBclass(listOf(Pair(97u, 100u)))))
     // In `[a ^]`, `^` does not need to be escaped, so it makes sense that
     // `^` is also allowed to be unescaped after `&&`.
-    check(t("[\\^&&^]") == hirUclass(listOf(Pair('^', '^'))))
+    check(t("[\\^&&^]") == hirUclass(listOf(up('^', '^'))))
     // `]` needs to be escaped after `&&` since it's not at start of class.
-    check(t("[]&&\\]]") == hirUclass(listOf(Pair(']', ']'))))
-    check(t("[-&&-]") == hirUclass(listOf(Pair('-', '-'))))
-    check(t("[\\&&&&]") == hirUclass(listOf(Pair('&', '&'))))
-    check(t("[\\&&&\\&]") == hirUclass(listOf(Pair('&', '&'))))
+    check(t("[]&&\\]]") == hirUclass(listOf(up(']', ']'))))
+    check(t("[-&&-]") == hirUclass(listOf(up('-', '-'))))
+    check(t("[\\&&&&]") == hirUclass(listOf(up('&', '&'))))
+    check(t("[\\&&&\\&]") == hirUclass(listOf(up('&', '&'))))
     // Test precedence.
-    check(t("[a-w&&[^c-g]z]") == hirUclass(listOf(Pair('a', 'b'), Pair('h', 'w'))))
+    check(t("[a-w&&[^c-g]z]") == hirUclass(listOf(up('a', 'b'), up('h', 'w'))))
 }
 
 @kotlin.test.Test
 public fun classBracketedIntersectNegate() {
     check(t("[^\\w&&\\d]") == hirNegate(hirUclassQuery(ClassQuery.Binary("digit"))))
-    check(t("[^[a-z&&a-c]]") == hirNegate(hirUclass(listOf(Pair('a', 'c')))))
+    check(t("[^[a-z&&a-c]]") == hirNegate(hirUclass(listOf(up('a', 'c')))))
     check(t("[^[\\w&&\\d]]") == hirNegate(hirUclassQuery(ClassQuery.Binary("digit"))))
     check(t("[^[^\\w&&\\d]]") == hirUclassQuery(ClassQuery.Binary("digit")))
     check(t("[[[^\\w]&&[^\\d]]]") == hirNegate(hirUclassPerlWord()))
@@ -627,8 +637,8 @@ public fun classBracketedDifference() {
 
 @kotlin.test.Test
 public fun classBracketedSymmetricDifference() {
-    check(t("[\\p{sc:Greek}~~\\p{scx:Greek}]") == hirUclass(listOf(Pair('\u00b7', '\u00b7'), Pair('\u0300', '\u0301'), Pair('\u0304', '\u0304'), Pair('\u0306', '\u0306'), Pair('\u0308', '\u0308'), Pair('\u0313', '\u0313'), Pair('\u0342', '\u0342'), Pair('\u0345', '\u0345'), Pair('\u0374', '\u0374'), Pair('\u1dc0', '\u1dc1'), Pair('\u205d', '\u205d'))))
-    check(t("[a-g~~c-j]") == hirUclass(listOf(Pair('a', 'b'), Pair('h', 'j'))))
+    check(t("[\\p{sc:Greek}~~\\p{scx:Greek}]") == hirUclass(listOf(up('\u00b7', '\u00b7'), up('\u0300', '\u0301'), up('\u0304', '\u0304'), up('\u0306', '\u0306'), up('\u0308', '\u0308'), up('\u0313', '\u0313'), up('\u0342', '\u0342'), up('\u0345', '\u0345'), up('\u0374', '\u0374'), up('\u1dc0', '\u1dc1'), up('\u205d', '\u205d'))))
+    check(t("[a-g~~c-j]") == hirUclass(listOf(up('a', 'b'), up('h', 'j'))))
     check(t("(?-u)[a-g~~c-j]") == hirBclass(listOf(Pair(97u, 98u), Pair(104u, 106u))))
 }
 
@@ -641,7 +651,7 @@ public fun ignoreWhitespace() {
     check(t("(?x)\\x # comment\n        53 # comment") == hirLit("S"))
     check(t("(?x)\\x5 3") == hirLit("S"))
     check(t("(?x)\\p # comment\n{ # comment\n    Separator # comment\n} # comment") == hirUclassQuery(ClassQuery.Binary("separator")))
-    check(t("(?x)a # comment\n{ # comment\n    5 # comment\n    , # comment\n    10 # comment\n} # comment") == hirRange(true, 5, 10, hirLit("a")))
+    check(t("(?x)a # comment\n{ # comment\n    5 # comment\n    , # comment\n    10 # comment\n} # comment") == hirRange(true, 5u, 10u, hirLit("a")))
     check(t("(?x)a\\  # hi there") == hirLit("a "))
 }
 
@@ -686,7 +696,7 @@ public fun analysisCapturesLen() {
 
 @kotlin.test.Test
 public fun analysisStaticCapturesLen() {
-    val len = { pattern -> props(pattern).staticExplicitCapturesLen() }
+    val len = { pattern: String -> props(pattern).staticExplicitCapturesLen() }
     check(0 == len(""))
     check(0 == len("foo|bar"))
     check(null == len("(foo)|bar"))
@@ -763,8 +773,8 @@ public fun analysisLookSetPrefixAny() {
 
 @kotlin.test.Test
 public fun analysisIsAnchored() {
-    val isStart = { p -> props(p).lookSetPrefix().contains(Look.Start) }
-    val isEnd = { p -> props(p).lookSetSuffix().contains(Look.End) }
+    val isStart = { p: String -> props(p).lookSetPrefix().contains(Look.Start) }
+    val isEnd = { p: String -> props(p).lookSetSuffix().contains(Look.End) }
     // Positive examples.
     check(isStart("^"))
     check(isEnd("\$"))
@@ -819,8 +829,8 @@ public fun analysisIsAnchored() {
 
 @kotlin.test.Test
 public fun analysisIsAnyAnchored() {
-    val isStart = { p -> props(p).lookSet().contains(Look.Start) }
-    val isEnd = { p -> props(p).lookSet().contains(Look.End) }
+    val isStart = { p: String -> props(p).lookSet().contains(Look.Start) }
+    val isEnd = { p: String -> props(p).lookSet().contains(Look.End) }
     // Positive examples.
     check(isStart("^"))
     check(isEnd("\$"))
@@ -836,7 +846,7 @@ public fun analysisIsAnyAnchored() {
 @kotlin.test.Test
 public fun analysisCanEmpty() {
     // Positive examples.
-    val assertEmpty = { p -> check(0 == propsBytes(p).minimumLen()) }
+    val assertEmpty = { p: String -> check(0 == propsBytes(p).minimumLen()) }
     assertEmpty("")
     assertEmpty("()")
     assertEmpty("()*")
@@ -866,7 +876,7 @@ public fun analysisCanEmpty() {
     assertEmpty("\\b")
     assertEmpty("(?-u)\\b")
     // Negative examples.
-    val assertNonEmpty = { p -> check(0 != propsBytes(p).minimumLen()) }
+    val assertNonEmpty = { p: String -> check(0 != propsBytes(p).minimumLen()) }
     assertNonEmpty("a+")
     assertNonEmpty("a{1}")
     assertNonEmpty("a{1,}")
@@ -963,12 +973,12 @@ public fun smartAlternation() {
     check(t("(?:foo)|(?:bar)") == hirAlt(mutableListOf(hirLit("foo"), hirLit("bar"))))
     check(t("quux|(?:abc|def|xyz)|baz") == hirAlt(mutableListOf(hirLit("quux"), hirLit("abc"), hirLit("def"), hirLit("xyz"), hirLit("baz"))))
     check(t("quux|(?:abc|(?:def|mno)|xyz)|baz") == hirAlt(mutableListOf(hirLit("quux"), hirLit("abc"), hirLit("def"), hirLit("mno"), hirLit("xyz"), hirLit("baz"))))
-    check(t("a|b|c|d|e|f|x|y|z") == hirUclass(listOf(Pair('a', 'f'), Pair('x', 'z'))))
+    check(t("a|b|c|d|e|f|x|y|z") == hirUclass(listOf(up('a', 'f'), up('x', 'z'))))
     // Tests that we lift common prefixes out of an alternation.
-    check(t("[A-Z]foo|[A-Z]quux") == hirCat(mutableListOf(hirUclass(listOf(Pair('A', 'Z'))), hirAlt(mutableListOf(hirLit("foo"), hirLit("quux"))))))
-    check(t("[A-Z][A-Z]|[A-Z]quux") == hirCat(mutableListOf(hirUclass(listOf(Pair('A', 'Z'))), hirAlt(mutableListOf(hirUclass(listOf(Pair('A', 'Z'))), hirLit("quux"))))))
-    check(t("[A-Z][A-Z]|[A-Z][A-Z]quux") == hirCat(mutableListOf(hirUclass(listOf(Pair('A', 'Z'))), hirUclass(listOf(Pair('A', 'Z'))), hirAlt(mutableListOf(Hir.empty(), hirLit("quux"))))))
-    check(t("[A-Z]foo|[A-Z]foobar") == hirCat(mutableListOf(hirUclass(listOf(Pair('A', 'Z'))), hirAlt(mutableListOf(hirLit("foo"), hirLit("foobar"))))))
+    check(t("[A-Z]foo|[A-Z]quux") == hirCat(mutableListOf(hirUclass(listOf(up('A', 'Z'))), hirAlt(mutableListOf(hirLit("foo"), hirLit("quux"))))))
+    check(t("[A-Z][A-Z]|[A-Z]quux") == hirCat(mutableListOf(hirUclass(listOf(up('A', 'Z'))), hirAlt(mutableListOf(hirUclass(listOf(up('A', 'Z'))), hirLit("quux"))))))
+    check(t("[A-Z][A-Z]|[A-Z][A-Z]quux") == hirCat(mutableListOf(hirUclass(listOf(up('A', 'Z'))), hirUclass(listOf(up('A', 'Z'))), hirAlt(mutableListOf(Hir.empty(), hirLit("quux"))))))
+    check(t("[A-Z]foo|[A-Z]foobar") == hirCat(mutableListOf(hirUclass(listOf(up('A', 'Z'))), hirAlt(mutableListOf(hirLit("foo"), hirLit("foobar"))))))
 }
 
 @kotlin.test.Test
@@ -976,7 +986,7 @@ public fun regressionAltEmptyConcat() {
     val span = Span.splat(Position.new(0, 0, 0))
     val ast = Ast.alternation(Alternation(span = span, asts = mutableListOf(Ast.concat(Concat(span = span, asts = mutableListOf())))))
     val t = Translator.new()
-    check(Result.success(Hir.empty()) == t.translate("", ast))
+    check(Result.Ok(Hir.empty()) == t.translate("", ast))
 }
 
 @kotlin.test.Test
@@ -984,7 +994,7 @@ public fun regressionEmptyAlt() {
     val span = Span.splat(Position.new(0, 0, 0))
     val ast = Ast.concat(Concat(span = span, asts = mutableListOf(Ast.alternation(Alternation(span = span, asts = mutableListOf())))))
     val t = Translator.new()
-    check(Result.success(Hir.fail()) == t.translate("", ast))
+    check(Result.Ok(Hir.fail()) == t.translate("", ast))
 }
 
 @kotlin.test.Test
@@ -992,7 +1002,7 @@ public fun regressionSingletonAlt() {
     val span = Span.splat(Position.new(0, 0, 0))
     val ast = Ast.concat(Concat(span = span, asts = mutableListOf(Ast.alternation(Alternation(span = span, asts = mutableListOf(Ast.dot(span)))))))
     val t = Translator.new()
-    check(Result.success(Hir.dot(Dot.AnyCharExceptLF)) == t.translate("", ast))
+    check(Result.Ok(Hir.dot(Dot.AnyCharExceptLF)) == t.translate("", ast))
 }
 
 // See: https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=63168
@@ -1001,7 +1011,7 @@ public fun regressionFuzzMatch() {
     val pat = "[(\u0006 \u0000-򯷵]  \u0000 "
     val ast = ParserBuilder.new().octal(false).ignoreWhitespace(true).build().parse(pat).unwrap()
     val hir = TranslatorBuilder.new().utf8(true).caseInsensitive(false).multiLine(false).dotMatchesNewLine(false).swapGreed(true).unicode(true).build().translate(pat, ast).unwrap()
-    check(hir == Hir.concat(mutableListOf(hirUclass(listOf(Pair('\u0000', 0xafdf5))), hirLit("\u0000"))))
+    check(hir == Hir.concat(mutableListOf(hirUclass(listOf(up('\u0000', 0xafdf5u))), hirLit("\u0000"))))
 }
 
 // See: https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=63155
@@ -1015,7 +1025,7 @@ public fun regressionFuzzDifference1() {
 // See: https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=63153
 @kotlin.test.Test
 public fun regressionFuzzCharDecrement1() {
-    val pat = "w[w[^w?\rw\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\r\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000w?\rw[^w?\rw[^w?\rw[^w\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000*\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000][^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000x\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000*??\u0000{2}\u0010??\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000\u0000}\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0001\u0001H-i]-]\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000\u0000\u0000\u0000\u00019-]\u0000'|-]\u0000'|(?i-ux)[-]\u0000'\u0003\u0000\u0000\u0000}\u0000-*\u0000]<D\u0000\u0000\u0000\u0000\u0000\u0000\u0001]\u0000\u0000\u0000\u0000]\u0000\u0000-*\u0000]\u0000\u0000 "
+    val pat = "w[w[^w?\rw\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\r\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000w?\rw[^w?\rw[^w?\rw[^w\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000*\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000][^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w?\rw[^w\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000x\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000*??\u0000\u007f{2}\u0010??\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0003\u0000\u0000\u0000}\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000]\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0001\u0001H-i]-]\u0000\u0000\u0000\u0000\u0001\u0000]\u0000\u0000\u0000\u0001\u0000]\u0000\u0000-*\u0000\u0000\u0000\u0000\u00019-\u007f]\u0000'|-\u007f]\u0000'|(?i-ux)[-\u007f]\u0000'\u0003\u0000\u0000\u0000}\u0000-*\u0000]<D\u0000\u0000\u0000\u0000\u0000\u0000\u0001]\u0000\u0000\u0000\u0000]\u0000\u0000-*\u0000]\u0000\u0000 "
     t(pat)
     // shouldn't panic
 }

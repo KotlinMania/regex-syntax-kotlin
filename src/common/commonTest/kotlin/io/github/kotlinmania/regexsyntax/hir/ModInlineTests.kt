@@ -17,17 +17,23 @@ package io.github.kotlinmania.regexsyntax.hir
 // equivalent regex pattern string, it is unlikely to look like the original due
 // to its simplified structure.
 
-public fun uclass(ranges: List<Pair<Char, Char>>): ClassUnicode {
-    val ranges1: List<ClassUnicodeRange> = ranges.map({ (s, e) -> ClassUnicodeRange.new(s, e) }).collect()
+public fun up(start: Char, end: Char): Pair<UInt, UInt> = Pair(start.code.toUInt(), end.code.toUInt())
+
+public fun up(start: Char, end: UInt): Pair<UInt, UInt> = Pair(start.code.toUInt(), end)
+
+public fun up(start: UInt, end: UInt): Pair<UInt, UInt> = Pair(start, end)
+
+public fun uclass(ranges: List<Pair<UInt, UInt>>): ClassUnicode {
+    val ranges1: List<ClassUnicodeRange> = ranges.map { (s, e) -> ClassUnicodeRange.new(s, e) }
     return ClassUnicode.new(ranges1)
 }
 
-public fun bclass(ranges: List<Pair<UByte, UByte>>): ClassBytes {
-    val ranges1: List<ClassBytesRange> = ranges.map({ (s, e) -> ClassBytesRange.new(s, e) }).collect()
+public fun bclass(ranges: List<Pair<UInt, UInt>>): ClassBytes {
+    val ranges1: List<ClassBytesRange> = ranges.map { (s, e) -> ClassBytesRange.new(s.toUByte(), e.toUByte()) }
     return ClassBytes.new(ranges1)
 }
 
-public fun uranges(cls: ClassUnicode): List<Pair<Char, Char>> = cls.iter().map({ x -> Pair(x.start(), x.end()) }).collect()
+public fun uranges(cls: ClassUnicode): List<Pair<UInt, UInt>> = cls.iter().map { x -> Pair(x.start(), x.end()) }
 
 public fun ucasefold(cls: ClassUnicode): ClassUnicode {
     val cls = cls.clone()
@@ -65,7 +71,7 @@ public fun unegate(cls: ClassUnicode): ClassUnicode {
     return cls
 }
 
-public fun branges(cls: ClassBytes): List<Pair<UByte, UByte>> = cls.iter().map({ x -> Pair(x.start(), x.end()) }).collect()
+public fun branges(cls: ClassBytes): List<Pair<UInt, UInt>> = cls.iter().map { x -> Pair(x.start().toUInt(), x.end().toUInt()) }
 
 public fun bcasefold(cls: ClassBytes): ClassBytes {
     val cls = cls.clone()
@@ -105,40 +111,40 @@ public fun bnegate(cls: ClassBytes): ClassBytes {
 
 @kotlin.test.Test
 public fun classRangeCanonicalUnicode() {
-    val range = ClassUnicodeRange.new('\u00ff', '\u0000')
-    check('\u0000' == range.start())
-    check('\u00ff' == range.end())
+    val range = ClassUnicodeRange.new(0x00ffu, 0x0000u)
+    check(0x0000u == range.start())
+    check(0x00ffu == range.end())
 }
 
 @kotlin.test.Test
 public fun classRangeCanonicalBytes() {
-    val range = ClassBytesRange.new(255u, 0u)
-    check(0u == range.start())
-    check(255u == range.end())
+    val range = ClassBytesRange.new(255u.toUByte(), 0u.toUByte())
+    check(0u.toUByte() == range.start())
+    check(255u.toUByte() == range.end())
 }
 
 @kotlin.test.Test
 public fun classCanonicalizeUnicode() {
-    val cls = uclass(listOf(Pair('a', 'c'), Pair('x', 'z')))
-    val expected = mutableListOf(Pair('a', 'c'), Pair('x', 'z'))
+    val cls = uclass(listOf(up('a', 'c'), up('x', 'z')))
+    val expected = mutableListOf(up('a', 'c'), up('x', 'z'))
     check(expected == uranges(cls))
-    val cls1 = uclass(listOf(Pair('x', 'z'), Pair('a', 'c')))
-    val expected1 = mutableListOf(Pair('a', 'c'), Pair('x', 'z'))
+    val cls1 = uclass(listOf(up('x', 'z'), up('a', 'c')))
+    val expected1 = mutableListOf(up('a', 'c'), up('x', 'z'))
     check(expected1 == uranges(cls1))
-    val cls2 = uclass(listOf(Pair('x', 'z'), Pair('w', 'y')))
-    val expected2 = mutableListOf(Pair('w', 'z'))
+    val cls2 = uclass(listOf(up('x', 'z'), up('w', 'y')))
+    val expected2 = mutableListOf(up('w', 'z'))
     check(expected2 == uranges(cls2))
-    val cls3 = uclass(listOf(Pair('c', 'f'), Pair('a', 'g'), Pair('d', 'j'), Pair('a', 'c'), Pair('m', 'p'), Pair('l', 's')))
-    val expected3 = mutableListOf(Pair('a', 'j'), Pair('l', 's'))
+    val cls3 = uclass(listOf(up('c', 'f'), up('a', 'g'), up('d', 'j'), up('a', 'c'), up('m', 'p'), up('l', 's')))
+    val expected3 = mutableListOf(up('a', 'j'), up('l', 's'))
     check(expected3 == uranges(cls3))
-    val cls4 = uclass(listOf(Pair('x', 'z'), Pair('u', 'w')))
-    val expected4 = mutableListOf(Pair('u', 'z'))
+    val cls4 = uclass(listOf(up('x', 'z'), up('u', 'w')))
+    val expected4 = mutableListOf(up('u', 'z'))
     check(expected4 == uranges(cls4))
-    val cls5 = uclass(listOf(Pair('\u0000', 0x10ffff), Pair('\u0000', 0x10ffff)))
-    val expected5 = mutableListOf(Pair('\u0000', 0x10ffff))
+    val cls5 = uclass(listOf(up('\u0000', 0x10ffffu), up('\u0000', 0x10ffffu)))
+    val expected5 = mutableListOf(up('\u0000', 0x10ffffu))
     check(expected5 == uranges(cls5))
-    val cls6 = uclass(listOf(Pair('a', 'a'), Pair('b', 'b')))
-    val expected6 = mutableListOf(Pair('a', 'b'))
+    val cls6 = uclass(listOf(up('a', 'a'), up('b', 'b')))
+    val expected6 = mutableListOf(up('a', 'b'))
     check(expected6 == uranges(cls6))
 }
 
@@ -169,27 +175,27 @@ public fun classCanonicalizeBytes() {
 
 @kotlin.test.Test
 public fun classCaseFoldUnicode() {
-    val cls = uclass(listOf(Pair('C', 'F'), Pair('A', 'G'), Pair('D', 'J'), Pair('A', 'C'), Pair('M', 'P'), Pair('L', 'S'), Pair('c', 'f')))
-    val expected = uclass(listOf(Pair('A', 'J'), Pair('L', 'S'), Pair('a', 'j'), Pair('l', 's'), Pair('\u017f', '\u017f')))
+    val cls = uclass(listOf(up('C', 'F'), up('A', 'G'), up('D', 'J'), up('A', 'C'), up('M', 'P'), up('L', 'S'), up('c', 'f')))
+    val expected = uclass(listOf(up('A', 'J'), up('L', 'S'), up('a', 'j'), up('l', 's'), up('\u017f', '\u017f')))
     check(expected == ucasefold(cls))
-    val cls1 = uclass(listOf(Pair('A', 'Z')))
-    val expected1 = uclass(listOf(Pair('A', 'Z'), Pair('a', 'z'), Pair('\u017f', '\u017f'), Pair('\u212a', '\u212a')))
+    val cls1 = uclass(listOf(up('A', 'Z')))
+    val expected1 = uclass(listOf(up('A', 'Z'), up('a', 'z'), up('\u017f', '\u017f'), up('\u212a', '\u212a')))
     check(expected1 == ucasefold(cls1))
-    val cls2 = uclass(listOf(Pair('a', 'z')))
-    val expected2 = uclass(listOf(Pair('A', 'Z'), Pair('a', 'z'), Pair('\u017f', '\u017f'), Pair('\u212a', '\u212a')))
+    val cls2 = uclass(listOf(up('a', 'z')))
+    val expected2 = uclass(listOf(up('A', 'Z'), up('a', 'z'), up('\u017f', '\u017f'), up('\u212a', '\u212a')))
     check(expected2 == ucasefold(cls2))
-    val cls3 = uclass(listOf(Pair('A', 'A'), Pair('_', '_')))
-    val expected3 = uclass(listOf(Pair('A', 'A'), Pair('_', '_'), Pair('a', 'a')))
+    val cls3 = uclass(listOf(up('A', 'A'), up('_', '_')))
+    val expected3 = uclass(listOf(up('A', 'A'), up('_', '_'), up('a', 'a')))
     check(expected3 == ucasefold(cls3))
-    val cls4 = uclass(listOf(Pair('A', 'A'), Pair('=', '=')))
-    val expected4 = uclass(listOf(Pair('=', '='), Pair('A', 'A'), Pair('a', 'a')))
+    val cls4 = uclass(listOf(up('A', 'A'), up('=', '=')))
+    val expected4 = uclass(listOf(up('=', '='), up('A', 'A'), up('a', 'a')))
     check(expected4 == ucasefold(cls4))
-    val cls5 = uclass(listOf(Pair('\u0000', '\u0010')))
+    val cls5 = uclass(listOf(up('\u0000', '\u0010')))
     check(cls5 == ucasefold(cls5))
-    val cls6 = uclass(listOf(Pair('k', 'k')))
-    val expected5 = uclass(listOf(Pair('K', 'K'), Pair('k', 'k'), Pair('\u212a', '\u212a')))
+    val cls6 = uclass(listOf(up('k', 'k')))
+    val expected5 = uclass(listOf(up('K', 'K'), up('k', 'k'), up('\u212a', '\u212a')))
     check(expected5 == ucasefold(cls6))
-    val cls7 = uclass(listOf(Pair('@', '@')))
+    val cls7 = uclass(listOf(up('@', '@')))
     check(cls7 == ucasefold(cls7))
 }
 
@@ -221,41 +227,41 @@ public fun classCaseFoldBytes() {
 
 @kotlin.test.Test
 public fun classNegateUnicode() {
-    val cls = uclass(listOf(Pair('a', 'a')))
-    val expected = uclass(listOf(Pair('\u0000', '`'), Pair('b', 0x10ffff)))
+    val cls = uclass(listOf(up('a', 'a')))
+    val expected = uclass(listOf(up('\u0000', '`'), up('b', 0x10ffffu)))
     check(expected == unegate(cls))
-    val cls1 = uclass(listOf(Pair('a', 'a'), Pair('b', 'b')))
-    val expected1 = uclass(listOf(Pair('\u0000', '`'), Pair('c', 0x10ffff)))
+    val cls1 = uclass(listOf(up('a', 'a'), up('b', 'b')))
+    val expected1 = uclass(listOf(up('\u0000', '`'), up('c', 0x10ffffu)))
     check(expected1 == unegate(cls1))
-    val cls2 = uclass(listOf(Pair('a', 'c'), Pair('x', 'z')))
-    val expected2 = uclass(listOf(Pair('\u0000', '`'), Pair('d', 'w'), Pair('{', 0x10ffff)))
+    val cls2 = uclass(listOf(up('a', 'c'), up('x', 'z')))
+    val expected2 = uclass(listOf(up('\u0000', '`'), up('d', 'w'), up('{', 0x10ffffu)))
     check(expected2 == unegate(cls2))
-    val cls3 = uclass(listOf(Pair('\u0000', 'a')))
-    val expected3 = uclass(listOf(Pair('b', 0x10ffff)))
+    val cls3 = uclass(listOf(up('\u0000', 'a')))
+    val expected3 = uclass(listOf(up('b', 0x10ffffu)))
     check(expected3 == unegate(cls3))
-    val cls4 = uclass(listOf(Pair('a', 0x10ffff)))
-    val expected4 = uclass(listOf(Pair('\u0000', '`')))
+    val cls4 = uclass(listOf(up('a', 0x10ffffu)))
+    val expected4 = uclass(listOf(up('\u0000', '`')))
     check(expected4 == unegate(cls4))
-    val cls5 = uclass(listOf(Pair('\u0000', 0x10ffff)))
+    val cls5 = uclass(listOf(up('\u0000', 0x10ffffu)))
     val expected5 = uclass(listOf())
     check(expected5 == unegate(cls5))
     val cls6 = uclass(listOf())
-    val expected6 = uclass(listOf(Pair('\u0000', 0x10ffff)))
+    val expected6 = uclass(listOf(up('\u0000', 0x10ffffu)))
     check(expected6 == unegate(cls6))
-    val cls7 = uclass(listOf(Pair('\u0000', 0x10fffd), Pair(0x10ffff, 0x10ffff)))
-    val expected7 = uclass(listOf(Pair(0x10fffe, 0x10fffe)))
+    val cls7 = uclass(listOf(up('\u0000', 0x10fffdu), up(0x10ffffu, 0x10ffffu)))
+    val expected7 = uclass(listOf(up(0x10fffeu, 0x10fffeu)))
     check(expected7 == unegate(cls7))
-    val cls8 = uclass(listOf(Pair('\u0000', '\ud7ff')))
-    val expected8 = uclass(listOf(Pair('\ue000', 0x10ffff)))
+    val cls8 = uclass(listOf(up('\u0000', '\ud7ff')))
+    val expected8 = uclass(listOf(up('\ue000', 0x10ffffu)))
     check(expected8 == unegate(cls8))
-    val cls9 = uclass(listOf(Pair('\u0000', '\ud7fe')))
-    val expected9 = uclass(listOf(Pair('\ud7ff', 0x10ffff)))
+    val cls9 = uclass(listOf(up('\u0000', '\ud7fe')))
+    val expected9 = uclass(listOf(up('\ud7ff', 0x10ffffu)))
     check(expected9 == unegate(cls9))
-    val cls10 = uclass(listOf(Pair('\ue000', 0x10ffff)))
-    val expected10 = uclass(listOf(Pair('\u0000', '\ud7ff')))
+    val cls10 = uclass(listOf(up('\ue000', 0x10ffffu)))
+    val expected10 = uclass(listOf(up('\u0000', '\ud7ff')))
     check(expected10 == unegate(cls10))
-    val cls11 = uclass(listOf(Pair('\ue001', 0x10ffff)))
-    val expected11 = uclass(listOf(Pair('\u0000', '\ue000')))
+    val cls11 = uclass(listOf(up('\ue001', 0x10ffffu)))
+    val expected11 = uclass(listOf(up('\u0000', '\ue000')))
     check(expected11 == unegate(cls11))
 }
 
@@ -289,9 +295,9 @@ public fun classNegateBytes() {
 
 @kotlin.test.Test
 public fun classUnionUnicode() {
-    val cls1 = uclass(listOf(Pair('a', 'g'), Pair('m', 't'), Pair('A', 'C')))
-    val cls2 = uclass(listOf(Pair('a', 'z')))
-    val expected = uclass(listOf(Pair('a', 'z'), Pair('A', 'C')))
+    val cls1 = uclass(listOf(up('a', 'g'), up('m', 't'), up('A', 'C')))
+    val cls2 = uclass(listOf(up('a', 'z')))
+    val expected = uclass(listOf(up('a', 'z'), up('A', 'C')))
     check(expected == uunion(cls1, cls2))
 }
 
@@ -306,60 +312,60 @@ public fun classUnionBytes() {
 @kotlin.test.Test
 public fun classIntersectUnicode() {
     val cls1 = uclass(listOf())
-    val cls2 = uclass(listOf(Pair('a', 'a')))
+    val cls2 = uclass(listOf(up('a', 'a')))
     val expected = uclass(listOf())
     check(expected == uintersect(cls1, cls2))
-    val cls11 = uclass(listOf(Pair('a', 'a')))
-    val cls21 = uclass(listOf(Pair('a', 'a')))
-    val expected1 = uclass(listOf(Pair('a', 'a')))
+    val cls11 = uclass(listOf(up('a', 'a')))
+    val cls21 = uclass(listOf(up('a', 'a')))
+    val expected1 = uclass(listOf(up('a', 'a')))
     check(expected1 == uintersect(cls11, cls21))
-    val cls12 = uclass(listOf(Pair('a', 'a')))
-    val cls22 = uclass(listOf(Pair('b', 'b')))
+    val cls12 = uclass(listOf(up('a', 'a')))
+    val cls22 = uclass(listOf(up('b', 'b')))
     val expected2 = uclass(listOf())
     check(expected2 == uintersect(cls12, cls22))
-    val cls13 = uclass(listOf(Pair('a', 'a')))
-    val cls23 = uclass(listOf(Pair('a', 'c')))
-    val expected3 = uclass(listOf(Pair('a', 'a')))
+    val cls13 = uclass(listOf(up('a', 'a')))
+    val cls23 = uclass(listOf(up('a', 'c')))
+    val expected3 = uclass(listOf(up('a', 'a')))
     check(expected3 == uintersect(cls13, cls23))
-    val cls14 = uclass(listOf(Pair('a', 'b')))
-    val cls24 = uclass(listOf(Pair('a', 'c')))
-    val expected4 = uclass(listOf(Pair('a', 'b')))
+    val cls14 = uclass(listOf(up('a', 'b')))
+    val cls24 = uclass(listOf(up('a', 'c')))
+    val expected4 = uclass(listOf(up('a', 'b')))
     check(expected4 == uintersect(cls14, cls24))
-    val cls15 = uclass(listOf(Pair('a', 'b')))
-    val cls25 = uclass(listOf(Pair('b', 'c')))
-    val expected5 = uclass(listOf(Pair('b', 'b')))
+    val cls15 = uclass(listOf(up('a', 'b')))
+    val cls25 = uclass(listOf(up('b', 'c')))
+    val expected5 = uclass(listOf(up('b', 'b')))
     check(expected5 == uintersect(cls15, cls25))
-    val cls16 = uclass(listOf(Pair('a', 'b')))
-    val cls26 = uclass(listOf(Pair('c', 'd')))
+    val cls16 = uclass(listOf(up('a', 'b')))
+    val cls26 = uclass(listOf(up('c', 'd')))
     val expected6 = uclass(listOf())
     check(expected6 == uintersect(cls16, cls26))
-    val cls17 = uclass(listOf(Pair('b', 'c')))
-    val cls27 = uclass(listOf(Pair('a', 'd')))
-    val expected7 = uclass(listOf(Pair('b', 'c')))
+    val cls17 = uclass(listOf(up('b', 'c')))
+    val cls27 = uclass(listOf(up('a', 'd')))
+    val expected7 = uclass(listOf(up('b', 'c')))
     check(expected7 == uintersect(cls17, cls27))
-    val cls18 = uclass(listOf(Pair('a', 'b'), Pair('d', 'e'), Pair('g', 'h')))
-    val cls28 = uclass(listOf(Pair('a', 'h')))
-    val expected8 = uclass(listOf(Pair('a', 'b'), Pair('d', 'e'), Pair('g', 'h')))
+    val cls18 = uclass(listOf(up('a', 'b'), up('d', 'e'), up('g', 'h')))
+    val cls28 = uclass(listOf(up('a', 'h')))
+    val expected8 = uclass(listOf(up('a', 'b'), up('d', 'e'), up('g', 'h')))
     check(expected8 == uintersect(cls18, cls28))
-    val cls19 = uclass(listOf(Pair('a', 'b'), Pair('d', 'e'), Pair('g', 'h')))
-    val cls29 = uclass(listOf(Pair('a', 'b'), Pair('d', 'e'), Pair('g', 'h')))
-    val expected9 = uclass(listOf(Pair('a', 'b'), Pair('d', 'e'), Pair('g', 'h')))
+    val cls19 = uclass(listOf(up('a', 'b'), up('d', 'e'), up('g', 'h')))
+    val cls29 = uclass(listOf(up('a', 'b'), up('d', 'e'), up('g', 'h')))
+    val expected9 = uclass(listOf(up('a', 'b'), up('d', 'e'), up('g', 'h')))
     check(expected9 == uintersect(cls19, cls29))
-    val cls110 = uclass(listOf(Pair('a', 'b'), Pair('g', 'h')))
-    val cls210 = uclass(listOf(Pair('d', 'e'), Pair('k', 'l')))
+    val cls110 = uclass(listOf(up('a', 'b'), up('g', 'h')))
+    val cls210 = uclass(listOf(up('d', 'e'), up('k', 'l')))
     val expected10 = uclass(listOf())
     check(expected10 == uintersect(cls110, cls210))
-    val cls111 = uclass(listOf(Pair('a', 'b'), Pair('d', 'e'), Pair('g', 'h')))
-    val cls211 = uclass(listOf(Pair('h', 'h')))
-    val expected11 = uclass(listOf(Pair('h', 'h')))
+    val cls111 = uclass(listOf(up('a', 'b'), up('d', 'e'), up('g', 'h')))
+    val cls211 = uclass(listOf(up('h', 'h')))
+    val expected11 = uclass(listOf(up('h', 'h')))
     check(expected11 == uintersect(cls111, cls211))
-    val cls112 = uclass(listOf(Pair('a', 'b'), Pair('e', 'f'), Pair('i', 'j')))
-    val cls212 = uclass(listOf(Pair('c', 'd'), Pair('g', 'h'), Pair('k', 'l')))
+    val cls112 = uclass(listOf(up('a', 'b'), up('e', 'f'), up('i', 'j')))
+    val cls212 = uclass(listOf(up('c', 'd'), up('g', 'h'), up('k', 'l')))
     val expected12 = uclass(listOf())
     check(expected12 == uintersect(cls112, cls212))
-    val cls113 = uclass(listOf(Pair('a', 'b'), Pair('c', 'd'), Pair('e', 'f')))
-    val cls213 = uclass(listOf(Pair('b', 'c'), Pair('d', 'e'), Pair('f', 'g')))
-    val expected13 = uclass(listOf(Pair('b', 'f')))
+    val cls113 = uclass(listOf(up('a', 'b'), up('c', 'd'), up('e', 'f')))
+    val cls213 = uclass(listOf(up('b', 'c'), up('d', 'e'), up('f', 'g')))
+    val expected13 = uclass(listOf(up('b', 'f')))
     check(expected13 == uintersect(cls113, cls213))
 }
 
@@ -425,53 +431,53 @@ public fun classIntersectBytes() {
 
 @kotlin.test.Test
 public fun classDifferenceUnicode() {
-    val cls1 = uclass(listOf(Pair('a', 'a')))
-    val cls2 = uclass(listOf(Pair('a', 'a')))
+    val cls1 = uclass(listOf(up('a', 'a')))
+    val cls2 = uclass(listOf(up('a', 'a')))
     val expected = uclass(listOf())
     check(expected == udifference(cls1, cls2))
-    val cls11 = uclass(listOf(Pair('a', 'a')))
+    val cls11 = uclass(listOf(up('a', 'a')))
     val cls21 = uclass(listOf())
-    val expected1 = uclass(listOf(Pair('a', 'a')))
+    val expected1 = uclass(listOf(up('a', 'a')))
     check(expected1 == udifference(cls11, cls21))
     val cls12 = uclass(listOf())
-    val cls22 = uclass(listOf(Pair('a', 'a')))
+    val cls22 = uclass(listOf(up('a', 'a')))
     val expected2 = uclass(listOf())
     check(expected2 == udifference(cls12, cls22))
-    val cls13 = uclass(listOf(Pair('a', 'z')))
-    val cls23 = uclass(listOf(Pair('a', 'a')))
-    val expected3 = uclass(listOf(Pair('b', 'z')))
+    val cls13 = uclass(listOf(up('a', 'z')))
+    val cls23 = uclass(listOf(up('a', 'a')))
+    val expected3 = uclass(listOf(up('b', 'z')))
     check(expected3 == udifference(cls13, cls23))
-    val cls14 = uclass(listOf(Pair('a', 'z')))
-    val cls24 = uclass(listOf(Pair('z', 'z')))
-    val expected4 = uclass(listOf(Pair('a', 'y')))
+    val cls14 = uclass(listOf(up('a', 'z')))
+    val cls24 = uclass(listOf(up('z', 'z')))
+    val expected4 = uclass(listOf(up('a', 'y')))
     check(expected4 == udifference(cls14, cls24))
-    val cls15 = uclass(listOf(Pair('a', 'z')))
-    val cls25 = uclass(listOf(Pair('m', 'm')))
-    val expected5 = uclass(listOf(Pair('a', 'l'), Pair('n', 'z')))
+    val cls15 = uclass(listOf(up('a', 'z')))
+    val cls25 = uclass(listOf(up('m', 'm')))
+    val expected5 = uclass(listOf(up('a', 'l'), up('n', 'z')))
     check(expected5 == udifference(cls15, cls25))
-    val cls16 = uclass(listOf(Pair('a', 'c'), Pair('g', 'i'), Pair('r', 't')))
-    val cls26 = uclass(listOf(Pair('a', 'z')))
+    val cls16 = uclass(listOf(up('a', 'c'), up('g', 'i'), up('r', 't')))
+    val cls26 = uclass(listOf(up('a', 'z')))
     val expected6 = uclass(listOf())
     check(expected6 == udifference(cls16, cls26))
-    val cls17 = uclass(listOf(Pair('a', 'c'), Pair('g', 'i'), Pair('r', 't')))
-    val cls27 = uclass(listOf(Pair('d', 'v')))
-    val expected7 = uclass(listOf(Pair('a', 'c')))
+    val cls17 = uclass(listOf(up('a', 'c'), up('g', 'i'), up('r', 't')))
+    val cls27 = uclass(listOf(up('d', 'v')))
+    val expected7 = uclass(listOf(up('a', 'c')))
     check(expected7 == udifference(cls17, cls27))
-    val cls18 = uclass(listOf(Pair('a', 'c'), Pair('g', 'i'), Pair('r', 't')))
-    val cls28 = uclass(listOf(Pair('b', 'g'), Pair('s', 'u')))
-    val expected8 = uclass(listOf(Pair('a', 'a'), Pair('h', 'i'), Pair('r', 'r')))
+    val cls18 = uclass(listOf(up('a', 'c'), up('g', 'i'), up('r', 't')))
+    val cls28 = uclass(listOf(up('b', 'g'), up('s', 'u')))
+    val expected8 = uclass(listOf(up('a', 'a'), up('h', 'i'), up('r', 'r')))
     check(expected8 == udifference(cls18, cls28))
-    val cls19 = uclass(listOf(Pair('a', 'c'), Pair('g', 'i'), Pair('r', 't')))
-    val cls29 = uclass(listOf(Pair('b', 'd'), Pair('e', 'g'), Pair('s', 'u')))
-    val expected9 = uclass(listOf(Pair('a', 'a'), Pair('h', 'i'), Pair('r', 'r')))
+    val cls19 = uclass(listOf(up('a', 'c'), up('g', 'i'), up('r', 't')))
+    val cls29 = uclass(listOf(up('b', 'd'), up('e', 'g'), up('s', 'u')))
+    val expected9 = uclass(listOf(up('a', 'a'), up('h', 'i'), up('r', 'r')))
     check(expected9 == udifference(cls19, cls29))
-    val cls110 = uclass(listOf(Pair('x', 'z')))
-    val cls210 = uclass(listOf(Pair('a', 'c'), Pair('e', 'g'), Pair('s', 'u')))
-    val expected10 = uclass(listOf(Pair('x', 'z')))
+    val cls110 = uclass(listOf(up('x', 'z')))
+    val cls210 = uclass(listOf(up('a', 'c'), up('e', 'g'), up('s', 'u')))
+    val expected10 = uclass(listOf(up('x', 'z')))
     check(expected10 == udifference(cls110, cls210))
-    val cls111 = uclass(listOf(Pair('a', 'z')))
-    val cls211 = uclass(listOf(Pair('a', 'c'), Pair('e', 'g'), Pair('s', 'u')))
-    val expected11 = uclass(listOf(Pair('d', 'd'), Pair('h', 'r'), Pair('v', 'z')))
+    val cls111 = uclass(listOf(up('a', 'z')))
+    val cls211 = uclass(listOf(up('a', 'c'), up('e', 'g'), up('s', 'u')))
+    val expected11 = uclass(listOf(up('d', 'd'), up('h', 'r'), up('v', 'z')))
     check(expected11 == udifference(cls111, cls211))
 }
 
@@ -529,9 +535,9 @@ public fun classDifferenceBytes() {
 
 @kotlin.test.Test
 public fun classSymmetricDifferenceUnicode() {
-    val cls1 = uclass(listOf(Pair('a', 'm')))
-    val cls2 = uclass(listOf(Pair('g', 't')))
-    val expected = uclass(listOf(Pair('a', 'f'), Pair('n', 't')))
+    val cls1 = uclass(listOf(up('a', 'm')))
+    val cls2 = uclass(listOf(up('g', 't')))
+    val expected = uclass(listOf(up('a', 'f'), up('n', 't')))
     check(expected == usymdifference(cls1, cls2))
 }
 
@@ -541,6 +547,39 @@ public fun classSymmetricDifferenceBytes() {
     val cls2 = bclass(listOf(Pair(103u, 116u)))
     val expected = bclass(listOf(Pair(97u, 102u), Pair(110u, 116u)))
     check(expected == bsymdifference(cls1, cls2))
+}
+
+// KMP commonTest has no portable 16 KiB OS thread spawner; verify iterative Hir.drop() handles deep nesting directly.
+@kotlin.test.Test
+public fun noStackOverflowOnDrop() {
+    var expr = Hir.empty()
+    for (unused in 0 until 100) {
+        expr = Hir.capture(
+            Capture(
+                index = 1u,
+                name = null,
+                sub = expr,
+            ),
+        )
+        expr = Hir.repetition(
+            Repetition(
+                min = 0u,
+                max = 1u,
+                greedy = true,
+                sub = expr,
+            ),
+        )
+        expr = Hir(
+            kind = HirKind.Concat(listOf(expr)),
+            props = Properties.empty(),
+        )
+        expr = Hir(
+            kind = HirKind.Alternation(listOf(expr)),
+            props = Properties.empty(),
+        )
+    }
+    check(expr.kind() !is HirKind.Empty)
+    expr.drop()
 }
 
 @kotlin.test.Test

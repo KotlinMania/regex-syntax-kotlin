@@ -5,6 +5,7 @@ import io.github.kotlinmania.regexsyntax.hir.Capture
 import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.hir.HirKind
 import io.github.kotlinmania.regexsyntax.hir.Repetition
+import io.github.kotlinmania.rustlang.core.result.Result
 
 /**
  * A trait for visiting the high-level IR (HIR) in depth first order.
@@ -23,7 +24,7 @@ public interface Visitor<Output, Err> {
      * All implementors of `Visitor` must provide a `finish` method, which
      * yields the result of visiting the HIR or an error.
      */
-    public fun finish(): Result<Output>
+    public fun finish(): Result<Output, Err>
 
     /**
      * This method is called before beginning traversal of the HIR.
@@ -34,23 +35,23 @@ public interface Visitor<Output, Err> {
      * This method is called on an `Hir` before descending into child `Hir`
      * nodes.
      */
-    public fun visitPre(hir: Hir): Result<Unit> = Result.success(Unit)
+    public fun visitPre(hir: Hir): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called on an `Hir` after descending all of its child
      * `Hir` nodes.
      */
-    public fun visitPost(hir: Hir): Result<Unit> = Result.success(Unit)
+    public fun visitPost(hir: Hir): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called between child nodes of an alternation.
      */
-    public fun visitAlternationIn(): Result<Unit> = Result.success(Unit)
+    public fun visitAlternationIn(): Result<Unit, Err> = Result.Ok(Unit)
 
     /**
      * This method is called between child nodes of a concatenation.
      */
-    public fun visitConcatIn(): Result<Unit> = Result.success(Unit)
+    public fun visitConcatIn(): Result<Unit, Err> = Result.Ok(Unit)
 }
 
 /**
@@ -69,118 +70,113 @@ public interface Visitor<Output, Err> {
  * If the visitor returns an error at any point, then visiting is stopped and
  * the error is returned.
  */
-public fun <Output, Err, V : Visitor> visit(hir: Hir, visitor: V): Result<Output> = HeapVisitor.new().visit(hir, visitor)
+public fun <Output, Err, V : Visitor<Output, Err>> visit(hir: Hir, visitor: V): Result<Output, Err> =
+    HeapVisitor.new().visit(hir, visitor)
 
 /**
  * HeapVisitor visits every item in an `Hir` recursively using constant stack
  * size and a heap size proportional to the size of the `Hir`.
  */
-public open class HeapVisitor(
+internal class HeapVisitor(
     /**
      * A stack of `Hir` nodes. This is roughly analogous to the call stack
      * used in a typical recursive visitor.
      */
-    public var stack: MutableList<Pair<Hir, Frame>>,
+    internal var stack: MutableList<Pair<Hir, Frame>>,
 ) {
-    public open fun <Output, Err, V : Visitor> visit(hir: Hir, visitor: V): Result<Output> {
+    internal fun <Output, Err, V : Visitor<Output, Err>> visit(hir: Hir, visitor: V): Result<Output, Err> {
         var hir1 = hir
         this.stack.clear()
         visitor.start()
         while (true) {
-            visitor.visitPre(hir1).getOrElse { return Result.failure(it) }
-            when (val matchVal = this.induct(hir1)) {
-                null -> {}
-                else -> {
-                    val x = matchVal
-                    val child = x.child()
-                    this.stack.add(Pair(hir1, x))
-                    hir1 = child
-                    continue
-                }
+            when (val r = visitor.visitPre(hir1)) {
+                is Result.Err -> return r
+                is Result.Ok -> {}
+            }
+            val x = this.induct(hir1)
+            if (x != null) {
+                val child = x.child()
+                this.stack.add(Pair(hir1, x))
+                hir1 = child
+                continue
             }
             // No induction means we have a base case, so we can post visit
             // it now.
-            visitor.visitPost(hir1).getOrElse { return Result.failure(it) }
+            when (val r = visitor.visitPost(hir1)) {
+                is Result.Err -> return r
+                is Result.Ok -> {}
+            }
             // At this point, we now try to pop our call stack until it is
             // either empty or we hit another inductive case.
             while (true) {
-                val (postHir1, frame1) =
-                    when (val matchVal1 = this.stack.removeLastOrNull()) {
-                        null -> { return visitor.finish() }
-                        else -> {
-                            val postHir = matchVal1.first
-                            val frame = matchVal1.second
-                            Pair(postHir, frame)
-                        }
-                    }
+                val entry = this.stack.removeLastOrNull() ?: return visitor.finish()
+                val postHir = entry.first
+                val frame = entry.second
                 // If this is a concat/alternate, then we might have additional
                 // inductive steps to process.
-                when (val matchVal2 = this.pop(frame1)) {
-                    null -> {}
-                    else -> {
-                        val x1 = matchVal2
-                        when (x1) {
-                            is Frame.Alternation -> {
-                                visitor.visitAlternationIn().getOrElse { return Result.failure(it) }
+                val nextFrame = this.pop(frame)
+                if (nextFrame != null) {
+                    when (nextFrame) {
+                        is Frame.Alternation -> {
+                            when (val r = visitor.visitAlternationIn()) {
+                                is Result.Err -> return r
+                                is Result.Ok -> {}
                             }
-                            is Frame.Concat -> {
-                                visitor.visitConcatIn().getOrElse { return Result.failure(it) }
-                            }
-                            else -> {}
                         }
-                        hir1 = x1.child()
-                        this.stack.add(Pair(postHir1, x1))
-                        break
+                        is Frame.Concat -> {
+                            when (val r = visitor.visitConcatIn()) {
+                                is Result.Err -> return r
+                                is Result.Ok -> {}
+                            }
+                        }
+                        else -> {}
                     }
+                    hir1 = nextFrame.child()
+                    this.stack.add(Pair(postHir, nextFrame))
+                    break
                 }
                 // Otherwise, we've finished visiting all the child nodes for
                 // this HIR, so we can post visit it now.
-                visitor.visitPost(postHir1).getOrElse { return Result.failure(it) }
+                when (val r = visitor.visitPost(postHir)) {
+                    is Result.Err -> return r
+                    is Result.Ok -> {}
+                }
             }
         }
     }
 
     /**
      * Build a stack frame for the given HIR if one is needed (which occurs if
-     * and only if there are child nodes in the HIR). Otherwise, return None.
+     * and only if there are child nodes in the HIR). Otherwise, return null.
      */
-    public open fun induct(hir: Hir): Frame? =
-        run {
-            val matchVal = hir.kind()
-            when {
-                matchVal is HirKind.Repetition -> {
-                    val (x) = matchVal
-                    Frame.Repetition(x)
-                }
-                matchVal is HirKind.Capture -> {
-                    val (x1) = matchVal
-                    Frame.Capture(x1)
-                }
-                matchVal is HirKind.Concat && (matchVal as HirKind.Concat).value.isEmpty() -> {
-                    val (x2) = matchVal
+    internal fun induct(hir: Hir): Frame? =
+        when (val kind = hir.kind()) {
+            is HirKind.Repetition -> Frame.Repetition(kind.value)
+            is HirKind.Capture -> Frame.Capture(kind.value)
+            is HirKind.Concat -> {
+                val subs = kind.value
+                if (subs.isEmpty()) {
                     null
+                } else {
+                    Frame.Concat(head = subs[0], tail = subs.subList(1, subs.size))
                 }
-                matchVal is HirKind.Concat -> {
-                    val (x3) = matchVal
-                    Frame.Concat(head = x3[0], tail = x3[1 until x3.size])
-                }
-                matchVal is HirKind.Alternation && (matchVal as HirKind.Alternation).value.isEmpty() -> {
-                    val (x4) = matchVal
-                    null
-                }
-                matchVal is HirKind.Alternation -> {
-                    val (x5) = matchVal
-                    Frame.Alternation(head = x5[0], tail = x5[1 until x5.size])
-                }
-                else -> null
             }
+            is HirKind.Alternation -> {
+                val subs = kind.value
+                if (subs.isEmpty()) {
+                    null
+                } else {
+                    Frame.Alternation(head = subs[0], tail = subs.subList(1, subs.size))
+                }
+            }
+            else -> null
         }
 
     /**
      * Pops the given frame. If the frame has an additional inductive step,
-     * then return it, otherwise return `None`.
+     * then return it, otherwise return `null`.
      */
-    public open fun pop(induct: Frame): Frame? =
+    internal fun pop(induct: Frame): Frame? =
         when (induct) {
             is Frame.Repetition -> null
             is Frame.Capture -> null
@@ -189,21 +185,21 @@ public open class HeapVisitor(
                 if (tail.isEmpty()) {
                     null
                 } else {
-                    Frame.Concat(head = tail[0], tail = tail[1 until tail.size])
+                    Frame.Concat(head = tail[0], tail = tail.subList(1, tail.size))
                 }
             }
             is Frame.Alternation -> {
-                val tail1 = induct.tail
-                if (tail1.isEmpty()) {
+                val tail = induct.tail
+                if (tail.isEmpty()) {
                     null
                 } else {
-                    Frame.Alternation(head = tail1[0], tail = tail1[1 until tail1.size])
+                    Frame.Alternation(head = tail[0], tail = tail.subList(1, tail.size))
                 }
             }
         }
 
-    public companion object {
-        public fun new(): HeapVisitor = HeapVisitor(stack = mutableListOf())
+    internal companion object {
+        internal fun new(): HeapVisitor = HeapVisitor(stack = mutableListOf())
     }
 }
 
@@ -211,49 +207,40 @@ public open class HeapVisitor(
  * Represents a single stack frame while performing structural induction over
  * an `Hir`.
  */
-public sealed class Frame {
+internal sealed class Frame {
     /**
      * A stack frame allocated just before descending into a repetition
      * operator's child node.
      */
-    public data class Repetition(public var value: Repetition) : Frame()
+    internal data class Repetition(internal var value: io.github.kotlinmania.regexsyntax.hir.Repetition) : Frame()
+
     /**
      * A stack frame allocated just before descending into a capture's child
      * node.
      */
-    public data class Capture(public var value: Capture) : Frame()
+    internal data class Capture(internal var value: io.github.kotlinmania.regexsyntax.hir.Capture) : Frame()
+
     /**
      * The stack frame used while visiting every child node of a concatenation
      * of expressions.
      */
-    public data class Concat(public var head: Hir, public var tail: List<Hir>) : Frame()
+    internal data class Concat(internal var head: Hir, internal var tail: List<Hir>) : Frame()
+
     /**
      * The stack frame used while visiting every child node of an alternation
      * of expressions.
      */
-    public data class Alternation(public var head: Hir, public var tail: List<Hir>) : Frame()
+    internal data class Alternation(internal var head: Hir, internal var tail: List<Hir>) : Frame()
 
     /**
      * Perform the next inductive step on this frame and return the next
      * child HIR node to visit.
      */
-    public open fun child(): Hir =
+    internal fun child(): Hir =
         when (this) {
-            is Frame.Repetition -> {
-                val (rep) = this
-                rep.sub
-            }
-            is Frame.Capture -> {
-                val (capture) = this
-                capture.sub
-            }
-            is Frame.Concat -> {
-                val head = this.head
-                head
-            }
-            is Frame.Alternation -> {
-                val head1 = this.head
-                head1
-            }
+            is Repetition -> this.value.sub
+            is Capture -> this.value.sub
+            is Concat -> this.head
+            is Alternation -> this.head
         }
 }

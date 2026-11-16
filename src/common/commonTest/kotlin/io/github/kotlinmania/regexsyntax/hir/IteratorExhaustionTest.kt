@@ -13,9 +13,9 @@ class IteratorExhaustionTest {
     fun allRangeIteratorAdaptersRejectEmptyNext() {
         val iterators: List<Iterator<*>> =
             listOf(
-                ClassUnicode.empty().iter(),
-                ClassBytes.empty().iter(),
-                IntervalSetIter(emptyList<Int>().iterator()),
+                ClassUnicode.empty().iter().iterator(),
+                ClassBytes.empty().iter().iterator(),
+                IntervalSetIter(emptyList<Int>().iterator()).iterator(),
             )
         for (iterator in iterators) {
             assertFalse(iterator.hasNext())
@@ -25,28 +25,30 @@ class IteratorExhaustionTest {
 
     @Test
     fun classRangeIteratorsPreserveBoundsAndExhaustion() {
-        val unicode = ClassUnicode.new(listOf(ClassUnicodeRange.new('a'.code, 'c'.code))).iter()
-        assertTrue(unicode.hasNext())
-        assertTrue(unicode.hasNext())
-        val unicodeRange = unicode.next()
-        assertEquals('a'.code, unicodeRange.start())
-        assertEquals('c'.code, unicodeRange.end())
-        assertFalse(unicode.hasNext())
-        assertFailsWith<NoSuchElementException> { unicode.next() }
+        val unicode = ClassUnicode.new(listOf(ClassUnicodeRange.new('a'.code.toUInt(), 'c'.code.toUInt()))).iter()
+        val unicodeIter = unicode.iterator()
+        assertTrue(unicodeIter.hasNext())
+        assertTrue(unicodeIter.hasNext())
+        val unicodeRange = unicodeIter.next()
+        assertEquals('a'.code.toUInt(), unicodeRange.start())
+        assertEquals('c'.code.toUInt(), unicodeRange.end())
+        assertFalse(unicodeIter.hasNext())
+        assertFailsWith<NoSuchElementException> { unicodeIter.next() }
 
-        val bytes = ClassBytes.new(listOf(ClassBytesRange.new(1.toByte(), 3.toByte()))).iter()
-        assertTrue(bytes.hasNext())
-        assertTrue(bytes.hasNext())
-        val byteRange = bytes.next()
-        assertEquals(1.toByte(), byteRange.start())
-        assertEquals(3.toByte(), byteRange.end())
-        assertFalse(bytes.hasNext())
-        assertFailsWith<NoSuchElementException> { bytes.next() }
+        val bytes = ClassBytes.new(listOf(ClassBytesRange.new(1u.toUByte(), 3u.toUByte()))).iter()
+        val bytesIter = bytes.iterator()
+        assertTrue(bytesIter.hasNext())
+        assertTrue(bytesIter.hasNext())
+        val byteRange = bytesIter.next()
+        assertEquals(1u.toUByte(), byteRange.start())
+        assertEquals(3u.toUByte(), byteRange.end())
+        assertFalse(bytesIter.hasNext())
+        assertFailsWith<NoSuchElementException> { bytesIter.next() }
     }
 
     @Test
     fun genericIntervalIteratorPreservesNullableValues() {
-        val iterator = IntervalSetIter(listOf<Int?>(null, 7).iterator())
+        val iterator = IntervalSetIter(listOf<Int?>(null, 7).iterator()).iterator()
         assertTrue(iterator.hasNext())
         assertTrue(iterator.hasNext())
         assertNull(iterator.next())

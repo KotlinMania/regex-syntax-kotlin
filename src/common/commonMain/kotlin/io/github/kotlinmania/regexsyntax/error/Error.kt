@@ -1,43 +1,48 @@
 // port-lint: source error.rs
 package io.github.kotlinmania.regexsyntax.error
 
+import io.github.kotlinmania.regexsyntax.ast.Error as AstError
+import io.github.kotlinmania.regexsyntax.ast.ErrorKind as AstErrorKind
+import io.github.kotlinmania.regexsyntax.ast.Span
+import io.github.kotlinmania.regexsyntax.hir.Error as HirError
+import io.github.kotlinmania.regexsyntax.hir.ErrorKind as HirErrorKind
+import io.github.kotlinmania.regexsyntax.repeatChar
+
 /**
  * This error type encompasses any error that can be returned by this crate.
  *
  * This error type is marked as `nonExhaustive`. This means that adding a
  * new variant is not considered a breaking change.
  */
-public sealed class Error : From<Error>, Error {
+public sealed class Error : Exception() {
     /**
      * An error that occurred while translating concrete syntax into abstract
      * syntax (AST).
      */
-    public data class Parse(public var value: Error) : Error()
+    public data class Parse(public var value: AstError) : Error()
+
     /**
      * An error that occurred while translating abstract syntax into a high
      * level intermediate representation (HIR).
      */
-    public data class Translate(public var value: Error) : Error()
+    public data class Translate(public var value: HirError) : Error()
 
-    public fun rustEquals(other: Error): Boolean = this == other
+    override val message: String
+        get() = toString()
 
     public open fun fmt(f: StringBuilder) {
         when (this) {
-            is Error.Parse -> {
-                val (x) = this
-                x.fmt(f)
-            }
-            is Error.Translate -> {
-                val (x1) = this
-                x1.fmt(f)
-            }
+            is Parse -> this.value.fmt(f)
+            is Translate -> this.value.fmt(f)
         }
     }
 
-    public companion object {
-        public fun from(err: Error): Error = Error.Parse(err)
+    override fun toString(): String = buildString { fmt(this) }
 
-        public fun fromError(err: Error): Error = Error.Translate(err)
+    public companion object {
+        public fun from(err: AstError): Error = Parse(err)
+
+        public fun from(err: HirError): Error = Translate(err)
     }
 }
 
@@ -48,54 +53,80 @@ public sealed class Error : From<Error>, Error {
  * readable format. Most of its complexity is from interspersing notational
  * markers pointing out the position where an error occurred.
  */
-public open class Formatter<E>(
+internal class Formatter<E>(
     /**
      * The original regex pattern in which the error occurred.
      */
-    public var pattern: String,
+    internal var pattern: String,
     /**
-     * The error kind. It must impl fmt.Display.
+     * The error kind. It must implement formatting via toString.
      */
-    public var err: E,
+    internal var err: E,
     /**
      * The primary span of the error.
      */
-    public var span: Span,
+    internal var span: Span,
     /**
      * An auxiliary and optional span, in case the error needs to point to
      * two locations (e.g., when reporting a duplicate capture group name).
      */
-    public var auxSpan: Span?,
+    internal var auxSpan: Span?,
 ) {
-    public open fun fmt(f: StringBuilder) {
+    internal fun fmt(f: StringBuilder) {
         val spans = Spans.fromFormatter(this)
         if (this.pattern.contains('\n')) {
             val divider = repeatChar('~', 79)
-            f.appendLine("regex parse error:").getOrElse { return Result.failure(it) }
-            f.appendLine("$divider").getOrElse { return Result.failure(it) }
-            val notated = spans.notate()
-            f.append("$notated").getOrElse { return Result.failure(it) }
-            f.appendLine("$divider").getOrElse { return Result.failure(it) }
+            f.appendLine("regex parse error:")
+            f.appendLine(divider)
+            f.append(spans.notate())
+            f.appendLine(divider)
             // If we have error spans that cover multiple lines, then we just
             // note the line numbers.
-            if (!spans.multiLine.isEmpty()) {
-                val notes = mutableListOf()
+            if (spans.multiLine.isNotEmpty()) {
+                val notes = mutableListOf<String>()
                 for (span in spans.multiLine) {
-                    notes.add("on line ${span.start.line} (column ${span.start.column}) through line ${span.end.line} (column ${span.end.column - 1})")
+                    notes.add(
+                        "on line ${span.start.line} " +
+                            "(column ${span.start.column}) through line ${span.end.line} " +
+                            "(column ${span.end.column - 1})",
+                    )
                 }
-                f.appendLine((notes.join("\n")).toString()).getOrElse { return Result.failure(it) }
+                f.appendLine(notes.joinToString("\n"))
             }
-            f.append("error: ${this.err}").getOrElse { return Result.failure(it) }
+            f.append("error: ${this.err}")
         } else {
-            f.appendLine("regex parse error:").getOrElse { return Result.failure(it) }
-            f.append("$notated").getOrElse { return Result.failure(it) }
-            f.append("error: ${this.err}").getOrElse { return Result.failure(it) }
+            f.appendLine("regex parse error:")
+            f.append(spans.notate())
+            f.append("error: ${this.err}")
         }
-        Result.success(Unit)
     }
+
+    override fun toString(): String = buildString { fmt(this) }
 }
 
-public fun fromFormatterErrorKind(err: Error): Formatter<ErrorKind> = Formatter(pattern = err.pattern(), err = err.kind(), span = err.span(), auxSpan = err.auxiliarySpan())
+internal fun fromFormatterErrorKind(err: AstError): Formatter<AstErrorKind> =
+    Formatter(
+        pattern = err.pattern(),
+        err = err.kind(),
+        span = err.span(),
+        auxSpan = err.auxiliarySpan(),
+    )
+
+internal fun fromFormatterErrorKind(err: HirError): Formatter<HirErrorKind> =
+    Formatter(
+        pattern = err.pattern(),
+        err = err.kind(),
+        span = err.span(),
+        auxSpan = null,
+    )
+
+private fun rustLines(s: String): List<String> {
+    if (s.isEmpty()) {
+        return emptyList()
+    }
+    val lines = s.lines()
+    return if (s.endsWith('\n')) lines.dropLast(1) else lines
+}
 
 /**
  * This type represents an arbitrary number of error spans in a way that makes
@@ -107,11 +138,11 @@ public fun fromFormatterErrorKind(err: Error): Formatter<ErrorKind> = Formatter(
  * two spans, it became obvious that an algorithm to handle an arbitrary
  * number of spans was actually much simpler.
  */
-public open class Spans(
+internal class Spans(
     /**
      * The original regex pattern string.
      */
-    public var pattern: String,
+    internal var pattern: String,
     /**
      * The total width that should be used for line numbers. The width is
      * used for left padding the line numbers for alignment.
@@ -119,35 +150,38 @@ public open class Spans(
      * A value of `0` means line numbers should not be displayed. That is,
      * the pattern is itself only one line.
      */
-    public var lineNumberWidth: Int,
+    internal var lineNumberWidth: Int,
     /**
      * All error spans that occur on a single line. This sequence always has
      * length equivalent to the number of lines in `pattern`, where the index
      * of the sequence represents a line number, starting at `0`. The spans
      * in each line are sorted in ascending order.
      */
-    public var byLine: List<List<Span>>,
+    internal var byLine: MutableList<MutableList<Span>>,
     /**
      * All error spans that occur over one or more lines. That is, the start
      * and end position of the span have different line numbers. The spans are
      * sorted in ascending order.
      */
-    public var multiLine: MutableList<Span>,
+    internal var multiLine: MutableList<Span>,
 ) {
     /**
      * Add the given span to this sequence, putting it in the right place.
      */
-    public open fun add(span: Span) {
+    internal fun add(span: Span) {
         // This is grossly inefficient since we sort after each add, but right
         // now, we only ever add two spans at most.
         if (span.isOneLine()) {
-            val i = span.start.line - 1
-            // because lines are 1-indexed
-            this.byLine[i].push(span)
-            this.byLine[i].sort()
+            // Subtract 1 because lines are 1-indexed.
+            val i = (span.start.line - 1).coerceAtLeast(0)
+            while (this.byLine.size <= i) {
+                this.byLine.add(mutableListOf())
+            }
+            this.byLine[i].add(span)
+            this.byLine[i].sortWith(compareBy({ it.start }, { it.end }))
         } else {
             this.multiLine.add(span)
-            this.multiLine.sort()
+            this.multiLine.sortWith(compareBy({ it.start }, { it.end }))
         }
     }
 
@@ -155,69 +189,64 @@ public open class Spans(
      * Notate the pattern string with carets (`^`) pointing at each span
      * location. This only applies to spans that occur within a single line.
      */
-    public open fun notate(): String {
-        val notated = String.new()
-        for ((i, line) in this.pattern.lines().enumerate()) {
+    internal fun notate(): String {
+        val notated = StringBuilder()
+        for ((i, line) in rustLines(this.pattern).withIndex()) {
             if (this.lineNumberWidth > 0) {
-                notated.pushStr(this.leftPadLineNumber(i + 1))
-                notated.pushStr(": ")
+                notated.append(this.leftPadLineNumber(i + 1))
+                notated.append(": ")
             } else {
-                notated.pushStr("    ")
+                notated.append("    ")
             }
-            notated.pushStr(line)
-            notated.push('\n')
-            when (val matchVal = this.notateLine(i)) {
-                null -> {}
-                else -> {
-                    val notes = matchVal
-                    notated.pushStr(notes)
-                    notated.push('\n')
-                }
+            notated.append(line)
+            notated.append('\n')
+            val notes = this.notateLine(i)
+            if (notes != null) {
+                notated.append(notes)
+                notated.append('\n')
             }
         }
-        return notated
+        return notated.toString()
     }
 
     /**
      * Return notes for the line indexed at `i` (zero-based). If there are no
-     * spans for the given line, then `None` is returned. Otherwise, an
+     * spans for the given line, then `null` is returned. Otherwise, an
      * appropriately space padded string with correctly positioned `^` is
      * returned, accounting for line numbers.
      */
-    public open fun notateLine(i: Int): String? {
+    internal fun notateLine(i: Int): String? {
         val spans = this.byLine[i]
         if (spans.isEmpty()) {
             return null
         }
-        val notes = String.new()
-        for (unused in 0 until this.lineNumberPadding()) {
-            notes.push(' ')
+        val notes = StringBuilder()
+        repeat(this.lineNumberPadding()) {
+            notes.append(' ')
         }
         var pos = 0
         for (span in spans) {
-            for (unused1 in pos until (span.start.column - 1)) {
-                notes.push(' ')
+            for (unused in pos until (span.start.column - 1)) {
+                notes.append(' ')
                 pos += 1
             }
-            val noteLen = span.end.column.saturatingSub(span.start.column)
-            for (unused2 in 0 until max(1, noteLen)) {
-                notes.push('^')
+            val noteLen = (span.end.column - span.start.column).coerceAtLeast(0)
+            repeat(maxOf(1, noteLen)) {
+                notes.append('^')
                 pos += 1
             }
         }
-        return notes
+        return notes.toString()
     }
 
     /**
      * Left pad the given line number with spaces such that it is aligned with
      * other line numbers.
      */
-    public open fun leftPadLineNumber(n: Int): String {
-        val n1 = n.toString()
-        val pad = (((this.lineNumberWidth).toLong() - (n1.len()).toLong()).takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt())!!
-        val result = repeatChar(' ', pad)
-        result.pushStr(n1)
-        return result
+    internal fun leftPadLineNumber(n: Int): String {
+        val nStr = n.toString()
+        val pad = (this.lineNumberWidth - nStr.length).coerceAtLeast(0)
+        return repeatChar(' ', pad) + nStr
     }
 
     /**
@@ -227,22 +256,22 @@ public open class Spans(
      * If the pattern is only one line, then this returns a fixed padding
      * for visual indentation.
      */
-    public open fun lineNumberPadding(): Int =
+    internal fun lineNumberPadding(): Int =
         if (this.lineNumberWidth == 0) {
             4
         } else {
             2 + this.lineNumberWidth
         }
 
-    public companion object {
+    internal companion object {
         /**
          * Build a sequence of spans from a formatter.
          */
-        public fun <E> fromFormatter(fmter: Formatter<E>): Spans {
-            var lineCount = fmter.pattern.lines().count()
+        internal fun <E> fromFormatter(fmter: Formatter<E>): Spans {
+            var lineCount = rustLines(fmter.pattern).size
             // If the pattern ends with a `\n` literal, then our line count is
             // off by one, since a span can occur immediately after the last `\n`,
-            // which is consider to be an additional line.
+            // which is considered to be an additional line.
             if (fmter.pattern.endsWith('\n')) {
                 lineCount += 1
             }
@@ -250,20 +279,21 @@ public open class Spans(
                 if (lineCount <= 1) {
                     0
                 } else {
-                    lineCount.toString().len()
+                    lineCount.toString().length
                 }
-            val spans = Spans(pattern = fmter.pattern, lineNumberWidth = lineNumberWidth, byLine = mutableListOf(mutableListOf(), lineCount), multiLine = mutableListOf())
-            spans.add(fmter.span.clone())
-            when (val matchVal = fmter.auxSpan) {
-                null -> {}
-                else -> {
-                    val span = matchVal
-                    spans.add(span.clone())
-                }
+            val spans =
+                Spans(
+                    pattern = fmter.pattern,
+                    lineNumberWidth = lineNumberWidth,
+                    byLine = MutableList(lineCount) { mutableListOf() },
+                    multiLine = mutableListOf(),
+                )
+            spans.add(fmter.span.copy())
+            val aux = fmter.auxSpan
+            if (aux != null) {
+                spans.add(aux.copy())
             }
             return spans
         }
     }
 }
-
-public fun repeatChar(c: Char, count: Int): String = repeat(c).take(count).collect()

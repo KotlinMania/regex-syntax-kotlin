@@ -213,6 +213,48 @@ internal inline fun <T, R> RefCell<T>.withBorrowMut(block: (RefMut<T>) -> R): R 
     }
 }
 
+internal fun isValidUtf8(bytes: List<UByte>): Boolean {
+    var i = 0
+    val len = bytes.size
+    while (i < len) {
+        val b0 = bytes[i].toInt() and 0xFF
+        if (b0 <= 0x7F) {
+            i += 1
+        } else if (b0 in 0xC2..0xDF) {
+            if (i + 1 >= len) return false
+            val b1 = bytes[i + 1].toInt() and 0xFF
+            if (b1 !in 0x80..0xBF) return false
+            i += 2
+        } else if (b0 in 0xE0..0xEF) {
+            if (i + 2 >= len) return false
+            val b1 = bytes[i + 1].toInt() and 0xFF
+            val b2 = bytes[i + 2].toInt() and 0xFF
+            when (b0) {
+                0xE0 -> if (b1 !in 0xA0..0xBF) return false
+                0xED -> if (b1 !in 0x80..0x9F) return false
+                else -> if (b1 !in 0x80..0xBF) return false
+            }
+            if (b2 !in 0x80..0xBF) return false
+            i += 3
+        } else if (b0 in 0xF0..0xF4) {
+            if (i + 3 >= len) return false
+            val b1 = bytes[i + 1].toInt() and 0xFF
+            val b2 = bytes[i + 2].toInt() and 0xFF
+            val b3 = bytes[i + 3].toInt() and 0xFF
+            when (b0) {
+                0xF0 -> if (b1 !in 0x90..0xBF) return false
+                0xF4 -> if (b1 !in 0x80..0x8F) return false
+                else -> if (b1 !in 0x80..0xBF) return false
+            }
+            if (b2 !in 0x80..0xBF || b3 !in 0x80..0xBF) return false
+            i += 4
+        } else {
+            return false
+        }
+    }
+    return true
+}
+
 internal fun asciiEscapeDefault(byte: UByte): List<UByte> {
     val b = byte.toInt() and 0xFF
     return when (b) {

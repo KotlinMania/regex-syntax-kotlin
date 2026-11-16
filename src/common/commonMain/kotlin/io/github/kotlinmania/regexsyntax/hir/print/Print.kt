@@ -1,23 +1,21 @@
 // port-lint: source hir/print.rs
 package io.github.kotlinmania.regexsyntax.hir.print
 
-import io.github.kotlinmania.regexsyntax.hir.Capture
+import io.github.kotlinmania.regexsyntax.FmtError
+import io.github.kotlinmania.regexsyntax.formatHexUpperPadded
 import io.github.kotlinmania.regexsyntax.hir.Class
 import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.hir.HirKind
-import io.github.kotlinmania.regexsyntax.hir.Literal
 import io.github.kotlinmania.regexsyntax.hir.Look
 import io.github.kotlinmania.regexsyntax.hir.visitor.Visitor
 import io.github.kotlinmania.regexsyntax.hir.visitor.visit
 import io.github.kotlinmania.regexsyntax.isMetaCharacter
-import io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts
-import io.github.kotlinmania.rustlang.core.mem.TypeLayout
+import io.github.kotlinmania.regexsyntax.scalarToString
+import io.github.kotlinmania.regexsyntax.unicodeScalars
+import io.github.kotlinmania.rustlang.core.result.Result
+import io.github.kotlinmania.rustlang.core.str.fromUtf8
 
 // This module provides a regular expression printer for `Hir`.
-
-public typealias Output = Unit
-
-public typealias Err = fmt.Error
 
 /**
  * A builder for constructing a printer.
@@ -25,28 +23,15 @@ public typealias Err = fmt.Error
  * Note that since a printer doesn't have any configuration knobs, this type
  * remains unexported.
  */
-public open class PrinterBuilder(
-    public var priv: Unit,
+internal class PrinterBuilder(
+    internal var priv: Unit = Unit,
 ) {
-    public open fun build(): Printer = Printer(priv = Unit)
+    internal fun build(): Printer = Printer(priv = Unit)
 
-    public companion object {
-        public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<PrinterBuilder> =
-            object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<PrinterBuilder> {
-                override val alignBytes: Long = 1L
-                override val sizeBytes: Long = 0L
-                override fun readNative(addr: Long): PrinterBuilder =
-                    PrinterBuilder(
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.UNIT).readNative(addr),
-                    )
-                override fun writeNative(addr: Long, value: PrinterBuilder) {
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.UNIT).writeNative(addr, value.priv)
-                }
-            }
+    internal companion object {
+        internal fun default(): PrinterBuilder = new()
 
-        public fun default(): PrinterBuilder = PrinterBuilder.new()
-
-        public fun new(): PrinterBuilder = PrinterBuilder(priv = Unit)
+        internal fun new(): PrinterBuilder = PrinterBuilder(priv = Unit)
     }
 }
 
@@ -69,32 +54,15 @@ public open class PrinterBuilder(
  * specific HIR representation.)
  */
 public open class Printer(
-    public var priv: Unit,
+    internal var priv: Unit = Unit,
 ) {
     /**
-     * Print the given `Ast` to the given writer. The writer must implement
-     * `fmt.Write`. Typical implementations of `fmt.Write` that can be used
-     * here are a `fmt.Formatter` (which is available in `fmt.Display`
-     * implementations) or a `String`.
+     * Print the given `Hir` to the given writer.
      */
-    public open fun <W : fmt.Write> print(hir: Hir, wtr: W) {
+    public open fun print(hir: Hir, wtr: Appendable): Result<Unit, FmtError> =
         visit(hir, Writer(wtr = wtr))
-    }
 
     public companion object {
-        public fun typeLayout(): io.github.kotlinmania.rustlang.core.mem.TypeLayout<Printer> =
-            object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<Printer> {
-                override val alignBytes: Long = 1L
-                override val sizeBytes: Long = 0L
-                override fun readNative(addr: Long): Printer =
-                    Printer(
-                        (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.UNIT).readNative(addr),
-                    )
-                override fun writeNative(addr: Long, value: Printer) {
-                    (io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts.UNIT).writeNative(addr, value.priv)
-                }
-            }
-
         /**
          * Create a new printer.
          */
@@ -102,293 +70,221 @@ public open class Printer(
     }
 }
 
-public open class Writer<W>(
-    public var wtr: W,
-) : Visitor {
-    public open fun finish() {
-        Result.success(Unit)
-    }
+internal class Writer(
+    internal var wtr: Appendable,
+) : Visitor<Unit, FmtError> {
+    override fun finish(): Result<Unit, FmtError> = Result.Ok(Unit)
 
-    public open fun visitPre(hir: Hir) {
-        run {
-            val matchVal = hir.kind()
-            when {
-                matchVal == HirKind.Empty -> {
-                    // Technically an empty sub-expression could be "printed" by
-                    // just ignoring it, but in practice, you could have a
-                    // repetition operator attached to an empty expression, and you
-                    // really need something in the concrete syntax to make that
-                    // work as you'd expect.
-                    this.wtr.append("(?:)").getOrElse { return Result.failure(it) }
-                }
-                // Repetition operators are strictly suffix oriented.
-                matchVal is HirKind.Repetition -> {}
-                matchVal is HirKind.Literal && matchVal.value is Literal -> {
-                    val (bytes) = matchVal.value as Literal
-                    // See the comment on the 'Concat' and 'Alternation' case below
-                    // for why we put parens here. Literals are, conceptually,
-                    // a special case of concatenation where each element is a
-                    // character. The HIR flattens this into a Holder<[u8]>, but we
-                    // still need to treat it like a concatenation for correct
-                    // printing. As a special case, we don't write parens if there
-                    // is only one character. One character means there is no
-                    // concat so we don't need parens. Adding parens would still be
-                    // correct, but we drop them here because it tends to create
-                    // rather noisy regexes even in simple cases.
-                    val result = String.fromUtf8(bytes)
-                    val len = result.mapOr(bytes.len(), { s -> s.chars().count() })
-                    if (len > 1) {
-                        this.wtr.append("(?:").getOrElse { return Result.failure(it) }
-                    }
+    override fun visitPre(hir: Hir): Result<Unit, FmtError> {
+        when (val kind = hir.kind()) {
+            HirKind.Empty -> {
+                // Technically an empty sub-expression could be "printed" by
+                // just ignoring it, but in practice, you could have a
+                // repetition operator attached to an empty expression, and you
+                // really need something in the concrete syntax to make that
+                // work as you expect.
+                this.wtr.append("(?:)")
+            }
+            // Repetition operators are strictly suffix oriented.
+            is HirKind.Repetition -> {}
+            is HirKind.Literal -> {
+                val bytes = kind.value.value
+                // See the comment on the `Concat` and `Alternation` case below
+                // for why we put parens here. Literals are, conceptually,
+                // a special case of concatenation where each element is a
+                // character. The HIR flattens this into a byte sequence, but we
+                // still need to treat it like a concatenation for correct
+                // printing. As a special case, we don't write parens if there
+                // is only one character. One character means there is no
+                // concat so we don't need parens. Adding parens would still be
+                // correct, but we drop them here because it tends to create
+                // rather noisy regexes even in simple cases.
+                val result = fromUtf8(bytes)
+                val scalars =
                     when (result) {
-                        is Ok -> {
-                            val (string) = result
-                            for (c in string.chars()) {
-                                this.writeLiteralChar(c).getOrElse { return Result.failure(it) }
-                            }
-                        }
-                        is Err -> {
-                            for (b in bytes.iter()) {
-                                this.writeLiteralByte(b).getOrElse { return Result.failure(it) }
-                            }
-                        }
+                        is Result.Ok -> result.value.unicodeScalars()
+                        is Result.Err -> null
                     }
-                    if (len > 1) {
-                        this.wtr.append(")").getOrElse { return Result.failure(it) }
+                val len = scalars?.size ?: bytes.size
+                if (len > 1) {
+                    this.wtr.append("(?:")
+                }
+                if (scalars != null) {
+                    for (c in scalars) {
+                        this.writeLiteralChar(c)
+                    }
+                } else {
+                    for (b in bytes) {
+                        this.writeLiteralByte(b)
                     }
                 }
-                matchVal is HirKind.Class && matchVal.value is Class.Unicode -> {
-                    val (cls) = matchVal.value as Class.Unicode
-                    if (cls.ranges().isEmpty()) {
-                        return this.wtr.append("[a&&b]")
-                    }
-                    this.wtr.append("[").getOrElse { return Result.failure(it) }
-                    for (range in cls.iter()) {
-                        if (range.start() == range.end()) {
-                            this.writeLiteralChar(range.start()).getOrElse { return Result.failure(it) }
-                        } else if (UInt.from(range.start()) + 1 == UInt.from(range.end())) {
-                            this.writeLiteralChar(range.start()).getOrElse { return Result.failure(it) }
-                            this.writeLiteralChar(range.end()).getOrElse { return Result.failure(it) }
-                        } else {
-                            this.writeLiteralChar(range.start()).getOrElse { return Result.failure(it) }
-                            this.wtr.append("-").getOrElse { return Result.failure(it) }
-                            this.writeLiteralChar(range.end()).getOrElse { return Result.failure(it) }
-                        }
-                    }
-                    this.wtr.append("]").getOrElse { return Result.failure(it) }
-                }
-                matchVal is HirKind.Class && matchVal.value is Class.Bytes -> {
-                    val (cls1) = matchVal.value as Class.Bytes
-                    if (cls1.ranges().isEmpty()) {
-                        return this.wtr.append("[a&&b]")
-                    }
-                    this.wtr.append("(?-u:[").getOrElse { return Result.failure(it) }
-                    for (range1 in cls1.iter()) {
-                        if (range1.start() == range1.end()) {
-                            this.writeLiteralClassByte(range1.start()).getOrElse { return Result.failure(it) }
-                        } else if (range1.start() + 1 == range1.end()) {
-                            this.writeLiteralClassByte(range1.start()).getOrElse { return Result.failure(it) }
-                            this.writeLiteralClassByte(range1.end()).getOrElse { return Result.failure(it) }
-                        } else {
-                            this.writeLiteralClassByte(range1.start()).getOrElse { return Result.failure(it) }
-                            this.wtr.append("-").getOrElse { return Result.failure(it) }
-                            this.writeLiteralClassByte(range1.end()).getOrElse { return Result.failure(it) }
-                        }
-                    }
-                    this.wtr.append("])").getOrElse { return Result.failure(it) }
-                }
-                matchVal is HirKind.Look -> {
-                    val (look) = matchVal
-                    when (look) {
-                        Look.Start -> {
-                            this.wtr.append("\\A").getOrElse { return Result.failure(it) }
-                        }
-                        Look.End -> {
-                            this.wtr.append("\\z").getOrElse { return Result.failure(it) }
-                        }
-                        Look.StartLF -> {
-                            this.wtr.append("(?m:^)").getOrElse { return Result.failure(it) }
-                        }
-                        Look.EndLF -> {
-                            this.wtr.append("(?m:\$)").getOrElse { return Result.failure(it) }
-                        }
-                        Look.StartCRLF -> {
-                            this.wtr.append("(?mR:^)").getOrElse { return Result.failure(it) }
-                        }
-                        Look.EndCRLF -> {
-                            this.wtr.append("(?mR:\$)").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordAscii -> {
-                            this.wtr.append("(?-u:\\b)").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordAsciiNegate -> {
-                            this.wtr.append("(?-u:\\B)").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordUnicode -> {
-                            this.wtr.append("\\b").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordUnicodeNegate -> {
-                            this.wtr.append("\\B").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordStartAscii -> {
-                            this.wtr.append("(?-u:\\b{start})").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordEndAscii -> {
-                            this.wtr.append("(?-u:\\b{end})").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordStartUnicode -> {
-                            this.wtr.append("\\b{start}").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordEndUnicode -> {
-                            this.wtr.append("\\b{end}").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordStartHalfAscii -> {
-                            this.wtr.append("(?-u:\\b{start-half})").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordEndHalfAscii -> {
-                            this.wtr.append("(?-u:\\b{end-half})").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordStartHalfUnicode -> {
-                            this.wtr.append("\\b{start-half}").getOrElse { return Result.failure(it) }
-                        }
-                        Look.WordEndHalfUnicode -> {
-                            this.wtr.append("\\b{end-half}").getOrElse { return Result.failure(it) }
-                        }
-                    }
-                }
-                matchVal is HirKind.Capture && matchVal.value is Capture -> {
-                    val name = (matchVal.value as Capture).name
-                    this.wtr.append("(").getOrElse { return Result.failure(it) }
-                    when (val matchVal1 = name) {
-                        null -> {}
-                        else -> {
-                            this.wtr.append("?P<$name>").getOrElse { return Result.failure(it) }
-                        }
-                    }
-                }
-                // Why do this? Wrapping concats and alts in non-capturing groups
-                // is not *always* necessary, but is sometimes necessary. For
-                // example, concat(a, alt(b, c))' should be written as a(?:b|c)'
-                // and not ab|c'. The former is clearly the intended meaning, but
-                // the latter is actually alt(concat(a, b), c)'.
-                //
-                // It would be possible to only group these things in cases where
-                // it's strictly necessary, but it requires knowing the parent
-                // expression. And since this technique is simpler and always
-                // correct, we take this route. More to the point, it is a non-goal
-                // of an HIR printer to show a nice easy-to-read regex. Indeed,
-                // its construction forbids it from doing so. Therefore, inserting
-                // extra groups where they aren't necessary is perfectly okay.
-                matchVal is HirKind.Concat -> {
-                    this.wtr.append("(?:").getOrElse { return Result.failure(it) }
-                }
-                else -> {
-                    this.wtr.append("(?:").getOrElse { return Result.failure(it) }
+                if (len > 1) {
+                    this.wtr.append(")")
                 }
             }
+            is HirKind.Class -> {
+                when (val clsVal = kind.value) {
+                    is Class.Unicode -> {
+                        val cls = clsVal.value
+                        if (cls.ranges().isEmpty()) {
+                            this.wtr.append("[a&&b]")
+                            return Result.Ok(Unit)
+                        }
+                        this.wtr.append("[")
+                        for (range in cls.iter()) {
+                            if (range.start() == range.end()) {
+                                this.writeLiteralChar(range.start())
+                            } else if (range.start() + 1u == range.end()) {
+                                this.writeLiteralChar(range.start())
+                                this.writeLiteralChar(range.end())
+                            } else {
+                                this.writeLiteralChar(range.start())
+                                this.wtr.append("-")
+                                this.writeLiteralChar(range.end())
+                            }
+                        }
+                        this.wtr.append("]")
+                    }
+                    is Class.Bytes -> {
+                        val cls = clsVal.value
+                        if (cls.ranges().isEmpty()) {
+                            this.wtr.append("[a&&b]")
+                            return Result.Ok(Unit)
+                        }
+                        this.wtr.append("(?-u:[")
+                        for (range in cls.iter()) {
+                            if (range.start() == range.end()) {
+                                this.writeLiteralClassByte(range.start())
+                            } else if (range.start().toUInt() + 1u == range.end().toUInt()) {
+                                this.writeLiteralClassByte(range.start())
+                                this.writeLiteralClassByte(range.end())
+                            } else {
+                                this.writeLiteralClassByte(range.start())
+                                this.wtr.append("-")
+                                this.writeLiteralClassByte(range.end())
+                            }
+                        }
+                        this.wtr.append("])")
+                    }
+                }
+            }
+            is HirKind.Look -> {
+                when (kind.value) {
+                    Look.Start -> this.wtr.append("\\A")
+                    Look.End -> this.wtr.append("\\z")
+                    Look.StartLF -> this.wtr.append("(?m:^)")
+                    Look.EndLF -> this.wtr.append("(?m:$)")
+                    Look.StartCRLF -> this.wtr.append("(?mR:^)")
+                    Look.EndCRLF -> this.wtr.append("(?mR:$)")
+                    Look.WordAscii -> this.wtr.append("(?-u:\\b)")
+                    Look.WordAsciiNegate -> this.wtr.append("(?-u:\\B)")
+                    Look.WordUnicode -> this.wtr.append("\\b")
+                    Look.WordUnicodeNegate -> this.wtr.append("\\B")
+                    Look.WordStartAscii -> this.wtr.append("(?-u:\\b{start})")
+                    Look.WordEndAscii -> this.wtr.append("(?-u:\\b{end})")
+                    Look.WordStartUnicode -> this.wtr.append("\\b{start}")
+                    Look.WordEndUnicode -> this.wtr.append("\\b{end}")
+                    Look.WordStartHalfAscii -> this.wtr.append("(?-u:\\b{start-half})")
+                    Look.WordEndHalfAscii -> this.wtr.append("(?-u:\\b{end-half})")
+                    Look.WordStartHalfUnicode -> this.wtr.append("\\b{start-half}")
+                    Look.WordEndHalfUnicode -> this.wtr.append("\\b{end-half}")
+                }
+            }
+            is HirKind.Capture -> {
+                val name = kind.value.name
+                this.wtr.append("(")
+                if (name != null) {
+                    this.wtr.append("?P<$name>")
+                }
+            }
+            // Why do this? Wrapping concats and alts in non-capturing groups
+            // is not *always* necessary, but is sometimes necessary. For
+            // example, `concat(a, alt(b, c))` should be written as `a(?:b|c)`
+            // and not `ab|c`. The former is clearly the intended meaning, but
+            // the latter is actually `alt(concat(a, b), c)`.
+            //
+            // It would be possible to only group these things in cases where
+            // it is strictly necessary, but it requires knowing the parent
+            // expression. And since this technique is simpler and always
+            // correct, we take this route. More to the point, it is a non-goal
+            // of an HIR printer to show a nice easy-to-read regex. Indeed,
+            // its construction forbids it from doing so. Therefore, inserting
+            // extra groups where they aren't necessary is perfectly okay.
+            is HirKind.Concat -> this.wtr.append("(?:")
+            is HirKind.Alternation -> this.wtr.append("(?:")
         }
-        Result.success(Unit)
+        return Result.Ok(Unit)
     }
 
-    public open fun visitPost(hir: Hir) {
-        when (val matchVal = hir.kind()) {
+    override fun visitPost(hir: Hir): Result<Unit, FmtError> {
+        when (val kind = hir.kind()) {
             // Handled during visitPre
             HirKind.Empty -> {}
             is HirKind.Literal -> {}
             is HirKind.Class -> {}
             is HirKind.Look -> {}
             is HirKind.Repetition -> {
-                val (x) = matchVal
-                run {
-                    val matchVal1 = Pair(x.min, x.max)
-                    when {
-                        matchVal1.first == 0 && matchVal1.second != null && matchVal1.second == 1 -> {
-                            this.wtr.append("?").getOrElse { return Result.failure(it) }
-                        }
-                        matchVal1.first == 0 && matchVal1.second == null -> {
-                            this.wtr.append("*").getOrElse { return Result.failure(it) }
-                        }
-                        matchVal1.first == 1 && matchVal1.second == null -> {
-                            this.wtr.append("+").getOrElse { return Result.failure(it) }
-                        }
-                        matchVal1.first == 1 && matchVal1.second != null && matchVal1.second == 1 -> {
-                            // a{1}' and a{1}?' are exactly equivalent to 'a'.
-                            return Result.success(Unit)
-                        }
-                        matchVal1.second == null -> {
-                            val m = matchVal1.first
-                            this.wtr.append("{$m,}").getOrElse { return Result.failure(it) }
-                        }
-                        matchVal1.second != null && matchVal1.first == matchVal1.second -> {
-                            val m1 = matchVal1.first
-                            val n = matchVal1.second
-                            this.wtr.append("{$m}").getOrElse { return Result.failure(it) }
-                            // a{m} and a{m}? are always exactly equivalent.
-                            return Result.success(Unit)
-                        }
-                        else -> {
-                            val m2 = matchVal1.first
-                            val n1 = matchVal1.second
-                            this.wtr.append("{$m,$n}").getOrElse { return Result.failure(it) }
-                        }
+                val x = kind.value
+                val min = x.min
+                val max = x.max
+                when {
+                    min == 0u && max == 1u -> this.wtr.append("?")
+                    min == 0u && max == null -> this.wtr.append("*")
+                    min == 1u && max == null -> this.wtr.append("+")
+                    min == 1u && max == 1u -> {
+                        // `a{1}` and `a{1}?` are exactly equivalent to `a`.
+                        return Result.Ok(Unit)
                     }
+                    max == null -> this.wtr.append("{$min,}")
+                    min == max -> {
+                        this.wtr.append("{$min}")
+                        // a{m} and a{m}? are always exactly equivalent.
+                        return Result.Ok(Unit)
+                    }
+                    else -> this.wtr.append("{$min,$max}")
                 }
                 if (!x.greedy) {
-                    this.wtr.append("?").getOrElse { return Result.failure(it) }
+                    this.wtr.append("?")
                 }
             }
-            is HirKind.Capture -> {
-                this.wtr.append(")").getOrElse { return Result.failure(it) }
-            }
-            is HirKind.Concat -> {
-                this.wtr.append(")").getOrElse { return Result.failure(it) }
-            }
-            is HirKind.Alternation -> {
-                this.wtr.append(")").getOrElse { return Result.failure(it) }
-            }
+            is HirKind.Capture -> this.wtr.append(")")
+            is HirKind.Concat -> this.wtr.append(")")
+            is HirKind.Alternation -> this.wtr.append(")")
         }
-        Result.success(Unit)
+        return Result.Ok(Unit)
     }
 
-    public open fun visitAlternationIn() {
+    override fun visitAlternationIn(): Result<Unit, FmtError> {
         this.wtr.append("|")
+        return Result.Ok(Unit)
     }
 
-    public open fun writeLiteralChar(c: Char) {
+    internal fun writeLiteralChar(c: UInt): Result<Unit, FmtError> {
         if (isMetaCharacter(c)) {
-            this.wtr.append("\\").getOrElse { return Result.failure(it) }
+            this.wtr.append("\\")
         }
-        this.wtr.append(c)
+        this.wtr.append(scalarToString(c))
+        return Result.Ok(Unit)
     }
 
-    public open fun writeLiteralByte(b: UByte) {
-        if (b <= 0x7Fu.toUByte() && !b.isAsciiControl() && !b.isAsciiWhitespace()) {
-            this.writeLiteralChar(Char.tryFrom(b).unwrap())
-        } else {
-            this.wtr.append("(?-u:\\x$b)")
+    internal fun writeLiteralByte(b: UByte): Result<Unit, FmtError> {
+        val u = b.toUInt()
+        if (u <= 0x7Fu && !isAsciiControlOrWhitespace(u)) {
+            return this.writeLiteralChar(u)
         }
+        this.wtr.append("(?-u:\\x${formatHexUpperPadded(u, 2)})")
+        return Result.Ok(Unit)
     }
 
-    public open fun writeLiteralClassByte(b: UByte) {
-        if (b <= 0x7Fu.toUByte() && !b.isAsciiControl() && !b.isAsciiWhitespace()) {
-            this.writeLiteralChar(Char.tryFrom(b).unwrap())
-        } else {
-            this.wtr.append("\\x$b")
+    internal fun writeLiteralClassByte(b: UByte): Result<Unit, FmtError> {
+        val u = b.toUInt()
+        if (u <= 0x7Fu && !isAsciiControlOrWhitespace(u)) {
+            return this.writeLiteralChar(u)
         }
-    }
-
-    public companion object {
-        public fun <W> typeLayout(typeLayoutW: io.github.kotlinmania.rustlang.core.mem.TypeLayout<W>): io.github.kotlinmania.rustlang.core.mem.TypeLayout<Writer<W>> =
-            object : io.github.kotlinmania.rustlang.core.mem.TypeLayout<Writer<W>> {
-                override val alignBytes: Long = listOf(1L, typeLayoutW.alignBytes).max()
-                override val sizeBytes: Long = io.github.kotlinmania.rustlang.core.mem.alignUpBytes(typeLayoutW.sizeBytes, alignBytes)
-                override fun readNative(addr: Long): Writer<W> =
-                    Writer(
-                        (typeLayoutW).readNative(addr),
-                    )
-                override fun writeNative(addr: Long, value: Writer<W>) {
-                    (typeLayoutW).writeNative(addr, value.wtr)
-                }
-            }
+        this.wtr.append("\\x${formatHexUpperPadded(u, 2)}")
+        return Result.Ok(Unit)
     }
 }
+
+private fun isAsciiControlOrWhitespace(b: UInt): Boolean =
+    b <= 0x1Fu || b == 0x7Fu || b == 0x20u

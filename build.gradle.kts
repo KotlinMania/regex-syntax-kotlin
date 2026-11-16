@@ -1717,7 +1717,8 @@ val macHasHypervisorSupport =
         ProcessBuilder("/usr/sbin/sysctl", "-n", "kern.hv_support")
             .start()
             .let { proc ->
-                val out = proc.inputStream.bufferedReader().readText().trim()
+                val reader = proc.inputStream.bufferedReader()
+                val out = reader.readText().trim()
                 proc.waitFor() == 0 && out == "1"
             }
 
@@ -1750,10 +1751,10 @@ val androidNativeRuntimeTasks =
                     .get()
                     .asFile.absolutePath,
             )
-            val isHostMatchingAbi =
-                ((target == "androidNativeArm64" && hostIsArm64ForAndroidNative) ||
-                    (target == "androidNativeX64" && !hostIsArm64ForAndroidNative)) &&
-                    macHasHypervisorSupport
+            val abiMatchesHost =
+                (target == "androidNativeArm64" && hostIsArm64ForAndroidNative) ||
+                    (target == "androidNativeX64" && !hostIsArm64ForAndroidNative)
+            val isHostMatchingAbi = abiMatchesHost && macHasHypervisorSupport
             if (!isHostMatchingAbi) {
                 arguments.add("--allow-unavailable")
             }

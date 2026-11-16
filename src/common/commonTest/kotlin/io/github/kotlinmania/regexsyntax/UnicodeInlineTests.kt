@@ -1,66 +1,70 @@
 // port-lint: tests unicode.rs
 package io.github.kotlinmania.regexsyntax.unicode
 
-public fun simpleFoldOk(c: Char): Any = SimpleCaseFolder.new().unwrap().mapping(c).iter().copied()
+import io.github.kotlinmania.regexsyntax.unwrap
 
-public fun containsCaseMap(start: Char, end: Char): Boolean = SimpleCaseFolder.new().unwrap().overlaps(start, end)
+public fun simpleFoldOk(c: UInt): List<UInt> = SimpleCaseFolder.new().unwrap().mapping(c)
+
+public fun containsCaseMap(start: UInt, end: UInt): Boolean =
+    SimpleCaseFolder.new().unwrap().overlaps(start, end)
 
 @kotlin.test.Test
 public fun simpleFoldK() {
-    val xs: List<Char> = simpleFoldOk('k').collect()
-    check(xs == mutableListOf('K', '\u212a'))
-    val xs1: List<Char> = simpleFoldOk('K').collect()
-    check(xs1 == mutableListOf('k', '\u212a'))
-    val xs2: List<Char> = simpleFoldOk('\u212a').collect()
-    check(xs2 == mutableListOf('K', 'k'))
+    val xs = simpleFoldOk('k'.code.toUInt())
+    check(xs == listOf('K'.code.toUInt(), 0x212Au))
+    val xs1 = simpleFoldOk('K'.code.toUInt())
+    check(xs1 == listOf('k'.code.toUInt(), 0x212Au))
+    val xs2 = simpleFoldOk(0x212Au)
+    check(xs2 == listOf('K'.code.toUInt(), 'k'.code.toUInt()))
 }
 
 @kotlin.test.Test
 public fun simpleFoldA() {
-    val xs: List<Char> = simpleFoldOk('a').collect()
-    check(xs == mutableListOf('A'))
-    val xs1: List<Char> = simpleFoldOk('A').collect()
-    check(xs1 == mutableListOf('a'))
+    val xs = simpleFoldOk('a'.code.toUInt())
+    check(xs == listOf('A'.code.toUInt()))
+    val xs1 = simpleFoldOk('A'.code.toUInt())
+    check(xs1 == listOf('a'.code.toUInt()))
 }
+
+// Upstream `simple_fold_disabled` guards `#[cfg(not(feature = "unicode-case"))]`; unicode-case is always enabled in KMP.
 
 @kotlin.test.Test
 public fun rangeContains() {
-    check(containsCaseMap('A', 'A'))
-    check(containsCaseMap('Z', 'Z'))
-    check(containsCaseMap('A', 'Z'))
-    check(containsCaseMap('@', 'A'))
-    check(containsCaseMap('Z', '['))
-    check(containsCaseMap('\u2603', '\u2c00'))
-    check(!containsCaseMap('[', '['))
-    check(!containsCaseMap('[', '`'))
-    check(!containsCaseMap('\u2603', '\u2603'))
+    check(containsCaseMap('A'.code.toUInt(), 'A'.code.toUInt()))
+    check(containsCaseMap('Z'.code.toUInt(), 'Z'.code.toUInt()))
+    check(containsCaseMap('A'.code.toUInt(), 'Z'.code.toUInt()))
+    check(containsCaseMap('@'.code.toUInt(), 'A'.code.toUInt()))
+    check(containsCaseMap('Z'.code.toUInt(), '['.code.toUInt()))
+    check(containsCaseMap(0x2603u, 0x2c00u))
+    check(!containsCaseMap('['.code.toUInt(), '['.code.toUInt()))
+    check(!containsCaseMap('['.code.toUInt(), '`'.code.toUInt()))
+    check(!containsCaseMap(0x2603u, 0x2603u))
 }
 
 @kotlin.test.Test
 public fun regression466() {
-    val q = ClassQuery.OneLetter('C')
+    val q = ClassQuery.OneLetter('C'.code.toUInt())
     check(q.canonicalize().unwrap() == CanonicalClassQuery.GeneralCategory("Other"))
 }
 
 @kotlin.test.Test
 public fun symNormalize() {
-    val symNorm = ::symbolicNameNormalize
-    check(symNorm("Line_Break") == "linebreak")
-    check(symNorm("Line-break") == "linebreak")
-    check(symNorm("linebreak") == "linebreak")
-    check(symNorm("BA") == "ba")
-    check(symNorm("ba") == "ba")
-    check(symNorm("Greek") == "greek")
-    check(symNorm("isGreek") == "greek")
-    check(symNorm("IS_Greek") == "greek")
-    check(symNorm("isc") == "isc")
-    check(symNorm("is c") == "isc")
-    check(symNorm("is_c") == "isc")
+    check(symbolicNameNormalize("Line_Break") == "linebreak")
+    check(symbolicNameNormalize("Line-break") == "linebreak")
+    check(symbolicNameNormalize("linebreak") == "linebreak")
+    check(symbolicNameNormalize("BA") == "ba")
+    check(symbolicNameNormalize("ba") == "ba")
+    check(symbolicNameNormalize("Greek") == "greek")
+    check(symbolicNameNormalize("isGreek") == "greek")
+    check(symbolicNameNormalize("IS_Greek") == "greek")
+    check(symbolicNameNormalize("isc") == "isc")
+    check(symbolicNameNormalize("is c") == "isc")
+    check(symbolicNameNormalize("is_c") == "isc")
 }
 
 @kotlin.test.Test
 public fun validUtf8Symbolic() {
-    val x = "abcÿxyz".encodeToByteArray().toVec()
+    val x = "abcÿxyz".encodeToByteArray().map { it.toUByte() }.toMutableList()
     val y = symbolicNameNormalizeBytes(x)
-    check(y == "abcxyz".encodeToByteArray())
+    check(y == "abcxyz".encodeToByteArray().map { it.toUByte() })
 }

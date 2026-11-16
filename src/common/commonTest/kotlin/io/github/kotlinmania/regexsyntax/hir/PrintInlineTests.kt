@@ -5,6 +5,7 @@ import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.hir.Look
 import io.github.kotlinmania.regexsyntax.hir.Repetition
 import io.github.kotlinmania.regexsyntax.parser.ParserBuilder
+import io.github.kotlinmania.regexsyntax.unwrap
 
 // This module provides a regular expression printer for `Hir`.
 
@@ -21,11 +22,11 @@ public fun roundtripWith(f: (ParserBuilder) -> ParserBuilder, given: String, exp
     f(builder)
     val hir = builder.build().parse(given).unwrap()
     val printer = Printer.new()
-    val dst = String.new()
+    val dst = StringBuilder()
     printer.print(hir, dst).unwrap()
     // Check that the result is actually valid.
-    builder.build().parse(dst).unwrap()
-    check(expected == dst)
+    builder.build().parse(dst.toString()).unwrap()
+    check(expected == dst.toString())
 }
 
 @kotlin.test.Test
