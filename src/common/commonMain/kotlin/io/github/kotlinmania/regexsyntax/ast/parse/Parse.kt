@@ -1625,7 +1625,9 @@ internal class ParserI(
         check(this.char() in ch('0')..ch('7'))
         val start = this.pos()
         // Parse up to two more digits.
-        while (this.bump() && this.char() in ch('0')..ch('7') && this.pos().offset - start.offset <= 2) {}
+        while (this.bump() && this.char() in ch('0')..ch('7') && this.pos().offset - start.offset <= 2) {
+            continue
+        }
         val end = this.pos()
         val octal = this.utf8Bytes.decodeToString(start.offset, end.offset)
         // Parsing the octal should never fail since the above guarantees a
@@ -2009,7 +2011,9 @@ internal class ParserI(
             }
         }
         val nameStart = this.offset()
-        while (this.char() != ch(':') && this.bump()) {}
+        while (this.char() != ch(':') && this.bump()) {
+            continue
+        }
         if (this.isEof()) {
             this.parser().pos.set(start)
             return null

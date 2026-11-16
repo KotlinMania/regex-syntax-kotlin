@@ -103,15 +103,22 @@ public fun npos(offset: Int, line: Int, column: Int): Position = Position.new(of
 public fun span(range: IntRange): Span {
     val rStart = range.first
     val rEnd = range.last + 1
-    val start = Position.new(rStart, 1, rStart + 1)
-    val end = Position.new(rEnd, 1, rEnd + 1)
-    return Span.new(start, end)
+    return span(rStart, rEnd)
+}
+
+public fun span(start: Int, end: Int): Span {
+    val startPos = Position.new(start, 1, start + 1)
+    val endPos = Position.new(end, 1, end + 1)
+    return Span.new(startPos, endPos)
 }
 
 /**
  * Create a new span for the corresponding byte range in the given string.
  */
-public fun spanRange(subject: String, range: IntRange): Span {
+public fun spanRange(subject: String, range: IntRange): Span =
+    spanRange(subject, range.first, range.last + 1)
+
+public fun spanRange(subject: String, rStart: Int, rEnd: Int): Span {
     val bytes = subject.encodeToByteArray()
     fun posAt(byteOffset: Int): Position {
         val prefix = bytes.copyOfRange(0, byteOffset).decodeToString()
@@ -127,7 +134,7 @@ public fun spanRange(subject: String, range: IntRange): Span {
         }
         return Position(offset = byteOffset, line = line, column = col)
     }
-    return Span.new(posAt(range.first), posAt(range.last + 1))
+    return Span.new(posAt(rStart), posAt(rEnd))
 }
 
 /**
@@ -187,7 +194,7 @@ public fun flagSet(pat: String, range: IntRange, flag: Flag, negated: Boolean): 
 public class AstParseInlineTests {
     @kotlin.test.Test
     public fun parseNestLimit() {
-        when (val matchVal = Pair(parserNestLimit("", 0u).parse(), Result.Ok(Ast.empty(span(0 until 0))))) {
+        when (val matchVal = Pair(parserNestLimit("", 0u).parse(), Result.Ok(Ast.empty(span(0, 0))))) {
             else -> {
                 val leftVal = matchVal.first
                 val rightVal = matchVal.second
@@ -472,7 +479,7 @@ public class AstParseInlineTests {
             }
         }
         val pat5 = "(?x)(  ?:  a )"
-        when (val matchVal5 = Pair(parser(pat5).parse(), Result.Ok(concatWith(spanRange(pat5, 0 until pat5.encodeToByteArray().size), mutableListOf(flagSet(pat5, 0 until 4, Flag.IgnoreWhitespace, false), Ast.group(Group(span = spanRange(pat5, 4 until pat5.encodeToByteArray().size), kind = GroupKind.NonCapturing(Flags(span = spanRange(pat5, 8 until 8), items = mutableListOf())), ast = litWith('a', spanRange(pat5, 11 until 12))))))))) {
+        when (val matchVal5 = Pair(parser(pat5).parse(), Result.Ok(concatWith(spanRange(pat5, 0 until pat5.encodeToByteArray().size), mutableListOf(flagSet(pat5, 0 until 4, Flag.IgnoreWhitespace, false), Ast.group(Group(span = spanRange(pat5, 4 until pat5.encodeToByteArray().size), kind = GroupKind.NonCapturing(Flags(span = spanRange(pat5, 8, 8), items = mutableListOf())), ast = litWith('a', spanRange(pat5, 11 until 12))))))))) {
             else -> {
                 val leftVal5 = matchVal5.first
                 val rightVal5 = matchVal5.second
@@ -611,7 +618,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal9 = Pair(parser("|a?").parse(), Result.Ok(alt(0 until 3, mutableListOf(Ast.empty(span(0 until 0)), Ast.repetition(Repetition(span = span(1 until 3), op = RepetitionOp(span = span(2 until 3), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 1)))))))) {
+        when (val matchVal9 = Pair(parser("|a?").parse(), Result.Ok(alt(0 until 3, mutableListOf(Ast.empty(span(0, 0)), Ast.repetition(Repetition(span = span(1 until 3), op = RepetitionOp(span = span(2 until 3), kind = RepetitionKind.ZeroOrOne), greedy = true, ast = lit('a', 1)))))))) {
             else -> {
                 val leftVal9 = matchVal9.first
                 val rightVal9 = matchVal9.second
@@ -620,7 +627,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal10 = Pair(parser("*").parse().unwrapErr(), TestError(span = span(0 until 0), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal10 = Pair(parser("*").parse().unwrapErr(), TestError(span = span(0, 0), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal10 = matchVal10.first
                 val rightVal10 = matchVal10.second
@@ -629,7 +636,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal11 = Pair(parser("(?i)*").parse().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal11 = Pair(parser("(?i)*").parse().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal11 = matchVal11.first
                 val rightVal11 = matchVal11.second
@@ -638,7 +645,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal12 = Pair(parser("(*)").parse().unwrapErr(), TestError(span = span(1 until 1), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal12 = Pair(parser("(*)").parse().unwrapErr(), TestError(span = span(1, 1), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal12 = matchVal12.first
                 val rightVal12 = matchVal12.second
@@ -647,7 +654,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal13 = Pair(parser("(?:?)").parse().unwrapErr(), TestError(span = span(3 until 3), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal13 = Pair(parser("(?:?)").parse().unwrapErr(), TestError(span = span(3, 3), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal13 = matchVal13.first
                 val rightVal13 = matchVal13.second
@@ -656,7 +663,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal14 = Pair(parser("+").parse().unwrapErr(), TestError(span = span(0 until 0), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal14 = Pair(parser("+").parse().unwrapErr(), TestError(span = span(0, 0), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal14 = matchVal14.first
                 val rightVal14 = matchVal14.second
@@ -665,7 +672,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal15 = Pair(parser("?").parse().unwrapErr(), TestError(span = span(0 until 0), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal15 = Pair(parser("?").parse().unwrapErr(), TestError(span = span(0, 0), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal15 = matchVal15.first
                 val rightVal15 = matchVal15.second
@@ -674,7 +681,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal16 = Pair(parser("(?)").parse().unwrapErr(), TestError(span = span(1 until 1), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal16 = Pair(parser("(?)").parse().unwrapErr(), TestError(span = span(1, 1), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal16 = matchVal16.first
                 val rightVal16 = matchVal16.second
@@ -683,7 +690,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal17 = Pair(parser("|*").parse().unwrapErr(), TestError(span = span(1 until 1), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal17 = Pair(parser("|*").parse().unwrapErr(), TestError(span = span(1, 1), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal17 = matchVal17.first
                 val rightVal17 = matchVal17.second
@@ -692,7 +699,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal18 = Pair(parser("|+").parse().unwrapErr(), TestError(span = span(1 until 1), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal18 = Pair(parser("|+").parse().unwrapErr(), TestError(span = span(1, 1), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal18 = matchVal18.first
                 val rightVal18 = matchVal18.second
@@ -701,7 +708,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal19 = Pair(parser("|?").parse().unwrapErr(), TestError(span = span(1 until 1), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal19 = Pair(parser("|?").parse().unwrapErr(), TestError(span = span(1, 1), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal19 = matchVal19.first
                 val rightVal19 = matchVal19.second
@@ -813,7 +820,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal11 = Pair(parser("(?i){0}").parse().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal11 = Pair(parser("(?i){0}").parse().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal11 = matchVal11.first
                 val rightVal11 = matchVal11.second
@@ -822,7 +829,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal12 = Pair(parser("(?m){1,1}").parse().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal12 = Pair(parser("(?m){1,1}").parse().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal12 = matchVal12.first
                 val rightVal12 = matchVal12.second
@@ -831,7 +838,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal13 = Pair(parser("a{]}").parse().unwrapErr(), TestError(span = span(2 until 2), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
+        when (val matchVal13 = Pair(parser("a{]}").parse().unwrapErr(), TestError(span = span(2, 2), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
             else -> {
                 val leftVal13 = matchVal13.first
                 val rightVal13 = matchVal13.second
@@ -840,7 +847,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal14 = Pair(parser("a{1,]}").parse().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
+        when (val matchVal14 = Pair(parser("a{1,]}").parse().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
             else -> {
                 val leftVal14 = matchVal14.first
                 val rightVal14 = matchVal14.second
@@ -858,7 +865,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal16 = Pair(parser("a{}").parse().unwrapErr(), TestError(span = span(2 until 2), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
+        when (val matchVal16 = Pair(parser("a{}").parse().unwrapErr(), TestError(span = span(2, 2), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
             else -> {
                 val leftVal16 = matchVal16.first
                 val rightVal16 = matchVal16.second
@@ -867,7 +874,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal17 = Pair(parser("a{a").parse().unwrapErr(), TestError(span = span(2 until 2), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
+        when (val matchVal17 = Pair(parser("a{a").parse().unwrapErr(), TestError(span = span(2, 2), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
             else -> {
                 val leftVal17 = matchVal17.first
                 val rightVal17 = matchVal17.second
@@ -894,7 +901,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal20 = Pair(parser("a{9,a").parse().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
+        when (val matchVal20 = Pair(parser("a{9,a").parse().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.RepetitionCountDecimalEmpty))) {
             else -> {
                 val leftVal20 = matchVal20.first
                 val rightVal20 = matchVal20.second
@@ -939,7 +946,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal25 = Pair(parser("{5}").parse().unwrapErr(), TestError(span = span(0 until 0), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal25 = Pair(parser("{5}").parse().unwrapErr(), TestError(span = span(0, 0), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal25 = matchVal25.first
                 val rightVal25 = matchVal25.second
@@ -948,7 +955,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal26 = Pair(parser("|{5}").parse().unwrapErr(), TestError(span = span(1 until 1), kind = ErrorKind.RepetitionMissing))) {
+        when (val matchVal26 = Pair(parser("|{5}").parse().unwrapErr(), TestError(span = span(1, 1), kind = ErrorKind.RepetitionMissing))) {
             else -> {
                 val leftVal26 = matchVal26.first
                 val rightVal26 = matchVal26.second
@@ -1015,7 +1022,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal6 = Pair(parser("|").parse(), Result.Ok(alt(0 until 1, mutableListOf(Ast.empty(span(0 until 0)), Ast.empty(span(1 until 1))))))) {
+        when (val matchVal6 = Pair(parser("|").parse(), Result.Ok(alt(0 until 1, mutableListOf(Ast.empty(span(0, 0)), Ast.empty(span(1, 1))))))) {
             else -> {
                 val leftVal6 = matchVal6.first
                 val rightVal6 = matchVal6.second
@@ -1024,7 +1031,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal7 = Pair(parser("||").parse(), Result.Ok(alt(0 until 2, mutableListOf(Ast.empty(span(0 until 0)), Ast.empty(span(1 until 1)), Ast.empty(span(2 until 2))))))) {
+        when (val matchVal7 = Pair(parser("||").parse(), Result.Ok(alt(0 until 2, mutableListOf(Ast.empty(span(0, 0)), Ast.empty(span(1, 1)), Ast.empty(span(2, 2))))))) {
             else -> {
                 val leftVal7 = matchVal7.first
                 val rightVal7 = matchVal7.second
@@ -1033,7 +1040,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal8 = Pair(parser("a|").parse(), Result.Ok(alt(0 until 2, mutableListOf(lit('a', 0), Ast.empty(span(2 until 2))))))) {
+        when (val matchVal8 = Pair(parser("a|").parse(), Result.Ok(alt(0 until 2, mutableListOf(lit('a', 0), Ast.empty(span(2, 2))))))) {
             else -> {
                 val leftVal8 = matchVal8.first
                 val rightVal8 = matchVal8.second
@@ -1042,7 +1049,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal9 = Pair(parser("|a").parse(), Result.Ok(alt(0 until 2, mutableListOf(Ast.empty(span(0 until 0)), lit('a', 1)))))) {
+        when (val matchVal9 = Pair(parser("|a").parse(), Result.Ok(alt(0 until 2, mutableListOf(Ast.empty(span(0, 0)), lit('a', 1)))))) {
             else -> {
                 val leftVal9 = matchVal9.first
                 val rightVal9 = matchVal9.second
@@ -1051,7 +1058,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal10 = Pair(parser("(|)").parse(), Result.Ok(group(0 until 3, 1u, alt(1 until 2, mutableListOf(Ast.empty(span(1 until 1)), Ast.empty(span(2 until 2)))))))) {
+        when (val matchVal10 = Pair(parser("(|)").parse(), Result.Ok(group(0 until 3, 1u, alt(1 until 2, mutableListOf(Ast.empty(span(1, 1)), Ast.empty(span(2, 2)))))))) {
             else -> {
                 val leftVal10 = matchVal10.first
                 val rightVal10 = matchVal10.second
@@ -1060,7 +1067,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal11 = Pair(parser("(a|)").parse(), Result.Ok(group(0 until 4, 1u, alt(1 until 3, mutableListOf(lit('a', 1), Ast.empty(span(3 until 3)))))))) {
+        when (val matchVal11 = Pair(parser("(a|)").parse(), Result.Ok(group(0 until 4, 1u, alt(1 until 3, mutableListOf(lit('a', 1), Ast.empty(span(3, 3)))))))) {
             else -> {
                 val leftVal11 = matchVal11.first
                 val rightVal11 = matchVal11.second
@@ -1069,7 +1076,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal12 = Pair(parser("(|a)").parse(), Result.Ok(group(0 until 4, 1u, alt(1 until 3, mutableListOf(Ast.empty(span(1 until 1)), lit('a', 2))))))) {
+        when (val matchVal12 = Pair(parser("(|a)").parse(), Result.Ok(group(0 until 4, 1u, alt(1 until 3, mutableListOf(Ast.empty(span(1, 1)), lit('a', 2))))))) {
             else -> {
                 val leftVal12 = matchVal12.first
                 val rightVal12 = matchVal12.second
@@ -1167,7 +1174,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal3 = Pair(parser("()").parse(), Result.Ok(Ast.group(Group(span = span(0 until 2), kind = GroupKind.CaptureIndex(1u), ast = Ast.empty(span(1 until 1))))))) {
+        when (val matchVal3 = Pair(parser("()").parse(), Result.Ok(Ast.group(Group(span = span(0 until 2), kind = GroupKind.CaptureIndex(1u), ast = Ast.empty(span(1, 1))))))) {
             else -> {
                 val leftVal3 = matchVal3.first
                 val rightVal3 = matchVal3.second
@@ -1185,7 +1192,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal5 = Pair(parser("(())").parse(), Result.Ok(Ast.group(Group(span = span(0 until 4), kind = GroupKind.CaptureIndex(1u), ast = Ast.group(Group(span = span(1 until 3), kind = GroupKind.CaptureIndex(2u), ast = Ast.empty(span(2 until 2))))))))) {
+        when (val matchVal5 = Pair(parser("(())").parse(), Result.Ok(Ast.group(Group(span = span(0 until 4), kind = GroupKind.CaptureIndex(1u), ast = Ast.group(Group(span = span(1 until 3), kind = GroupKind.CaptureIndex(2u), ast = Ast.empty(span(2, 2))))))))) {
             else -> {
                 val leftVal5 = matchVal5.first
                 val rightVal5 = matchVal5.second
@@ -1194,7 +1201,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal6 = Pair(parser("(?:a)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 5), kind = GroupKind.NonCapturing(Flags(span = span(2 until 2), items = mutableListOf())), ast = lit('a', 3)))))) {
+        when (val matchVal6 = Pair(parser("(?:a)").parse(), Result.Ok(Ast.group(Group(span = span(0 until 5), kind = GroupKind.NonCapturing(Flags(span = span(2, 2), items = mutableListOf())), ast = lit('a', 3)))))) {
             else -> {
                 val leftVal6 = matchVal6.first
                 val rightVal6 = matchVal6.second
@@ -1248,7 +1255,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal12 = Pair(parser("(?P<").parse().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.GroupNameUnexpectedEof))) {
+        when (val matchVal12 = Pair(parser("(?P<").parse().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.GroupNameUnexpectedEof))) {
             else -> {
                 val leftVal12 = matchVal12.first
                 val rightVal12 = matchVal12.second
@@ -1369,7 +1376,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal8 = Pair(parser("(?P<").parse().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.GroupNameUnexpectedEof))) {
+        when (val matchVal8 = Pair(parser("(?P<").parse().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.GroupNameUnexpectedEof))) {
             else -> {
                 val leftVal8 = matchVal8.first
                 val rightVal8 = matchVal8.second
@@ -1378,7 +1385,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal9 = Pair(parser("(?P<>z)").parse().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.GroupNameEmpty))) {
+        when (val matchVal9 = Pair(parser("(?P<>z)").parse().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.GroupNameEmpty))) {
             else -> {
                 val leftVal9 = matchVal9.first
                 val rightVal9 = matchVal9.second
@@ -1387,7 +1394,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal10 = Pair(parser("(?P<a").parse().unwrapErr(), TestError(span = span(5 until 5), kind = ErrorKind.GroupNameUnexpectedEof))) {
+        when (val matchVal10 = Pair(parser("(?P<a").parse().unwrapErr(), TestError(span = span(5, 5), kind = ErrorKind.GroupNameUnexpectedEof))) {
             else -> {
                 val leftVal10 = matchVal10.first
                 val rightVal10 = matchVal10.second
@@ -1396,7 +1403,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal11 = Pair(parser("(?P<ab").parse().unwrapErr(), TestError(span = span(6 until 6), kind = ErrorKind.GroupNameUnexpectedEof))) {
+        when (val matchVal11 = Pair(parser("(?P<ab").parse().unwrapErr(), TestError(span = span(6, 6), kind = ErrorKind.GroupNameUnexpectedEof))) {
             else -> {
                 val leftVal11 = matchVal11.first
                 val rightVal11 = matchVal11.second
@@ -1553,7 +1560,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal6 = Pair(parser("isU").parseFlags().unwrapErr(), TestError(span = span(3 until 3), kind = ErrorKind.FlagUnexpectedEof))) {
+        when (val matchVal6 = Pair(parser("isU").parseFlags().unwrapErr(), TestError(span = span(3, 3), kind = ErrorKind.FlagUnexpectedEof))) {
             else -> {
                 val leftVal6 = matchVal6.first
                 val rightVal6 = matchVal6.second
@@ -2067,7 +2074,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal1 = Pair(parser("\\xF").parseEscape().unwrapErr(), TestError(span = span(3 until 3), kind = ErrorKind.EscapeUnexpectedEof))) {
+        when (val matchVal1 = Pair(parser("\\xF").parseEscape().unwrapErr(), TestError(span = span(3, 3), kind = ErrorKind.EscapeUnexpectedEof))) {
             else -> {
                 val leftVal1 = matchVal1.first
                 val rightVal1 = matchVal1.second
@@ -2111,7 +2118,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal2 = Pair(parser("\\uF").parseEscape().unwrapErr(), TestError(span = span(3 until 3), kind = ErrorKind.EscapeUnexpectedEof))) {
+        when (val matchVal2 = Pair(parser("\\uF").parseEscape().unwrapErr(), TestError(span = span(3, 3), kind = ErrorKind.EscapeUnexpectedEof))) {
             else -> {
                 val leftVal1 = matchVal2.first
                 val rightVal1 = matchVal2.second
@@ -2182,7 +2189,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal2 = Pair(parser("\\UF").parseEscape().unwrapErr(), TestError(span = span(3 until 3), kind = ErrorKind.EscapeUnexpectedEof))) {
+        when (val matchVal2 = Pair(parser("\\UF").parseEscape().unwrapErr(), TestError(span = span(3, 3), kind = ErrorKind.EscapeUnexpectedEof))) {
             else -> {
                 val leftVal1 = matchVal2.first
                 val rightVal1 = matchVal2.second
@@ -2312,7 +2319,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal5 = Pair(parser("\\x").parseEscape().unwrapErr(), TestError(span = span(2 until 2), kind = ErrorKind.EscapeUnexpectedEof))) {
+        when (val matchVal5 = Pair(parser("\\x").parseEscape().unwrapErr(), TestError(span = span(2, 2), kind = ErrorKind.EscapeUnexpectedEof))) {
             else -> {
                 val leftVal5 = matchVal5.first
                 val rightVal5 = matchVal5.second
@@ -2415,7 +2422,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal3 = Pair(parser("-1").parseDecimal().unwrapErr(), TestError(span = span(0 until 0), kind = ErrorKind.DecimalEmpty))) {
+        when (val matchVal3 = Pair(parser("-1").parseDecimal().unwrapErr(), TestError(span = span(0, 0), kind = ErrorKind.DecimalEmpty))) {
             else -> {
                 val leftVal3 = matchVal3.first
                 val rightVal3 = matchVal3.second
@@ -2424,7 +2431,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal4 = Pair(parser("").parseDecimal().unwrapErr(), TestError(span = span(0 until 0), kind = ErrorKind.DecimalEmpty))) {
+        when (val matchVal4 = Pair(parser("").parseDecimal().unwrapErr(), TestError(span = span(0, 0), kind = ErrorKind.DecimalEmpty))) {
             else -> {
                 val leftVal4 = matchVal4.first
                 val rightVal4 = matchVal4.second
@@ -2662,7 +2669,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal22 = Pair(parser("[&&&&]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 6), negated = false, kind = intersection(span(1 until 5), intersection(span(1 until 3), itemset(empty(span(1 until 1))), itemset(empty(span(3 until 3)))), itemset(empty(span(5 until 5))))))))) {
+        when (val matchVal22 = Pair(parser("[&&&&]").parse(), Result.Ok(Ast.classBracketed(ClassBracketed(span = span(0 until 6), negated = false, kind = intersection(span(1 until 5), intersection(span(1 until 3), itemset(empty(span(1, 1))), itemset(empty(span(3, 3)))), itemset(empty(span(5, 5))))))))) {
             else -> {
                 val leftVal22 = matchVal22.first
                 val rightVal22 = matchVal22.second
@@ -2803,8 +2810,8 @@ public class AstParseInlineTests {
     @kotlin.test.Test
     public fun parseSetClassOpen() {
         when (val matchVal = Pair(parser("[a]").parseSetClassOpen(), run {
-            val set = ClassBracketed(span = span(0 until 1), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
-            val union = ClassSetUnion(span = span(1 until 1), items = mutableListOf())
+            val set = ClassBracketed(span = span(0 until 1), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
+            val union = ClassSetUnion(span = span(1, 1), items = mutableListOf())
             Result.Ok(Pair(set, union))
         })) {
             else -> {
@@ -2816,8 +2823,8 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal1 = Pair(parserIgnoreWhitespace("[   a]").parseSetClassOpen(), run {
-            val set1 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(4 until 4), items = mutableListOf())))
-            val union1 = ClassSetUnion(span = span(4 until 4), items = mutableListOf())
+            val set1 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(4, 4), items = mutableListOf())))
+            val union1 = ClassSetUnion(span = span(4, 4), items = mutableListOf())
             Result.Ok(Pair(set1, union1))
         })) {
             else -> {
@@ -2829,8 +2836,8 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal2 = Pair(parser("[^a]").parseSetClassOpen(), run {
-            val set2 = ClassBracketed(span = span(0 until 2), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
-            val union2 = ClassSetUnion(span = span(2 until 2), items = mutableListOf())
+            val set2 = ClassBracketed(span = span(0 until 2), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
+            val union2 = ClassSetUnion(span = span(2, 2), items = mutableListOf())
             Result.Ok(Pair(set2, union2))
         })) {
             else -> {
@@ -2842,8 +2849,8 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal3 = Pair(parserIgnoreWhitespace("[ ^ a]").parseSetClassOpen(), run {
-            val set3 = ClassBracketed(span = span(0 until 4), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(4 until 4), items = mutableListOf())))
-            val union3 = ClassSetUnion(span = span(4 until 4), items = mutableListOf())
+            val set3 = ClassBracketed(span = span(0 until 4), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(4, 4), items = mutableListOf())))
+            val union3 = ClassSetUnion(span = span(4, 4), items = mutableListOf())
             Result.Ok(Pair(set3, union3))
         })) {
             else -> {
@@ -2855,7 +2862,7 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal4 = Pair(parser("[-a]").parseSetClassOpen(), run {
-            val set4 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
+            val set4 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
             val union4 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
             Result.Ok(Pair(set4, union4))
         })) {
@@ -2868,7 +2875,7 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal5 = Pair(parserIgnoreWhitespace("[ - a]").parseSetClassOpen(), run {
-            val set5 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
+            val set5 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
             val union5 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
             Result.Ok(Pair(set5, union5))
         })) {
@@ -2881,7 +2888,7 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal6 = Pair(parser("[^-a]").parseSetClassOpen(), run {
-            val set6 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
+            val set6 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
             val union6 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
             Result.Ok(Pair(set6, union6))
         })) {
@@ -2894,7 +2901,7 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal7 = Pair(parser("[--a]").parseSetClassOpen(), run {
-            val set7 = ClassBracketed(span = span(0 until 3), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
+            val set7 = ClassBracketed(span = span(0 until 3), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
             val union7 = ClassSetUnion(span = span(1 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt())), ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
             Result.Ok(Pair(set7, union7))
         })) {
@@ -2907,7 +2914,7 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal8 = Pair(parser("[]a]").parseSetClassOpen(), run {
-            val set8 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
+            val set8 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
             val union8 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
             Result.Ok(Pair(set8, union8))
         })) {
@@ -2920,7 +2927,7 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal9 = Pair(parserIgnoreWhitespace("[ ] a]").parseSetClassOpen(), run {
-            val set9 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
+            val set9 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
             val union9 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
             Result.Ok(Pair(set9, union9))
         })) {
@@ -2933,7 +2940,7 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal10 = Pair(parser("[^]a]").parseSetClassOpen(), run {
-            val set10 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2 until 2), items = mutableListOf())))
+            val set10 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
             val union10 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
             Result.Ok(Pair(set10, union10))
         })) {
@@ -2946,7 +2953,7 @@ public class AstParseInlineTests {
             }
         }
         when (val matchVal11 = Pair(parser("[-]a]").parseSetClassOpen(), run {
-            val set11 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1 until 1), items = mutableListOf())))
+            val set11 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
             val union11 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
             Result.Ok(Pair(set11, union11))
         })) {
@@ -2994,7 +3001,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal16 = Pair(parser("[-").parseSetClassOpen().unwrapErr(), TestError(span = span(0 until 0), kind = ErrorKind.ClassUnclosed))) {
+        when (val matchVal16 = Pair(parser("[-").parseSetClassOpen().unwrapErr(), TestError(span = span(0, 0), kind = ErrorKind.ClassUnclosed))) {
             else -> {
                 val leftVal16 = matchVal16.first
                 val rightVal16 = matchVal16.second
@@ -3003,7 +3010,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal17 = Pair(parser("[--").parseSetClassOpen().unwrapErr(), TestError(span = span(0 until 0), kind = ErrorKind.ClassUnclosed))) {
+        when (val matchVal17 = Pair(parser("[--").parseSetClassOpen().unwrapErr(), TestError(span = span(0, 0), kind = ErrorKind.ClassUnclosed))) {
             else -> {
                 val leftVal17 = matchVal17.first
                 val rightVal17 = matchVal17.second
@@ -3012,7 +3019,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal18 = Pair(parser("(?x)[-#]").parseWithComments().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.ClassUnclosed))) {
+        when (val matchVal18 = Pair(parser("(?x)[-#]").parseWithComments().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.ClassUnclosed))) {
             else -> {
                 val leftVal18 = matchVal18.first
                 val rightVal18 = matchVal18.second
@@ -3269,7 +3276,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal11 = Pair(parser("\\p").parseEscape().unwrapErr(), TestError(span = span(2 until 2), kind = ErrorKind.EscapeUnexpectedEof))) {
+        when (val matchVal11 = Pair(parser("\\p").parseEscape().unwrapErr(), TestError(span = span(2, 2), kind = ErrorKind.EscapeUnexpectedEof))) {
             else -> {
                 val leftVal11 = matchVal11.first
                 val rightVal11 = matchVal11.second
@@ -3278,7 +3285,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal12 = Pair(parser("\\p{").parseEscape().unwrapErr(), TestError(span = span(3 until 3), kind = ErrorKind.EscapeUnexpectedEof))) {
+        when (val matchVal12 = Pair(parser("\\p{").parseEscape().unwrapErr(), TestError(span = span(3, 3), kind = ErrorKind.EscapeUnexpectedEof))) {
             else -> {
                 val leftVal12 = matchVal12.first
                 val rightVal12 = matchVal12.second
@@ -3287,7 +3294,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal13 = Pair(parser("\\p{N").parseEscape().unwrapErr(), TestError(span = span(4 until 4), kind = ErrorKind.EscapeUnexpectedEof))) {
+        when (val matchVal13 = Pair(parser("\\p{N").parseEscape().unwrapErr(), TestError(span = span(4, 4), kind = ErrorKind.EscapeUnexpectedEof))) {
             else -> {
                 val leftVal13 = matchVal13.first
                 val rightVal13 = matchVal13.second
@@ -3296,7 +3303,7 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal14 = Pair(parser("\\p{Greek").parseEscape().unwrapErr(), TestError(span = span(8 until 8), kind = ErrorKind.EscapeUnexpectedEof))) {
+        when (val matchVal14 = Pair(parser("\\p{Greek").parseEscape().unwrapErr(), TestError(span = span(8, 8), kind = ErrorKind.EscapeUnexpectedEof))) {
             else -> {
                 val leftVal14 = matchVal14.first
                 val rightVal14 = matchVal14.second

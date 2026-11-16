@@ -5,9 +5,9 @@ Based on AST analysis, here are the concrete next steps.
 ## Summary
 
 - **Files Present:** 27/33 (81.8%)
-- **Function parity:** 412/670 matched (target 706) — 61.5%
+- **Function parity:** 412/670 matched (target 708) — 61.5%
 - **Class/type parity:** 58/71 matched (target 120) — 81.7%
-- **Combined symbol parity:** 470/741 matched (target 826) — 63.4%
+- **Combined symbol parity:** 470/741 matched (target 828) — 63.4%
 - **Average inline-code cosine:** 0.66 (function body across 27 matched files)
 - **Average documentation cosine:** 0.47 (doc text across 27 matched files)
 - **Cheat-zeroed Files:** 0
@@ -115,7 +115,7 @@ Every matched file is listed below with function and type symbol parity.
 - **Similarity:** 0.33
 - **Dependents:** 0
 - **Priority Score:** 675906.7
-- **Functions:** 85/148 matched (target 155)
+- **Functions:** 85/148 matched (target 157)
 - **Missing functions:** `eq`, `eq`, `s`, `parser`, `parser_octal`, `parser_empty_min_range`, `parser_nest_limit`, `parser_ignore_whitespace`, `nspan`, `npos`, `span`, `span_range`, `lit`, `meta_lit`, `lit_with`, `concat`, `concat_with`, `alt`, `group`, `flag_set`, `parse_nest_limit`, `parse_comments`, `parse_holistic`, `parse_ignore_whitespace`, `parse_newlines`, `parse_uncounted_repetition`, `parse_counted_repetition`, `parse_alternate`, `parse_unsupported_lookaround`, `parse_group`, `parse_capture_name`, `parse_flags`, `parse_flag`, `parse_primitive_non_escape`, `parse_escape`, `parse_unsupported_backreference`, `parse_octal`, `parse_hex_two`, `parse_hex_four`, `parse_hex_eight`, `parse_hex_brace`, `parse_decimal`, `parse_set_class`, `union`, `intersection`, `difference`, `symdifference`, `itemset`, `item_ascii`, `item_unicode`, `item_perl`, `item_bracket`, `lit`, `empty`, `range`, `alnum`, `lower`, `parse_set_class_open`, `maybe_parse_ascii_class`, `parse_unicode_class`, `parse_perl_class`, `regression_454_nest_too_big`, `regression_455_trailing_dash_ignore_whitespace`
 - **Types:** 8/11 matched (target 19)
 - **Missing types:** `Result`, `Output`, `Err`
