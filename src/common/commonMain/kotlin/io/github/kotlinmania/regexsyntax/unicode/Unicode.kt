@@ -5,7 +5,6 @@ import io.github.kotlinmania.regexsyntax.hir.ClassUnicode
 import io.github.kotlinmania.regexsyntax.hir.ClassUnicodeRange
 import io.github.kotlinmania.regexsyntax.isWordByte
 import io.github.kotlinmania.regexsyntax.scalarToString
-import io.github.kotlinmania.regexsyntax.unicodetables.age.BY_NAME as AGE_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V10_0
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V11_0
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V12_0
@@ -34,19 +33,20 @@ import io.github.kotlinmania.regexsyntax.unicodetables.age.V7_0
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V8_0
 import io.github.kotlinmania.regexsyntax.unicodetables.age.V9_0
 import io.github.kotlinmania.regexsyntax.unicodetables.casefoldingsimple.CASE_FOLDING_SIMPLE
-import io.github.kotlinmania.regexsyntax.unicodetables.generalcategory.BY_NAME as GENCAT_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.generalcategory.DECIMAL_NUMBER
-import io.github.kotlinmania.regexsyntax.unicodetables.graphemeclusterbreak.BY_NAME as GCB_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.perlword.PERL_WORD
-import io.github.kotlinmania.regexsyntax.unicodetables.propertybool.BY_NAME as PROP_BOOL_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.propertybool.WHITE_SPACE
 import io.github.kotlinmania.regexsyntax.unicodetables.propertynames.PROPERTY_NAMES
 import io.github.kotlinmania.regexsyntax.unicodetables.propertyvalues.PROPERTY_VALUES
+import io.github.kotlinmania.rustlang.core.result.Result
+import io.github.kotlinmania.regexsyntax.unicodetables.age.BY_NAME as AGE_BY_NAME
+import io.github.kotlinmania.regexsyntax.unicodetables.generalcategory.BY_NAME as GENCAT_BY_NAME
+import io.github.kotlinmania.regexsyntax.unicodetables.graphemeclusterbreak.BY_NAME as GCB_BY_NAME
+import io.github.kotlinmania.regexsyntax.unicodetables.propertybool.BY_NAME as PROP_BOOL_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.script.BY_NAME as SCRIPT_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.scriptextension.BY_NAME as SCRIPT_EXT_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.sentencebreak.BY_NAME as SB_BY_NAME
 import io.github.kotlinmania.regexsyntax.unicodetables.wordbreak.BY_NAME as WB_BY_NAME
-import io.github.kotlinmania.rustlang.core.result.Result
 
 /**
  * An inclusive range of codepoints from a generated table.
@@ -254,7 +254,9 @@ internal sealed class ClassQuery {
      * Return a class corresponding to a Unicode binary property, named by
      * a single letter.
      */
-    internal data class OneLetter(internal var value: UInt) : ClassQuery()
+    internal data class OneLetter(
+        internal var value: UInt,
+    ) : ClassQuery()
 
     /**
      * Return a class corresponding to a Unicode binary property.
@@ -263,7 +265,9 @@ internal sealed class ClassQuery {
      * general category values and script values are permitted here as if
      * they were a binary property.
      */
-    internal data class Binary(internal var value: String) : ClassQuery()
+    internal data class Binary(
+        internal var value: String,
+    ) : ClassQuery()
 
     /**
      * Return a class corresponding to all codepoints whose property
@@ -373,17 +377,23 @@ internal sealed class CanonicalClassQuery {
     /**
      * The canonical binary property name.
      */
-    internal data class Binary(internal var value: String) : CanonicalClassQuery()
+    internal data class Binary(
+        internal var value: String,
+    ) : CanonicalClassQuery()
 
     /**
      * The canonical general category name.
      */
-    internal data class GeneralCategory(internal var value: String) : CanonicalClassQuery()
+    internal data class GeneralCategory(
+        internal var value: String,
+    ) : CanonicalClassQuery()
 
     /**
      * The canonical script name.
      */
-    internal data class Script(internal var value: String) : CanonicalClassQuery()
+    internal data class Script(
+        internal var value: String,
+    ) : CanonicalClassQuery()
 
     /**
      * An arbitrary association between property and value, both of which

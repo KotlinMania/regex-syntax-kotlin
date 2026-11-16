@@ -7,8 +7,6 @@ import io.github.kotlinmania.regexsyntax.encodeScalarUtf8
 import io.github.kotlinmania.regexsyntax.formatHexUpper
 import io.github.kotlinmania.regexsyntax.normalizeUByteList
 import io.github.kotlinmania.regexsyntax.scalarFromU32
-import io.github.kotlinmania.rustlang.core.mem.PrimitiveLayouts
-import io.github.kotlinmania.rustlang.core.mem.TypeLayout
 
 // Converts ranges of Unicode scalar values to equivalent ranges of UTF-8 bytes.
 //
@@ -101,23 +99,36 @@ public val MAX_UTF8_BYTES: Int = 4
  * For example, if there are two ranges, `[C2 - DF][80 - BF]`, then the byte
  * sequence `\xDD\x61` would not be accepted because `0x61<0x80`.
  */
-public sealed class Utf8Sequence : Comparable<Utf8Sequence>, Iterable<Utf8Range> {
+public sealed class Utf8Sequence :
+    Comparable<Utf8Sequence>,
+    Iterable<Utf8Range> {
     /**
      * One byte range.
      */
-    public data class One(public var value: Utf8Range) : Utf8Sequence()
+    public data class One(
+        public var value: Utf8Range,
+    ) : Utf8Sequence()
+
     /**
      * Two successive byte ranges.
      */
-    public data class Two(public var value: List<Utf8Range>) : Utf8Sequence()
+    public data class Two(
+        public var value: List<Utf8Range>,
+    ) : Utf8Sequence()
+
     /**
      * Three successive byte ranges.
      */
-    public data class Three(public var value: List<Utf8Range>) : Utf8Sequence()
+    public data class Three(
+        public var value: List<Utf8Range>,
+    ) : Utf8Sequence()
+
     /**
      * Four successive byte ranges.
      */
-    public data class Four(public var value: List<Utf8Range>) : Utf8Sequence()
+    public data class Four(
+        public var value: List<Utf8Range>,
+    ) : Utf8Sequence()
 
     public fun rustEquals(other: Utf8Sequence): Boolean = this == other
 
@@ -355,14 +366,15 @@ public data class Utf8Range(
 public open class Utf8Sequences internal constructor(
     private val rangeStack: MutableList<ScalarRange>,
 ) : Iterable<Utf8Sequence> {
-    override fun iterator(): kotlin.collections.Iterator<Utf8Sequence> = object : AbstractIterator<Utf8Sequence>() {
-        override fun computeNext() {
-            when (val v = this@Utf8Sequences.next()) {
-                null -> done()
-                else -> setNext(v)
+    override fun iterator(): kotlin.collections.Iterator<Utf8Sequence> =
+        object : AbstractIterator<Utf8Sequence>() {
+            override fun computeNext() {
+                when (val v = this@Utf8Sequences.next()) {
+                    null -> done()
+                    else -> setNext(v)
+                }
             }
         }
-    }
 
     /**
      * reset resets the scalar value range.

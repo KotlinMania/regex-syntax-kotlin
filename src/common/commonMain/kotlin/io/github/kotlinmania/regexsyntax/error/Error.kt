@@ -1,12 +1,12 @@
 // port-lint: source error.rs
 package io.github.kotlinmania.regexsyntax.error
 
+import io.github.kotlinmania.regexsyntax.ast.Span
+import io.github.kotlinmania.regexsyntax.repeatChar
 import io.github.kotlinmania.regexsyntax.ast.Error as AstError
 import io.github.kotlinmania.regexsyntax.ast.ErrorKind as AstErrorKind
-import io.github.kotlinmania.regexsyntax.ast.Span
 import io.github.kotlinmania.regexsyntax.hir.Error as HirError
 import io.github.kotlinmania.regexsyntax.hir.ErrorKind as HirErrorKind
-import io.github.kotlinmania.regexsyntax.repeatChar
 
 /**
  * This error type encompasses any error that can be returned by this crate.
@@ -19,13 +19,17 @@ public sealed class Error : Exception() {
      * An error that occurred while translating concrete syntax into abstract
      * syntax (AST).
      */
-    public data class Parse(public var value: AstError) : Error()
+    public data class Parse(
+        public var value: AstError,
+    ) : Error()
 
     /**
      * An error that occurred while translating abstract syntax into a high
      * level intermediate representation (HIR).
      */
-    public data class Translate(public var value: HirError) : Error()
+    public data class Translate(
+        public var value: HirError,
+    ) : Error()
 
     override val message: String
         get() = toString()
@@ -236,7 +240,7 @@ internal class Spans(
         }
         var pos = 0
         for (span in spans) {
-            for (unused in pos until (span.start.column - 1)) {
+            repeat((span.start.column - 1 - pos).coerceAtLeast(0)) {
                 notes.append(' ')
                 pos += 1
             }

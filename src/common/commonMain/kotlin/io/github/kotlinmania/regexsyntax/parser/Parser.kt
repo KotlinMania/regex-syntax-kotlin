@@ -1,12 +1,12 @@
 // port-lint: source parser.rs
 package io.github.kotlinmania.regexsyntax.parser
 
-import io.github.kotlinmania.regexsyntax.ast.parse.Parser as AstParser
-import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder as AstParserBuilder
 import io.github.kotlinmania.regexsyntax.error.Error
 import io.github.kotlinmania.regexsyntax.hir.Hir
 import io.github.kotlinmania.regexsyntax.hir.translate.Translator
 import io.github.kotlinmania.regexsyntax.hir.translate.TranslatorBuilder
+import io.github.kotlinmania.regexsyntax.ast.parse.Parser as AstParser
+import io.github.kotlinmania.regexsyntax.ast.parse.ParserBuilder as AstParserBuilder
 import io.github.kotlinmania.rustlang.core.result.Result as RustResult
 
 /**

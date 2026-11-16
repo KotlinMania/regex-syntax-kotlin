@@ -174,9 +174,9 @@ Every matched file is listed below with function and type symbol parity.
 ### 13. error
 
 - **Target:** `error.Error`
-- **Similarity:** 0.30
+- **Similarity:** 0.29
 - **Dependents:** 0
-- **Priority Score:** 61907.0
+- **Priority Score:** 61907.1
 - **Functions:** 10/16 matched (target 19)
 - **Missing functions:** `from`, `from`, `repeat_char`, `assert_panic_message`, `regression_464`, `repetition_quantifier_expects_a_valid_decimal`
 - **Types:** 3/3 matched (target 6)

@@ -52,7 +52,8 @@ public fun isMetaCharacter(c: UInt): Boolean =
         '\\'.code, '.'.code, '+'.code, '*'.code, '?'.code,
         '('.code, ')'.code, '|'.code, '['.code, ']'.code,
         '{'.code, '}'.code, '^'.code, '$'.code, '#'.code,
-        '&'.code, '-'.code, '~'.code -> true
+        '&'.code, '-'.code, '~'.code,
+        -> true
         else -> false
     }
 

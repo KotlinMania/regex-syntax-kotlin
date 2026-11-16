@@ -18,25 +18,30 @@ public sealed class ErrorKind {
      * this error to occur.
      */
     public object CaptureLimitExceeded : ErrorKind()
+
     /**
      * An invalid escape sequence was found in a character class set.
      */
     public object ClassEscapeInvalid : ErrorKind()
+
     /**
      * An invalid character class range was found. An invalid range is any
      * range where the start is greater than the end.
      */
     public object ClassRangeInvalid : ErrorKind()
+
     /**
      * An invalid range boundary was found in a character class. Range
      * boundaries must be a single literal codepoint, but this error indicates
      * that something else was found, such as a nested class.
      */
     public object ClassRangeLiteral : ErrorKind()
+
     /**
      * An opening `[` was found with no corresponding closing `]`.
      */
     public object ClassUnclosed : ErrorKind()
+
     /**
      * Note that this error variant is no longer used. Namely, a decimal
      * number can only appear as a repetition quantifier. When the number
@@ -44,105 +49,135 @@ public sealed class ErrorKind {
      * error, `RepetitionCountDecimalEmpty`.
      */
     public object DecimalEmpty : ErrorKind()
+
     /**
      * An invalid decimal number was given where one was expected.
      */
     public object DecimalInvalid : ErrorKind()
+
     /**
      * A bracketed hex literal was empty.
      */
     public object EscapeHexEmpty : ErrorKind()
+
     /**
      * A bracketed hex literal did not correspond to a Unicode scalar value.
      */
     public object EscapeHexInvalid : ErrorKind()
+
     /**
      * An invalid hexadecimal digit was found.
      */
     public object EscapeHexInvalidDigit : ErrorKind()
+
     /**
      * EOF was found before an escape sequence was completed.
      */
     public object EscapeUnexpectedEof : ErrorKind()
+
     /**
      * An unrecognized escape sequence.
      */
     public object EscapeUnrecognized : ErrorKind()
+
     /**
      * A dangling negation was used when setting flags, e.g., `i -`.
      */
     public object FlagDanglingNegation : ErrorKind()
+
     /**
      * A flag was used twice, e.g., `i - i`.
      */
-    public data class FlagDuplicate(public var original: Span) : ErrorKind() {
+    public data class FlagDuplicate(
+        public var original: Span,
+    ) : ErrorKind() {
         override fun toString(): String = buildString { fmt(this) }
     }
+
     /**
      * The negation operator was used twice, e.g., `- i - s`.
      */
-    public data class FlagRepeatedNegation(public var original: Span) : ErrorKind() {
+    public data class FlagRepeatedNegation(
+        public var original: Span,
+    ) : ErrorKind() {
         override fun toString(): String = buildString { fmt(this) }
     }
+
     /**
      * Expected a flag but got EOF, e.g., `(?`.
      */
     public object FlagUnexpectedEof : ErrorKind()
+
     /**
      * Unrecognized flag, e.g., `a`.
      */
     public object FlagUnrecognized : ErrorKind()
+
     /**
      * A duplicate capture name was found.
      */
-    public data class GroupNameDuplicate(public var original: Span) : ErrorKind() {
+    public data class GroupNameDuplicate(
+        public var original: Span,
+    ) : ErrorKind() {
         override fun toString(): String = buildString { fmt(this) }
     }
+
     /**
      * A capture group name is empty, e.g., `(? P<> abc)`.
      */
     public object GroupNameEmpty : ErrorKind()
+
     /**
      * An invalid character was seen for a capture group name. This includes
      * errors where the first character is a digit (even though subsequent
      * characters are allowed to be digits).
      */
     public object GroupNameInvalid : ErrorKind()
+
     /**
      * A closing `>` could not be found for a capture group name.
      */
     public object GroupNameUnexpectedEof : ErrorKind()
+
     /**
      * An unclosed group, e.g., `(ab`.
      *
      * The span of this error corresponds to the unclosed parenthesis.
      */
     public object GroupUnclosed : ErrorKind()
+
     /**
      * An unopened group, e.g., `ab)`.
      */
     public object GroupUnopened : ErrorKind()
+
     /**
      * The nest limit was exceeded. The limit stored here is the limit
      * configured in the parser.
      */
-    public data class NestLimitExceeded(public var value: UInt) : ErrorKind() {
+    public data class NestLimitExceeded(
+        public var value: UInt,
+    ) : ErrorKind() {
         override fun toString(): String = buildString { fmt(this) }
     }
+
     /**
      * The range provided in a counted repetition operator is invalid. The
      * range is invalid if the start is greater than the end.
      */
     public object RepetitionCountInvalid : ErrorKind()
+
     /**
      * An opening `{` was not followed by a valid decimal value.
      * For example, `x {}` or `x{]}` would fail.
      */
     public object RepetitionCountDecimalEmpty : ErrorKind()
+
     /**
      * An opening `{` was found with no corresponding closing `}`.
      */
     public object RepetitionCountUnclosed : ErrorKind()
+
     /**
      * A repetition operator was applied to a missing sub-expression. This
      * occurs, for example, in the regex consisting of just a `*` or even
@@ -150,17 +185,20 @@ public sealed class ErrorKind {
      * an empty sub-expression. For example, `() *` is still considered valid.
      */
     public object RepetitionMissing : ErrorKind()
+
     /**
      * The special word boundary syntax, `\b{something}`, was used, but
      * either EOF without `}` was seen, or an invalid character in the
      * braces was seen.
      */
     public object SpecialWordBoundaryUnclosed : ErrorKind()
+
     /**
      * The special word boundary syntax, `\b{something}`, was used, but
      * `something` was not recognized as a valid word boundary kind.
      */
     public object SpecialWordBoundaryUnrecognized : ErrorKind()
+
     /**
      * The syntax `\b{` was observed, but afterwards the end of the pattern
      * was observed without being able to tell whether it was meant to be a
@@ -168,17 +206,20 @@ public sealed class ErrorKind {
      * boundary assertion.
      */
     public object SpecialWordOrRepetitionUnexpectedEof : ErrorKind()
+
     /**
      * The Unicode class is not valid. This typically occurs when a `\p` is
      * followed by something other than a `{`.
      */
     public object UnicodeClassInvalid : ErrorKind()
+
     /**
      * When octal support is disabled, this error is produced when an octal
      * escape is used. The octal escape is assumed to be an invocation of
      * a backreference, which is the common case.
      */
     public object UnsupportedBackreference : ErrorKind()
+
     /**
      * When syntax similar to PCRE's look-around is used, this error is
      * returned. Some example syntaxes that are rejected include, but are
@@ -278,53 +319,88 @@ public sealed class Ast {
     /**
      * An empty regex that matches everything.
      */
-    public data class Empty(public var value: Span) : Ast()
+    public data class Empty(
+        public var value: Span,
+    ) : Ast()
+
     /**
      * A set of flags, e.g., `(? is)`.
      */
-    public data class Flags(public var value: SetFlags) : Ast()
+    public data class Flags(
+        public var value: SetFlags,
+    ) : Ast()
+
     /**
      * A single character literal, which includes escape sequences.
      */
-    public data class Literal(public var value: io.github.kotlinmania.regexsyntax.ast.Literal) : Ast()
+    public data class Literal(
+        public var value: io.github.kotlinmania.regexsyntax.ast.Literal,
+    ) : Ast()
+
     /**
      * The "any character" class.
      */
-    public data class Dot(public var value: Span) : Ast()
+    public data class Dot(
+        public var value: Span,
+    ) : Ast()
+
     /**
      * A single zero-width assertion.
      */
-    public data class Assertion(public var value: io.github.kotlinmania.regexsyntax.ast.Assertion) : Ast()
+    public data class Assertion(
+        public var value: io.github.kotlinmania.regexsyntax.ast.Assertion,
+    ) : Ast()
+
     /**
      * A single Unicode character class, e.g., `\pL` or `\p{Greek}`.
      */
-    public data class ClassUnicode(public var value: io.github.kotlinmania.regexsyntax.ast.ClassUnicode) : Ast()
+    public data class ClassUnicode(
+        public var value: io.github.kotlinmania.regexsyntax.ast.ClassUnicode,
+    ) : Ast()
+
     /**
      * A single perl character class, e.g., `\d` or `\W`.
      */
-    public data class ClassPerl(public var value: io.github.kotlinmania.regexsyntax.ast.ClassPerl) : Ast()
+    public data class ClassPerl(
+        public var value: io.github.kotlinmania.regexsyntax.ast.ClassPerl,
+    ) : Ast()
+
     /**
      * A single bracketed character class set, which may contain zero or more
      * character ranges and/or zero or more nested classes. e.g.,
      * `[a-zA-Z\pL]`.
      */
-    public data class ClassBracketed(public var value: io.github.kotlinmania.regexsyntax.ast.ClassBracketed) : Ast()
+    public data class ClassBracketed(
+        public var value: io.github.kotlinmania.regexsyntax.ast.ClassBracketed,
+    ) : Ast()
+
     /**
      * A repetition operator applied to an arbitrary regular expression.
      */
-    public data class Repetition(public var value: io.github.kotlinmania.regexsyntax.ast.Repetition) : Ast()
+    public data class Repetition(
+        public var value: io.github.kotlinmania.regexsyntax.ast.Repetition,
+    ) : Ast()
+
     /**
      * A grouped regular expression.
      */
-    public data class Group(public var value: io.github.kotlinmania.regexsyntax.ast.Group) : Ast()
+    public data class Group(
+        public var value: io.github.kotlinmania.regexsyntax.ast.Group,
+    ) : Ast()
+
     /**
      * An alternation of regular expressions.
      */
-    public data class Alternation(public var value: io.github.kotlinmania.regexsyntax.ast.Alternation) : Ast()
+    public data class Alternation(
+        public var value: io.github.kotlinmania.regexsyntax.ast.Alternation,
+    ) : Ast()
+
     /**
      * A concatenation of regular expressions.
      */
-    public data class Concat(public var value: io.github.kotlinmania.regexsyntax.ast.Concat) : Ast()
+    public data class Concat(
+        public var value: io.github.kotlinmania.regexsyntax.ast.Concat,
+    ) : Ast()
 
     public fun rustEquals(other: Ast): Boolean = this == other
 
@@ -441,7 +517,8 @@ public sealed class Ast {
             is Ast.Assertion,
             is Ast.ClassUnicode,
             is Ast.ClassPerl,
-            is Ast.ClassBracketed -> return
+            is Ast.ClassBracketed,
+            -> return
             is Ast.Repetition -> if (!this.value.ast.hasSubexprs()) return
             is Ast.Group -> if (!this.value.ast.hasSubexprs()) return
             is Ast.Alternation -> if (this.value.asts.isEmpty()) return
@@ -548,37 +625,49 @@ public sealed class LiteralKind {
      * The literal is written verbatim, e.g., `a` or `☃`.
      */
     public data object Verbatim : LiteralKind()
+
     /**
      * The literal is written as an escape because it is otherwise a special
      * regex meta character, e.g., `\*` or `\[`.
      */
     public data object Meta : LiteralKind()
+
     /**
      * The literal is written as an escape despite the fact that the escape is
      * unnecessary, e.g., `\%` or `\/`.
      */
     public data object Superfluous : LiteralKind()
+
     /**
      * The literal is written as an octal escape, e.g., `\141`.
      */
     public data object Octal : LiteralKind()
+
     /**
      * The literal is written as a hex code with a fixed number of digits
      * depending on the type of the escape, e.g., `\x61` or `\u0061` or
      * `\U00000061`.
      */
-    public data class HexFixed(public var value: HexLiteralKind) : LiteralKind()
+    public data class HexFixed(
+        public var value: HexLiteralKind,
+    ) : LiteralKind()
+
     /**
      * The literal is written as a hex code with a bracketed number of
      * digits. The only restriction is that the bracketed hex code must refer
      * to a valid Unicode scalar value.
      */
-    public data class HexBrace(public var value: HexLiteralKind) : LiteralKind()
+    public data class HexBrace(
+        public var value: HexLiteralKind,
+    ) : LiteralKind()
+
     /**
      * The literal is written as a specially recognized escape, e.g., `\f`
      * or `\n`.
      */
-    public data class Special(public var value: SpecialLiteralKind) : LiteralKind()
+    public data class Special(
+        public var value: SpecialLiteralKind,
+    ) : LiteralKind()
 
     public fun rustEquals(other: LiteralKind): Boolean = this == other
 }
@@ -594,26 +683,32 @@ public sealed class SpecialLiteralKind {
      * Bell, spelled `\a` (`\x07`).
      */
     public data object Bell : SpecialLiteralKind()
+
     /**
      * Form feed, spelled `\f` (`\x0C`).
      */
     public data object FormFeed : SpecialLiteralKind()
+
     /**
      * Tab, spelled `\t` (`\x09`).
      */
     public data object Tab : SpecialLiteralKind()
+
     /**
      * Line feed, spelled `\n` (`\x0A`).
      */
     public data object LineFeed : SpecialLiteralKind()
+
     /**
      * Carriage return, spelled `\r` (`\x0D`).
      */
     public data object CarriageReturn : SpecialLiteralKind()
+
     /**
      * Vertical tab, spelled `\v` (`\x0B`).
      */
     public data object VerticalTab : SpecialLiteralKind()
+
     /**
      * Space, spelled `\` (`\x20`). Note that this can only appear when
      * parsing in verbose mode.
@@ -636,11 +731,13 @@ public sealed class HexLiteralKind {
      * two digits.
      */
     public data object X : HexLiteralKind()
+
     /**
      * A `\u` prefix. When used without brackets, this form is limited to
      * four digits.
      */
     public data object UnicodeShort : HexLiteralKind()
+
     /**
      * A `\U` prefix. When used without brackets, this form is limited to
      * eight digits.
@@ -670,10 +767,12 @@ public sealed class ClassPerlKind {
      * Decimal numbers.
      */
     public data object Digit : ClassPerlKind()
+
     /**
      * Whitespace.
      */
     public data object Space : ClassPerlKind()
+
     /**
      * Word characters.
      */
@@ -690,54 +789,67 @@ public sealed class ClassAsciiKind {
      * `[0 - 9A - Za - z]`
      */
     public data object Alnum : ClassAsciiKind()
+
     /**
      * `[A - Za - z]`
      */
     public data object Alpha : ClassAsciiKind()
+
     /**
      * `[\x00-\x7F]`
      */
     public data object Ascii : ClassAsciiKind()
+
     /**
      * `[ \t]`
      */
     public data object Blank : ClassAsciiKind()
+
     /**
      * `[\x00-\x1F\x7F]`
      */
     public data object Cntrl : ClassAsciiKind()
+
     /**
      * `[0 - 9]`
      */
     public data object Digit : ClassAsciiKind()
+
     /**
      * `[! - ~]`
      */
     public data object Graph : ClassAsciiKind()
+
     /**
      * `[a - z]`
      */
     public data object Lower : ClassAsciiKind()
+
     /**
      * `[- ~]`
      */
     public data object Print : ClassAsciiKind()
+
     /**
      * [!-/:-@\[-`{-~]``
      */
     public data object Punct : ClassAsciiKind()
+
     /**
      * `[\t\n\v\f\r ]`
      */
     public data object Space : ClassAsciiKind()
+
     /**
      * `[A - Z]`
      */
     public data object Upper : ClassAsciiKind()
+
     /**
      * `[0 - 9A - Za - z_]`
      */
     public data object Word : ClassAsciiKind()
+
     /**
      * `[0 - 9A - Fa - f]`
      */
@@ -783,16 +895,26 @@ public sealed class ClassUnicodeKind {
     /**
      * A one letter abbreviated class, e.g., `\pN`.
      */
-    public data class OneLetter(public var value: UInt) : ClassUnicodeKind()
+    public data class OneLetter(
+        public var value: UInt,
+    ) : ClassUnicodeKind()
+
     /**
      * A binary property, general category or script. The string may be
      * empty.
      */
-    public data class Named(public var value: String) : ClassUnicodeKind()
+    public data class Named(
+        public var value: String,
+    ) : ClassUnicodeKind()
+
     /**
      * A property name and an associated value.
      */
-    public data class NamedValue(public var op: ClassUnicodeOpKind, public var name: String, public var value: String) : ClassUnicodeKind()
+    public data class NamedValue(
+        public var op: ClassUnicodeOpKind,
+        public var name: String,
+        public var value: String,
+    ) : ClassUnicodeKind()
 
     public fun rustEquals(other: ClassUnicodeKind): Boolean = this == other
 }
@@ -805,11 +927,13 @@ public sealed class ClassUnicodeOpKind {
      * A property set to a specific value, e.g., `\p{scx=Katakana}`.
      */
     public data object Equal : ClassUnicodeOpKind()
+
     /**
      * A property set to a specific value using a colon, e.g.,
      * `\p{scx:Katakana}`.
      */
     public data object Colon : ClassUnicodeOpKind()
+
     /**
      * A property that isn't a particular value, e.g., `\p{scx!=Katakana}`.
      */
@@ -840,11 +964,16 @@ public sealed class ClassSet {
      * An item, which can be a single literal, range, nested character class
      * or a union of items.
      */
-    public data class Item(public var value: ClassSetItem) : ClassSet()
+    public data class Item(
+        public var value: ClassSetItem,
+    ) : ClassSet()
+
     /**
      * A single binary operation (i.e., &&, -- or ~~).
      */
-    public data class BinaryOp(public var value: ClassSetBinaryOp) : ClassSet()
+    public data class BinaryOp(
+        public var value: ClassSetBinaryOp,
+    ) : ClassSet()
 
     public fun rustEquals(other: ClassSet): Boolean = this == other
 
@@ -882,7 +1011,8 @@ public sealed class ClassSet {
                     is ClassSetItem.Range,
                     is ClassSetItem.Ascii,
                     is ClassSetItem.Unicode,
-                    is ClassSetItem.Perl -> return
+                    is ClassSetItem.Perl,
+                    -> return
                     is ClassSetItem.Bracketed -> if (item.value.kind.isEmpty()) return
                     is ClassSetItem.Union -> if (item.value.items.isEmpty()) return
                 }
@@ -942,37 +1072,60 @@ public sealed class ClassSetItem {
      * item. Empty items can appear when using one of the binary operators.
      * For example, `[&&]` is the intersection of two empty classes.
      */
-    public data class Empty(public var value: Span) : ClassSetItem()
+    public data class Empty(
+        public var value: Span,
+    ) : ClassSetItem()
+
     /**
      * A single literal.
      */
-    public data class Literal(public var value: io.github.kotlinmania.regexsyntax.ast.Literal) : ClassSetItem()
+    public data class Literal(
+        public var value: io.github.kotlinmania.regexsyntax.ast.Literal,
+    ) : ClassSetItem()
+
     /**
      * A range between two literals.
      */
-    public data class Range(public var value: ClassSetRange) : ClassSetItem()
+    public data class Range(
+        public var value: ClassSetRange,
+    ) : ClassSetItem()
+
     /**
      * An ASCII character class, e.g., `[: alnum:]` or `[: punct:]`.
      */
-    public data class Ascii(public var value: ClassAscii) : ClassSetItem()
+    public data class Ascii(
+        public var value: ClassAscii,
+    ) : ClassSetItem()
+
     /**
      * A Unicode character class, e.g., `\pL` or `\p{Greek}`.
      */
-    public data class Unicode(public var value: ClassUnicode) : ClassSetItem()
+    public data class Unicode(
+        public var value: ClassUnicode,
+    ) : ClassSetItem()
+
     /**
      * A perl character class, e.g., `\d` or `\W`.
      */
-    public data class Perl(public var value: ClassPerl) : ClassSetItem()
+    public data class Perl(
+        public var value: ClassPerl,
+    ) : ClassSetItem()
+
     /**
      * A bracketed character class set, which may contain zero or more
      * character ranges and/or zero or more nested classes. e.g.,
      * `[a-zA-Z\pL]`.
      */
-    public data class Bracketed(public var value: ClassBracketed) : ClassSetItem()
+    public data class Bracketed(
+        public var value: ClassBracketed,
+    ) : ClassSetItem()
+
     /**
      * A union of items.
      */
-    public data class Union(public var value: ClassSetUnion) : ClassSetItem()
+    public data class Union(
+        public var value: ClassSetUnion,
+    ) : ClassSetItem()
 
     public fun rustEquals(other: ClassSetItem): Boolean = this == other
 
@@ -1028,10 +1181,12 @@ public sealed class ClassSetBinaryOpKind {
      * The intersection of two sets, e.g., `\pN&&[a-z]`.
      */
     public data object Intersection : ClassSetBinaryOpKind()
+
     /**
      * The difference of two sets, e.g., `\pN--[0-9]`.
      */
     public data object Difference : ClassSetBinaryOpKind()
+
     /**
      * The symmetric difference of two sets. The symmetric difference is the
      * set of elements belonging to one but not both sets.
@@ -1050,46 +1205,57 @@ public sealed class AssertionKind {
      * `^`
      */
     public data object StartLine : AssertionKind()
+
     /**
      * `$`
      */
     public data object EndLine : AssertionKind()
+
     /**
      * `\A`
      */
     public data object StartText : AssertionKind()
+
     /**
      * `\z`
      */
     public data object EndText : AssertionKind()
+
     /**
      * `\b`
      */
     public data object WordBoundary : AssertionKind()
+
     /**
      * `\B`
      */
     public data object NotWordBoundary : AssertionKind()
+
     /**
      * `\b{start}`
      */
     public data object WordBoundaryStart : AssertionKind()
+
     /**
      * `\b{end}`
      */
     public data object WordBoundaryEnd : AssertionKind()
+
     /**
      * `\<` (alias for `\b{start}`)
      */
     public data object WordBoundaryStartAngle : AssertionKind()
+
     /**
      * `\>` (alias for `\b{end}`)
      */
     public data object WordBoundaryEndAngle : AssertionKind()
+
     /**
      * `\b{start-half}`
      */
     public data object WordBoundaryStartHalf : AssertionKind()
+
     /**
      * `\b{end-half}`
      */
@@ -1106,18 +1272,23 @@ public sealed class RepetitionKind {
      * `?`
      */
     public data object ZeroOrOne : RepetitionKind()
+
     /**
      * `*`
      */
     public data object ZeroOrMore : RepetitionKind()
+
     /**
      * `+`
      */
     public data object OneOrMore : RepetitionKind()
+
     /**
      * `{ m, n }`
      */
-    public data class Range(public var value: RepetitionRange) : RepetitionKind()
+    public data class Range(
+        public var value: RepetitionRange,
+    ) : RepetitionKind()
 
     public fun rustEquals(other: RepetitionKind): Boolean = this == other
 }
@@ -1129,15 +1300,24 @@ public sealed class RepetitionRange {
     /**
      * `{ m }`
      */
-    public data class Exactly(public var value: UInt) : RepetitionRange()
+    public data class Exactly(
+        public var value: UInt,
+    ) : RepetitionRange()
+
     /**
      * `{ m, }`
      */
-    public data class AtLeast(public var value: UInt) : RepetitionRange()
+    public data class AtLeast(
+        public var value: UInt,
+    ) : RepetitionRange()
+
     /**
      * `{ m, n }`
      */
-    public data class Bounded(public var field0: UInt, public var field1: UInt) : RepetitionRange()
+    public data class Bounded(
+        public var field0: UInt,
+        public var field1: UInt,
+    ) : RepetitionRange()
 
     public fun rustEquals(other: RepetitionRange): Boolean = this == other
 
@@ -1158,15 +1338,24 @@ public sealed class GroupKind {
     /**
      * `(a)`
      */
-    public data class CaptureIndex(public var value: UInt) : GroupKind()
+    public data class CaptureIndex(
+        public var value: UInt,
+    ) : GroupKind()
+
     /**
      * `(?<name> a)` or `(? P<name> a)`
      */
-    public data class CaptureName(public var startsWithP: Boolean, public var name: io.github.kotlinmania.regexsyntax.ast.CaptureName) : GroupKind()
+    public data class CaptureName(
+        public var startsWithP: Boolean,
+        public var name: io.github.kotlinmania.regexsyntax.ast.CaptureName,
+    ) : GroupKind()
+
     /**
      * `(?: a)` and `(? i: a)`
      */
-    public data class NonCapturing(public var value: Flags) : GroupKind()
+    public data class NonCapturing(
+        public var value: Flags,
+    ) : GroupKind()
 
     public fun rustEquals(other: GroupKind): Boolean = this == other
 }
@@ -1180,10 +1369,13 @@ public sealed class FlagsItemKind {
      * group.
      */
     public data object Negation : FlagsItemKind()
+
     /**
      * A single flag in a group.
      */
-    public data class Flag(public var value: io.github.kotlinmania.regexsyntax.ast.Flag) : FlagsItemKind()
+    public data class Flag(
+        public var value: io.github.kotlinmania.regexsyntax.ast.Flag,
+    ) : FlagsItemKind()
 
     public fun rustEquals(other: FlagsItemKind): Boolean = this == other
 
@@ -1205,26 +1397,32 @@ public sealed class Flag {
      * `i`
      */
     public data object CaseInsensitive : Flag()
+
     /**
      * `m`
      */
     public data object MultiLine : Flag()
+
     /**
      * `s`
      */
     public data object DotMatchesNewLine : Flag()
+
     /**
      * `U`
      */
     public data object SwapGreed : Flag()
+
     /**
      * `u`
      */
     public data object Unicode : Flag()
+
     /**
      * `R`
      */
     public data object CRLF : Flag()
+
     /**
      * `x`
      */

@@ -30,7 +30,8 @@ public fun isWordCharacter(c: UInt): Boolean =
  * `Decimal_Number`, `Mark` or `Connector_Punctuation` general categories.
  */
 public fun tryIsWordCharacter(c: UInt): Result<Boolean, UnicodeWordError> =
-    io.github.kotlinmania.regexsyntax.unicode.isWordCharacter(c)
+    io.github.kotlinmania.regexsyntax.unicode
+        .isWordCharacter(c)
 
 /**
  * Returns `true` if and only if the given byte is an ASCII word character.

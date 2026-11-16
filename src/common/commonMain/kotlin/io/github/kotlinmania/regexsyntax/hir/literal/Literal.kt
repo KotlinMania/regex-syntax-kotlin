@@ -363,7 +363,7 @@ public open class Extractor internal constructor(
                 this.limitRepeat == other.limitRepeat &&
                 this.limitLiteralLen == other.limitLiteralLen &&
                 this.limitTotal == other.limitTotal
-            )
+        )
 
     override fun hashCode(): Int {
         var result = this.kind.hashCode()

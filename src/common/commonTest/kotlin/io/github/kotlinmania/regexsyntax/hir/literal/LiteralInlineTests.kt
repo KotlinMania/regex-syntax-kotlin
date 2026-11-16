@@ -56,7 +56,13 @@ import io.github.kotlinmania.regexsyntax.unwrap
 // the "trickier" parts are how to combine literal sequences, and that is all
 // implemented on [Seq].
 
-public fun parse(pattern: String): Hir = ParserBuilder.new().utf8(false).build().parse(pattern).unwrap()
+public fun parse(pattern: String): Hir =
+    ParserBuilder
+        .new()
+        .utf8(false)
+        .build()
+        .parse(pattern)
+        .unwrap()
 
 public fun prefixes(pattern: String): Seq = Extractor.new().kind(ExtractKind.Prefix).extract(parse(pattern))
 
@@ -307,8 +313,18 @@ public class HirLiteralInlineTests {
     // too big.
     @kotlin.test.Test
     public fun anythingSmallLimits() {
-        fun prefixes(pattern: String): Seq = Extractor.new().kind(ExtractKind.Prefix).limitTotal(10).extract(parse(pattern))
-        fun suffixes(pattern: String): Seq = Extractor.new().kind(ExtractKind.Suffix).limitTotal(10).extract(parse(pattern))
+        fun prefixes(pattern: String): Seq =
+            Extractor
+                .new()
+                .kind(ExtractKind.Prefix)
+                .limitTotal(10)
+                .extract(parse(pattern))
+        fun suffixes(pattern: String): Seq =
+            Extractor
+                .new()
+                .kind(ExtractKind.Suffix)
+                .limitTotal(10)
+                .extract(parse(pattern))
         fun e(pattern: String): Pair<Seq, Seq> = Pair(prefixes(pattern), suffixes(pattern))
         check(Pair(seq(listOf(I("aaa"), I("aab"), I("aba"), I("abb"), I("baa"), I("bab"), I("bba"), I("bbb"))), seq(listOf(I("aaa"), I("aab"), I("aba"), I("abb"), I("baa"), I("bab"), I("bba"), I("bbb")))) == e("[ab]{3}{3}"))
         check(infinite() == e("ab|cd|ef|gh|ij|kl|mn|op|qr|st|uv|wx|yz"))

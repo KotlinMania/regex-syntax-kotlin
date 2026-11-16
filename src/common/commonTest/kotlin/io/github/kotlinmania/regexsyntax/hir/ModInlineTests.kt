@@ -555,29 +555,33 @@ public class HirModInlineTests {
     public fun noStackOverflowOnDrop() {
         var expr = Hir.empty()
         repeat(100) {
-            expr = Hir.capture(
-                Capture(
-                    index = 1u,
-                    name = null,
-                    sub = expr,
-                ),
-            )
-            expr = Hir.repetition(
-                Repetition(
-                    min = 0u,
-                    max = 1u,
-                    greedy = true,
-                    sub = expr,
-                ),
-            )
-            expr = Hir(
-                kind = HirKind.Concat(listOf(expr)),
-                props = Properties.empty(),
-            )
-            expr = Hir(
-                kind = HirKind.Alternation(listOf(expr)),
-                props = Properties.empty(),
-            )
+            expr =
+                Hir.capture(
+                    Capture(
+                        index = 1u,
+                        name = null,
+                        sub = expr,
+                    ),
+                )
+            expr =
+                Hir.repetition(
+                    Repetition(
+                        min = 0u,
+                        max = 1u,
+                        greedy = true,
+                        sub = expr,
+                    ),
+                )
+            expr =
+                Hir(
+                    kind = HirKind.Concat(listOf(expr)),
+                    props = Properties.empty(),
+                )
+            expr =
+                Hir(
+                    kind = HirKind.Alternation(listOf(expr)),
+                    props = Properties.empty(),
+                )
         }
         check(expr.kind() !is HirKind.Empty)
         expr.drop()

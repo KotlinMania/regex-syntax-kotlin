@@ -2807,11 +2807,17 @@ public class AstParseInlineTests {
 
     @kotlin.test.Test
     public fun parseSetClassOpen() {
-        when (val matchVal = Pair(parser("[a]").parseSetClassOpen(), run {
-            val set = ClassBracketed(span = span(0 until 1), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
-            val union = ClassSetUnion(span = span(1, 1), items = mutableListOf())
-            Result.Ok(Pair(set, union))
-        })) {
+        when (
+            val matchVal =
+                Pair(
+                    parser("[a]").parseSetClassOpen(),
+                    run {
+                        val set = ClassBracketed(span = span(0 until 1), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
+                        val union = ClassSetUnion(span = span(1, 1), items = mutableListOf())
+                        Result.Ok(Pair(set, union))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal = matchVal.first
                 val rightVal = matchVal.second
@@ -2820,11 +2826,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal1 = Pair(parserIgnoreWhitespace("[   a]").parseSetClassOpen(), run {
-            val set1 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(4, 4), items = mutableListOf())))
-            val union1 = ClassSetUnion(span = span(4, 4), items = mutableListOf())
-            Result.Ok(Pair(set1, union1))
-        })) {
+        when (
+            val matchVal1 =
+                Pair(
+                    parserIgnoreWhitespace("[   a]").parseSetClassOpen(),
+                    run {
+                        val set1 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(4, 4), items = mutableListOf())))
+                        val union1 = ClassSetUnion(span = span(4, 4), items = mutableListOf())
+                        Result.Ok(Pair(set1, union1))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal1 = matchVal1.first
                 val rightVal1 = matchVal1.second
@@ -2833,11 +2845,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal2 = Pair(parser("[^a]").parseSetClassOpen(), run {
-            val set2 = ClassBracketed(span = span(0 until 2), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
-            val union2 = ClassSetUnion(span = span(2, 2), items = mutableListOf())
-            Result.Ok(Pair(set2, union2))
-        })) {
+        when (
+            val matchVal2 =
+                Pair(
+                    parser("[^a]").parseSetClassOpen(),
+                    run {
+                        val set2 = ClassBracketed(span = span(0 until 2), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
+                        val union2 = ClassSetUnion(span = span(2, 2), items = mutableListOf())
+                        Result.Ok(Pair(set2, union2))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal2 = matchVal2.first
                 val rightVal2 = matchVal2.second
@@ -2846,11 +2864,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal3 = Pair(parserIgnoreWhitespace("[ ^ a]").parseSetClassOpen(), run {
-            val set3 = ClassBracketed(span = span(0 until 4), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(4, 4), items = mutableListOf())))
-            val union3 = ClassSetUnion(span = span(4, 4), items = mutableListOf())
-            Result.Ok(Pair(set3, union3))
-        })) {
+        when (
+            val matchVal3 =
+                Pair(
+                    parserIgnoreWhitespace("[ ^ a]").parseSetClassOpen(),
+                    run {
+                        val set3 = ClassBracketed(span = span(0 until 4), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(4, 4), items = mutableListOf())))
+                        val union3 = ClassSetUnion(span = span(4, 4), items = mutableListOf())
+                        Result.Ok(Pair(set3, union3))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal3 = matchVal3.first
                 val rightVal3 = matchVal3.second
@@ -2859,11 +2883,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal4 = Pair(parser("[-a]").parseSetClassOpen(), run {
-            val set4 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
-            val union4 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
-            Result.Ok(Pair(set4, union4))
-        })) {
+        when (
+            val matchVal4 =
+                Pair(
+                    parser("[-a]").parseSetClassOpen(),
+                    run {
+                        val set4 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
+                        val union4 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+                        Result.Ok(Pair(set4, union4))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal4 = matchVal4.first
                 val rightVal4 = matchVal4.second
@@ -2872,11 +2902,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal5 = Pair(parserIgnoreWhitespace("[ - a]").parseSetClassOpen(), run {
-            val set5 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
-            val union5 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
-            Result.Ok(Pair(set5, union5))
-        })) {
+        when (
+            val matchVal5 =
+                Pair(
+                    parserIgnoreWhitespace("[ - a]").parseSetClassOpen(),
+                    run {
+                        val set5 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
+                        val union5 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+                        Result.Ok(Pair(set5, union5))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal5 = matchVal5.first
                 val rightVal5 = matchVal5.second
@@ -2885,11 +2921,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal6 = Pair(parser("[^-a]").parseSetClassOpen(), run {
-            val set6 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
-            val union6 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
-            Result.Ok(Pair(set6, union6))
-        })) {
+        when (
+            val matchVal6 =
+                Pair(
+                    parser("[^-a]").parseSetClassOpen(),
+                    run {
+                        val set6 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
+                        val union6 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+                        Result.Ok(Pair(set6, union6))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal6 = matchVal6.first
                 val rightVal6 = matchVal6.second
@@ -2898,11 +2940,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal7 = Pair(parser("[--a]").parseSetClassOpen(), run {
-            val set7 = ClassBracketed(span = span(0 until 3), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
-            val union7 = ClassSetUnion(span = span(1 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt())), ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
-            Result.Ok(Pair(set7, union7))
-        })) {
+        when (
+            val matchVal7 =
+                Pair(
+                    parser("[--a]").parseSetClassOpen(),
+                    run {
+                        val set7 = ClassBracketed(span = span(0 until 3), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
+                        val union7 = ClassSetUnion(span = span(1 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt())), ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+                        Result.Ok(Pair(set7, union7))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal7 = matchVal7.first
                 val rightVal7 = matchVal7.second
@@ -2911,11 +2959,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal8 = Pair(parser("[]a]").parseSetClassOpen(), run {
-            val set8 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
-            val union8 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
-            Result.Ok(Pair(set8, union8))
-        })) {
+        when (
+            val matchVal8 =
+                Pair(
+                    parser("[]a]").parseSetClassOpen(),
+                    run {
+                        val set8 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
+                        val union8 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
+                        Result.Ok(Pair(set8, union8))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal8 = matchVal8.first
                 val rightVal8 = matchVal8.second
@@ -2924,11 +2978,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal9 = Pair(parserIgnoreWhitespace("[ ] a]").parseSetClassOpen(), run {
-            val set9 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
-            val union9 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
-            Result.Ok(Pair(set9, union9))
-        })) {
+        when (
+            val matchVal9 =
+                Pair(
+                    parserIgnoreWhitespace("[ ] a]").parseSetClassOpen(),
+                    run {
+                        val set9 = ClassBracketed(span = span(0 until 4), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
+                        val union9 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
+                        Result.Ok(Pair(set9, union9))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal9 = matchVal9.first
                 val rightVal9 = matchVal9.second
@@ -2937,11 +2997,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal10 = Pair(parser("[^]a]").parseSetClassOpen(), run {
-            val set10 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
-            val union10 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
-            Result.Ok(Pair(set10, union10))
-        })) {
+        when (
+            val matchVal10 =
+                Pair(
+                    parser("[^]a]").parseSetClassOpen(),
+                    run {
+                        val set10 = ClassBracketed(span = span(0 until 3), negated = true, kind = ClassSet.union(ClassSetUnion(span = span(2, 2), items = mutableListOf())))
+                        val union10 = ClassSetUnion(span = span(2 until 3), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(2 until 3), kind = LiteralKind.Verbatim, c = ']'.code.toUInt()))))
+                        Result.Ok(Pair(set10, union10))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal10 = matchVal10.first
                 val rightVal10 = matchVal10.second
@@ -2950,11 +3016,17 @@ public class AstParseInlineTests {
                 }
             }
         }
-        when (val matchVal11 = Pair(parser("[-]a]").parseSetClassOpen(), run {
-            val set11 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
-            val union11 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
-            Result.Ok(Pair(set11, union11))
-        })) {
+        when (
+            val matchVal11 =
+                Pair(
+                    parser("[-]a]").parseSetClassOpen(),
+                    run {
+                        val set11 = ClassBracketed(span = span(0 until 2), negated = false, kind = ClassSet.union(ClassSetUnion(span = span(1, 1), items = mutableListOf())))
+                        val union11 = ClassSetUnion(span = span(1 until 2), items = mutableListOf(ClassSetItem.Literal(Literal(span = span(1 until 2), kind = LiteralKind.Verbatim, c = '-'.code.toUInt()))))
+                        Result.Ok(Pair(set11, union11))
+                    },
+                )
+        ) {
             else -> {
                 val leftVal11 = matchVal11.first
                 val rightVal11 = matchVal11.second

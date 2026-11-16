@@ -13,13 +13,14 @@ public class AstModInlineTests {
         val span = { Span.splat(Position.new(0, 0, 0)) }
         var ast = Ast.empty(span())
         for (i in 0u until 200u) {
-            ast = Ast.group(
-                Group(
-                    span = span(),
-                    kind = GroupKind.CaptureIndex(i),
-                    ast = ast,
-                ),
-            )
+            ast =
+                Ast.group(
+                    Group(
+                        span = span(),
+                        kind = GroupKind.CaptureIndex(i),
+                        ast = ast,
+                    ),
+                )
         }
         check(!ast.isEmpty())
         ast.drop()

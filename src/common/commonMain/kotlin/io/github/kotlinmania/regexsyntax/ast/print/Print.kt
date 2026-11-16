@@ -238,25 +238,28 @@ internal class Writer(
                 this.wtr.appendScalar(ast.c)
             }
             LiteralKind.Octal -> this.wtr.append("\\${formatOctal(ast.c)}")
-            is LiteralKind.HexFixed -> when (matchVal.value) {
-                HexLiteralKind.X -> this.wtr.append("\\x${formatHexUpperPadded(ast.c, 2)}")
-                HexLiteralKind.UnicodeShort -> this.wtr.append("\\u${formatHexUpperPadded(ast.c, 4)}")
-                HexLiteralKind.UnicodeLong -> this.wtr.append("\\U${formatHexUpperPadded(ast.c, 8)}")
-            }
-            is LiteralKind.HexBrace -> when (matchVal.value) {
-                HexLiteralKind.X -> this.wtr.append("\\x{${formatHexUpper(ast.c)}}")
-                HexLiteralKind.UnicodeShort -> this.wtr.append("\\u{${formatHexUpper(ast.c)}}")
-                HexLiteralKind.UnicodeLong -> this.wtr.append("\\U{${formatHexUpper(ast.c)}}")
-            }
-            is LiteralKind.Special -> when (matchVal.value) {
-                SpecialLiteralKind.Bell -> this.wtr.append("\\a")
-                SpecialLiteralKind.FormFeed -> this.wtr.append("\\f")
-                SpecialLiteralKind.Tab -> this.wtr.append("\\t")
-                SpecialLiteralKind.LineFeed -> this.wtr.append("\\n")
-                SpecialLiteralKind.CarriageReturn -> this.wtr.append("\\r")
-                SpecialLiteralKind.VerticalTab -> this.wtr.append("\\v")
-                SpecialLiteralKind.Space -> this.wtr.append("\\ ")
-            }
+            is LiteralKind.HexFixed ->
+                when (matchVal.value) {
+                    HexLiteralKind.X -> this.wtr.append("\\x${formatHexUpperPadded(ast.c, 2)}")
+                    HexLiteralKind.UnicodeShort -> this.wtr.append("\\u${formatHexUpperPadded(ast.c, 4)}")
+                    HexLiteralKind.UnicodeLong -> this.wtr.append("\\U${formatHexUpperPadded(ast.c, 8)}")
+                }
+            is LiteralKind.HexBrace ->
+                when (matchVal.value) {
+                    HexLiteralKind.X -> this.wtr.append("\\x{${formatHexUpper(ast.c)}}")
+                    HexLiteralKind.UnicodeShort -> this.wtr.append("\\u{${formatHexUpper(ast.c)}}")
+                    HexLiteralKind.UnicodeLong -> this.wtr.append("\\U{${formatHexUpper(ast.c)}}")
+                }
+            is LiteralKind.Special ->
+                when (matchVal.value) {
+                    SpecialLiteralKind.Bell -> this.wtr.append("\\a")
+                    SpecialLiteralKind.FormFeed -> this.wtr.append("\\f")
+                    SpecialLiteralKind.Tab -> this.wtr.append("\\t")
+                    SpecialLiteralKind.LineFeed -> this.wtr.append("\\n")
+                    SpecialLiteralKind.CarriageReturn -> this.wtr.append("\\r")
+                    SpecialLiteralKind.VerticalTab -> this.wtr.append("\\v")
+                    SpecialLiteralKind.Space -> this.wtr.append("\\ ")
+                }
         }
         return Result.Ok(Unit)
     }
@@ -290,15 +293,16 @@ internal class Writer(
         for (item in ast.items) {
             when (val matchVal = item.kind) {
                 FlagsItemKind.Negation -> this.wtr.append("-")
-                is FlagsItemKind.Flag -> when (matchVal.value) {
-                    Flag.CaseInsensitive -> this.wtr.append("i")
-                    Flag.MultiLine -> this.wtr.append("m")
-                    Flag.DotMatchesNewLine -> this.wtr.append("s")
-                    Flag.SwapGreed -> this.wtr.append("U")
-                    Flag.Unicode -> this.wtr.append("u")
-                    Flag.CRLF -> this.wtr.append("R")
-                    Flag.IgnoreWhitespace -> this.wtr.append("x")
-                }
+                is FlagsItemKind.Flag ->
+                    when (matchVal.value) {
+                        Flag.CaseInsensitive -> this.wtr.append("i")
+                        Flag.MultiLine -> this.wtr.append("m")
+                        Flag.DotMatchesNewLine -> this.wtr.append("s")
+                        Flag.SwapGreed -> this.wtr.append("U")
+                        Flag.Unicode -> this.wtr.append("u")
+                        Flag.CRLF -> this.wtr.append("R")
+                        Flag.IgnoreWhitespace -> this.wtr.append("x")
+                    }
             }
         }
         return Result.Ok(Unit)
@@ -328,49 +332,51 @@ internal class Writer(
     }
 
     internal fun fmtClassPerl(ast: ClassPerl): Result<Unit, FmtError> {
-        val s = when {
-            ast.kind == ClassPerlKind.Digit && ast.negated -> "\\D"
-            ast.kind == ClassPerlKind.Digit -> "\\d"
-            ast.kind == ClassPerlKind.Space && ast.negated -> "\\S"
-            ast.kind == ClassPerlKind.Space -> "\\s"
-            ast.kind == ClassPerlKind.Word && ast.negated -> "\\W"
-            else -> "\\w"
-        }
+        val s =
+            when {
+                ast.kind == ClassPerlKind.Digit && ast.negated -> "\\D"
+                ast.kind == ClassPerlKind.Digit -> "\\d"
+                ast.kind == ClassPerlKind.Space && ast.negated -> "\\S"
+                ast.kind == ClassPerlKind.Space -> "\\s"
+                ast.kind == ClassPerlKind.Word && ast.negated -> "\\W"
+                else -> "\\w"
+            }
         this.wtr.append(s)
         return Result.Ok(Unit)
     }
 
     internal fun fmtClassAscii(ast: ClassAscii): Result<Unit, FmtError> {
-        val s = when {
-            ast.kind == ClassAsciiKind.Alnum && ast.negated -> "[:^alnum:]"
-            ast.kind == ClassAsciiKind.Alnum -> "[:alnum:]"
-            ast.kind == ClassAsciiKind.Alpha && ast.negated -> "[:^alpha:]"
-            ast.kind == ClassAsciiKind.Alpha -> "[:alpha:]"
-            ast.kind == ClassAsciiKind.Ascii && ast.negated -> "[:^ascii:]"
-            ast.kind == ClassAsciiKind.Ascii -> "[:ascii:]"
-            ast.kind == ClassAsciiKind.Blank && ast.negated -> "[:^blank:]"
-            ast.kind == ClassAsciiKind.Blank -> "[:blank:]"
-            ast.kind == ClassAsciiKind.Cntrl && ast.negated -> "[:^cntrl:]"
-            ast.kind == ClassAsciiKind.Cntrl -> "[:cntrl:]"
-            ast.kind == ClassAsciiKind.Digit && ast.negated -> "[:^digit:]"
-            ast.kind == ClassAsciiKind.Digit -> "[:digit:]"
-            ast.kind == ClassAsciiKind.Graph && ast.negated -> "[:^graph:]"
-            ast.kind == ClassAsciiKind.Graph -> "[:graph:]"
-            ast.kind == ClassAsciiKind.Lower && ast.negated -> "[:^lower:]"
-            ast.kind == ClassAsciiKind.Lower -> "[:lower:]"
-            ast.kind == ClassAsciiKind.Print && ast.negated -> "[:^print:]"
-            ast.kind == ClassAsciiKind.Print -> "[:print:]"
-            ast.kind == ClassAsciiKind.Punct && ast.negated -> "[:^punct:]"
-            ast.kind == ClassAsciiKind.Punct -> "[:punct:]"
-            ast.kind == ClassAsciiKind.Space && ast.negated -> "[:^space:]"
-            ast.kind == ClassAsciiKind.Space -> "[:space:]"
-            ast.kind == ClassAsciiKind.Upper && ast.negated -> "[:^upper:]"
-            ast.kind == ClassAsciiKind.Upper -> "[:upper:]"
-            ast.kind == ClassAsciiKind.Word && ast.negated -> "[:^word:]"
-            ast.kind == ClassAsciiKind.Word -> "[:word:]"
-            ast.kind == ClassAsciiKind.Xdigit && ast.negated -> "[:^xdigit:]"
-            else -> "[:xdigit:]"
-        }
+        val s =
+            when {
+                ast.kind == ClassAsciiKind.Alnum && ast.negated -> "[:^alnum:]"
+                ast.kind == ClassAsciiKind.Alnum -> "[:alnum:]"
+                ast.kind == ClassAsciiKind.Alpha && ast.negated -> "[:^alpha:]"
+                ast.kind == ClassAsciiKind.Alpha -> "[:alpha:]"
+                ast.kind == ClassAsciiKind.Ascii && ast.negated -> "[:^ascii:]"
+                ast.kind == ClassAsciiKind.Ascii -> "[:ascii:]"
+                ast.kind == ClassAsciiKind.Blank && ast.negated -> "[:^blank:]"
+                ast.kind == ClassAsciiKind.Blank -> "[:blank:]"
+                ast.kind == ClassAsciiKind.Cntrl && ast.negated -> "[:^cntrl:]"
+                ast.kind == ClassAsciiKind.Cntrl -> "[:cntrl:]"
+                ast.kind == ClassAsciiKind.Digit && ast.negated -> "[:^digit:]"
+                ast.kind == ClassAsciiKind.Digit -> "[:digit:]"
+                ast.kind == ClassAsciiKind.Graph && ast.negated -> "[:^graph:]"
+                ast.kind == ClassAsciiKind.Graph -> "[:graph:]"
+                ast.kind == ClassAsciiKind.Lower && ast.negated -> "[:^lower:]"
+                ast.kind == ClassAsciiKind.Lower -> "[:lower:]"
+                ast.kind == ClassAsciiKind.Print && ast.negated -> "[:^print:]"
+                ast.kind == ClassAsciiKind.Print -> "[:print:]"
+                ast.kind == ClassAsciiKind.Punct && ast.negated -> "[:^punct:]"
+                ast.kind == ClassAsciiKind.Punct -> "[:punct:]"
+                ast.kind == ClassAsciiKind.Space && ast.negated -> "[:^space:]"
+                ast.kind == ClassAsciiKind.Space -> "[:space:]"
+                ast.kind == ClassAsciiKind.Upper && ast.negated -> "[:^upper:]"
+                ast.kind == ClassAsciiKind.Upper -> "[:upper:]"
+                ast.kind == ClassAsciiKind.Word && ast.negated -> "[:^word:]"
+                ast.kind == ClassAsciiKind.Word -> "[:word:]"
+                ast.kind == ClassAsciiKind.Xdigit && ast.negated -> "[:^xdigit:]"
+                else -> "[:xdigit:]"
+            }
         this.wtr.append(s)
         return Result.Ok(Unit)
     }
@@ -385,11 +391,12 @@ internal class Writer(
             is ClassUnicodeKind.OneLetter -> this.wtr.appendScalar(matchVal.value)
             is ClassUnicodeKind.Named -> this.wtr.append("{${matchVal.value}}")
             is ClassUnicodeKind.NamedValue -> {
-                val sep = when (matchVal.op) {
-                    ClassUnicodeOpKind.Equal -> "="
-                    ClassUnicodeOpKind.Colon -> ":"
-                    ClassUnicodeOpKind.NotEqual -> "!="
-                }
+                val sep =
+                    when (matchVal.op) {
+                        ClassUnicodeOpKind.Equal -> "="
+                        ClassUnicodeOpKind.Colon -> ":"
+                        ClassUnicodeOpKind.NotEqual -> "!="
+                    }
                 this.wtr.append("{${matchVal.name}$sep${matchVal.value}}")
             }
         }

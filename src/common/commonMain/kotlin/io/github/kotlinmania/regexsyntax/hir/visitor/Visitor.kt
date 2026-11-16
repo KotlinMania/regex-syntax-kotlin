@@ -212,25 +212,35 @@ internal sealed class Frame {
      * A stack frame allocated just before descending into a repetition
      * operator's child node.
      */
-    internal data class Repetition(internal var value: io.github.kotlinmania.regexsyntax.hir.Repetition) : Frame()
+    internal data class Repetition(
+        internal var value: io.github.kotlinmania.regexsyntax.hir.Repetition,
+    ) : Frame()
 
     /**
      * A stack frame allocated just before descending into a capture's child
      * node.
      */
-    internal data class Capture(internal var value: io.github.kotlinmania.regexsyntax.hir.Capture) : Frame()
+    internal data class Capture(
+        internal var value: io.github.kotlinmania.regexsyntax.hir.Capture,
+    ) : Frame()
 
     /**
      * The stack frame used while visiting every child node of a concatenation
      * of expressions.
      */
-    internal data class Concat(internal var head: Hir, internal var tail: List<Hir>) : Frame()
+    internal data class Concat(
+        internal var head: Hir,
+        internal var tail: List<Hir>,
+    ) : Frame()
 
     /**
      * The stack frame used while visiting every child node of an alternation
      * of expressions.
      */
-    internal data class Alternation(internal var head: Hir, internal var tail: List<Hir>) : Frame()
+    internal data class Alternation(
+        internal var head: Hir,
+        internal var tail: List<Hir>,
+    ) : Frame()
 
     /**
      * Perform the next inductive step on this frame and return the next

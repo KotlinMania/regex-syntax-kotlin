@@ -254,8 +254,20 @@ public open class Hir internal constructor(
     public open fun drop() {
         when (val matchVal = this.kind()) {
             is HirKind.Empty, is HirKind.Literal, is HirKind.Class, is HirKind.Look -> return
-            is HirKind.Capture -> if (matchVal.value.sub.kind.subs().isEmpty()) return
-            is HirKind.Repetition -> if (matchVal.value.sub.kind.subs().isEmpty()) return
+            is HirKind.Capture ->
+                if (matchVal.value.sub.kind
+                        .subs()
+                        .isEmpty()
+                ) {
+                    return
+                }
+            is HirKind.Repetition ->
+                if (matchVal.value.sub.kind
+                        .subs()
+                        .isEmpty()
+                ) {
+                    return
+                }
             is HirKind.Concat -> if (matchVal.value.isEmpty()) return
             is HirKind.Alternation -> if (matchVal.value.isEmpty()) return
         }
@@ -399,11 +411,13 @@ public open class Hir internal constructor(
         public fun cls(cls: Class): Hir {
             if (cls.isEmpty()) {
                 return Hir.fail()
-            } else when (val matchVal = cls.literal()) {
-                null -> {}
-                else -> {
-                    val bytes = matchVal
-                    return Hir.literal(bytes)
+            } else {
+                when (val matchVal = cls.literal()) {
+                    null -> {}
+                    else -> {
+                        val bytes = matchVal
+                        return Hir.literal(bytes)
+                    }
                 }
             }
             val props = Properties.cls(cls)
@@ -479,17 +493,12 @@ public open class Hir internal constructor(
             // them together. Basically, when we see a literal, we add its bytes
             // to `priorLit`, and whenever we see anything else, we first take
             // any bytes in `priorLit` and add it to the `new` concatenation.
-            var priorLit: MutableList<UByte>? = null
+            val priorLit = mutableListOf<UByte>()
             for (sub in subs) {
                 val (kind, props) = sub.intoParts()
                 when {
                     kind is HirKind.Literal -> {
-                        val bytes = kind.value.value
-                        if (priorLit != null) {
-                            priorLit.addAll(bytes)
-                        } else {
-                            priorLit = bytes.toMutableList()
-                        }
+                        priorLit.addAll(kind.value.value)
                     }
                     // We also flatten concats that are direct children of another
                     // concat. We only need to do this one level deep since
@@ -501,18 +510,12 @@ public open class Hir internal constructor(
                             val (kind2, props2) = sub2.intoParts()
                             when {
                                 kind2 is HirKind.Literal -> {
-                                    val bytes1 = kind2.value.value
-                                    if (priorLit != null) {
-                                        priorLit.addAll(bytes1)
-                                    } else {
-                                        priorLit = bytes1.toMutableList()
-                                    }
+                                    priorLit.addAll(kind2.value.value)
                                 }
                                 else -> {
-                                    val taken = priorLit
-                                    priorLit = null
-                                    if (taken != null) {
-                                        new.add(Hir.literal(taken))
+                                    if (priorLit.isNotEmpty()) {
+                                        new.add(Hir.literal(priorLit.toList()))
+                                        priorLit.clear()
                                     }
                                     new.add(Hir(kind = kind2, props = props2))
                                 }
@@ -522,19 +525,17 @@ public open class Hir internal constructor(
                     // We can just skip empty HIRs.
                     kind == HirKind.Empty -> {}
                     else -> {
-                        val taken = priorLit
-                        priorLit = null
-                        if (taken != null) {
-                            new.add(Hir.literal(taken))
+                        if (priorLit.isNotEmpty()) {
+                            new.add(Hir.literal(priorLit.toList()))
+                            priorLit.clear()
                         }
                         new.add(Hir(kind = kind, props = props))
                     }
                 }
             }
-            val takenTail = priorLit
-            priorLit = null
-            if (takenTail != null) {
-                new.add(Hir.literal(takenTail))
+            if (priorLit.isNotEmpty()) {
+                new.add(Hir.literal(priorLit.toList()))
+                priorLit.clear()
             }
             if (new.isEmpty()) {
                 return Hir.empty()
@@ -563,7 +564,7 @@ public open class Hir internal constructor(
             // We rebuild the alternation by simplifying it. We proceed similarly
             // as the concatenation case. But in this case, there's no literal
             // simplification happening. We're just flattening alternations.
-            var new = ArrayList<Hir>(subs.size)
+            val new = ArrayList<Hir>(subs.size)
             for (sub in subs) {
                 val (kind, props) = sub.intoParts()
                 when (kind) {
@@ -617,13 +618,13 @@ public open class Hir internal constructor(
             // simplify the expression and unlock other optimizations downstream.
             // It also might generally make NFA matching and DFA construction
             // faster by reducing the scope of branching in the regex.
-            new =
+            val alternations =
                 when (val lifted = liftCommonPrefix(new)) {
                     is Result.Ok -> return lifted.value
-                    is Result.Err -> lifted.error as ArrayList<Hir>
+                    is Result.Err -> lifted.error
                 }
-            val props1 = Properties.alternation(new)
-            return Hir(kind = HirKind.Alternation(new), props = props1)
+            val props1 = Properties.alternation(alternations)
+            return Hir(kind = HirKind.Alternation(alternations), props = props1)
         }
 
         /**
@@ -830,7 +831,11 @@ public open class ClassUnicode internal constructor(
      * nothing or only ASCII bytes. Stated differently, this returns false
      * if and only if this class contains a non-ASCII codepoint.
      */
-    public open fun isAscii(): Boolean = this.set.intervals().lastOrNull()?.let { r -> r.end <= 0x7Fu } ?: true
+    public open fun isAscii(): Boolean =
+        this.set
+            .intervals()
+            .lastOrNull()
+            ?.let { r -> r.end <= 0x7Fu } ?: true
 
     /**
      * Returns the length, in bytes, of the smallest string matched by this
@@ -896,13 +901,14 @@ public open class ClassUnicode internal constructor(
 
     override fun hashCode(): Int = this.set.hashCode()
 
-    override fun toString(): String = buildString {
-        val entries = mutableListOf<String>()
-        for (r in ranges()) {
-            entries.add(r.toString())
+    override fun toString(): String =
+        buildString {
+            val entries = mutableListOf<String>()
+            for (r in ranges()) {
+                entries.add(r.toString())
+            }
+            append("ClassUnicode(${entries.joinToString(", ", "{", "}")})")
         }
-        append("ClassUnicode(${entries.joinToString(", ", "{", "}")})")
-    }
 
     public companion object {
         internal operator fun invoke(
@@ -1193,7 +1199,11 @@ public open class ClassBytes internal constructor(
      * nothing or only ASCII bytes. Stated differently, this returns false
      * if and only if this class contains a non-ASCII byte.
      */
-    public open fun isAscii(): Boolean = this.set.intervals().lastOrNull()?.let { r -> r.end <= 0x7Fu.toUByte() } ?: true
+    public open fun isAscii(): Boolean =
+        this.set
+            .intervals()
+            .lastOrNull()
+            ?.let { r -> r.end <= 0x7Fu.toUByte() } ?: true
 
     /**
      * Returns the length, in bytes, of the smallest string matched by this
@@ -1262,13 +1272,14 @@ public open class ClassBytes internal constructor(
 
     override fun hashCode(): Int = this.set.hashCode()
 
-    override fun toString(): String = buildString {
-        val entries = mutableListOf<String>()
-        for (r in ranges()) {
-            entries.add(r.toString())
+    override fun toString(): String =
+        buildString {
+            val entries = mutableListOf<String>()
+            for (r in ranges()) {
+                entries.add(r.toString())
+            }
+            append("ClassBytes(${entries.joinToString(", ", "{", "}")})")
         }
-        append("ClassBytes(${entries.joinToString(", ", "{", "}")})")
-    }
 
     public companion object {
         internal operator fun invoke(
@@ -1402,9 +1413,15 @@ public open class ClassBytesRange internal constructor(
 
     public open fun fmt(f: StringBuilder) {
         DebugStruct(f, "ClassBytesRange")
-            .field("start", io.github.kotlinmania.regexsyntax.debug.Byte(this.start))
-            .field("end", io.github.kotlinmania.regexsyntax.debug.Byte(this.end))
-            .finish()
+            .field(
+                "start",
+                io.github.kotlinmania.regexsyntax.debug
+                    .Byte(this.start),
+            ).field(
+                "end",
+                io.github.kotlinmania.regexsyntax.debug
+                    .Byte(this.end),
+            ).finish()
     }
 
     override fun toString(): String = buildString { fmt(this) }

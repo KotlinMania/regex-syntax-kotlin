@@ -17,32 +17,38 @@ public sealed class ErrorKind {
      * support is disabled. For example `(?-u:\pL)` would trigger this error.
      */
     public object UnicodeNotAllowed : ErrorKind()
+
     /**
      * This error occurs when translating a pattern that could match a byte
      * sequence that isn't UTF-8 and `utf8` was enabled.
      */
     public object InvalidUtf8 : ErrorKind()
+
     /**
      * This error occurs when one uses a non-ASCII byte for a line terminator,
      * but where Unicode mode is enabled and UTF-8 mode is disabled.
      */
     public object InvalidLineTerminator : ErrorKind()
+
     /**
      * This occurs when an unrecognized Unicode property name could not
      * be found.
      */
     public object UnicodePropertyNotFound : ErrorKind()
+
     /**
      * This occurs when an unrecognized Unicode property value could not
      * be found.
      */
     public object UnicodePropertyValueNotFound : ErrorKind()
+
     /**
      * This occurs when a Unicode-aware Perl character class (`\w`, `\s` or
      * `\d`) could not be found. This can occur when the `unicode - perl`
      * crate feature is not enabled.
      */
     public object UnicodePerlClassNotFound : ErrorKind()
+
     /**
      * This occurs when the Unicode simple case mapping tables are not
      * available, and the regular expression required Unicode aware case
@@ -88,10 +94,14 @@ public sealed class HirKind {
      * empty string.
      */
     public data object Empty : HirKind()
+
     /**
      * A literal string that matches exactly these bytes.
      */
-    public data class Literal(public var value: io.github.kotlinmania.regexsyntax.hir.Literal) : HirKind()
+    public data class Literal(
+        public var value: io.github.kotlinmania.regexsyntax.hir.Literal,
+    ) : HirKind()
+
     /**
      * A single character class that matches any of the characters in the
      * class. A class can either consist of Unicode scalar values as
@@ -99,19 +109,31 @@ public sealed class HirKind {
      *
      * A class may be empty. In which case, it matches nothing.
      */
-    public data class Class(public var value: io.github.kotlinmania.regexsyntax.hir.Class) : HirKind()
+    public data class Class(
+        public var value: io.github.kotlinmania.regexsyntax.hir.Class,
+    ) : HirKind()
+
     /**
      * A look-around assertion. A look-around match always has zero length.
      */
-    public data class Look(public var value: io.github.kotlinmania.regexsyntax.hir.Look) : HirKind()
+    public data class Look(
+        public var value: io.github.kotlinmania.regexsyntax.hir.Look,
+    ) : HirKind()
+
     /**
      * A repetition operation applied to a sub-expression.
      */
-    public data class Repetition(public var value: io.github.kotlinmania.regexsyntax.hir.Repetition) : HirKind()
+    public data class Repetition(
+        public var value: io.github.kotlinmania.regexsyntax.hir.Repetition,
+    ) : HirKind()
+
     /**
      * A capturing group, which contains a sub-expression.
      */
-    public data class Capture(public var value: io.github.kotlinmania.regexsyntax.hir.Capture) : HirKind()
+    public data class Capture(
+        public var value: io.github.kotlinmania.regexsyntax.hir.Capture,
+    ) : HirKind()
+
     /**
      * A concatenation of expressions.
      *
@@ -121,7 +143,10 @@ public sealed class HirKind {
      * Concatenations are guaranteed by `Hir`s smart constructors to always
      * have at least two sub-expressions.
      */
-    public data class Concat(public var value: List<Hir>) : HirKind()
+    public data class Concat(
+        public var value: List<Hir>,
+    ) : HirKind()
+
     /**
      * An alternation of expressions.
      *
@@ -132,7 +157,9 @@ public sealed class HirKind {
      * Alternations are guaranteed by `Hir`s smart constructors to always
      * have at least two sub-expressions.
      */
-    public data class Alternation(public var value: List<Hir>) : HirKind()
+    public data class Alternation(
+        public var value: List<Hir>,
+    ) : HirKind()
 
     public fun rustEquals(other: HirKind): Boolean = this == other
 
@@ -193,12 +220,17 @@ public sealed class Class {
     /**
      * A set of characters represented by Unicode scalar values.
      */
-    public data class Unicode(public var value: ClassUnicode) : Class()
+    public data class Unicode(
+        public var value: ClassUnicode,
+    ) : Class()
+
     /**
      * A set of characters represented by arbitrary bytes (one byte per
      * character).
      */
-    public data class Bytes(public var value: ClassBytes) : Class()
+    public data class Bytes(
+        public var value: ClassBytes,
+    ) : Class()
 
     public fun rustEquals(other: Class): Boolean = this == other
 
@@ -475,23 +507,27 @@ public sealed class Look(
      * position of the input.
      */
     public data object Start : Look(1 shl 0)
+
     /**
      * Match the end of text. Specifically, this matches at the ending
      * position of the input.
      */
     public data object End : Look(1 shl 1)
+
     /**
      * Match the beginning of a line or the beginning of text. Specifically,
      * this matches at the starting position of the input, or at the position
      * immediately following a `\n` character.
      */
     public data object StartLF : Look(1 shl 2)
+
     /**
      * Match the end of a line or the end of text. Specifically, this matches
      * at the end position of the input, or at the position immediately
      * preceding a `\n` character.
      */
     public data object EndLF : Look(1 shl 3)
+
     /**
      * Match the beginning of a line or the beginning of text. Specifically,
      * this matches at the starting position of the input, or at the position
@@ -499,6 +535,7 @@ public sealed class Look(
      * a `\r` when a `\n` follows.
      */
     public data object StartCRLF : Look(1 shl 4)
+
     /**
      * Match the end of a line or the end of text. Specifically, this matches
      * at the end position of the input, or at the position immediately
@@ -506,26 +543,31 @@ public sealed class Look(
      * precedes it.
      */
     public data object EndCRLF : Look(1 shl 5)
+
     /**
      * Match an ASCII-only word boundary. That is, this matches a position
      * where the left adjacent character and right adjacent character
      * correspond to a word and non-word or a non-word and word character.
      */
     public data object WordAscii : Look(1 shl 6)
+
     /**
      * Match an ASCII-only negation of a word boundary.
      */
     public data object WordAsciiNegate : Look(1 shl 7)
+
     /**
      * Match a Unicode-aware word boundary. That is, this matches a position
      * where the left adjacent character and right adjacent character
      * correspond to a word and non-word or a non-word and word character.
      */
     public data object WordUnicode : Look(1 shl 8)
+
     /**
      * Match a Unicode-aware negation of a word boundary.
      */
     public data object WordUnicodeNegate : Look(1 shl 9)
+
     /**
      * Match the start of an ASCII-only word boundary. That is, this matches a
      * position at either the beginning of the haystack or where the previous
@@ -533,6 +575,7 @@ public sealed class Look(
      * character.
      */
     public data object WordStartAscii : Look(1 shl 10)
+
     /**
      * Match the end of an ASCII-only word boundary. That is, this matches
      * a position at either the end of the haystack or where the previous
@@ -540,6 +583,7 @@ public sealed class Look(
      * character.
      */
     public data object WordEndAscii : Look(1 shl 11)
+
     /**
      * Match the start of a Unicode word boundary. That is, this matches a
      * position at either the beginning of the haystack or where the previous
@@ -547,6 +591,7 @@ public sealed class Look(
      * character.
      */
     public data object WordStartUnicode : Look(1 shl 12)
+
     /**
      * Match the end of a Unicode word boundary. That is, this matches a
      * position at either the end of the haystack or where the previous
@@ -554,24 +599,28 @@ public sealed class Look(
      * character.
      */
     public data object WordEndUnicode : Look(1 shl 13)
+
     /**
      * Match the start half of an ASCII-only word boundary. That is, this
      * matches a position at either the beginning of the haystack or where the
      * previous character is not a word character.
      */
     public data object WordStartHalfAscii : Look(1 shl 14)
+
     /**
      * Match the end half of an ASCII-only word boundary. That is, this
      * matches a position at either the end of the haystack or where the
      * following character is not a word character.
      */
     public data object WordEndHalfAscii : Look(1 shl 15)
+
     /**
      * Match the start half of a Unicode word boundary. That is, this matches
      * a position at either the beginning of the haystack or where the
      * previous character is not a word character.
      */
     public data object WordStartHalfUnicode : Look(1 shl 16)
+
     /**
      * Match the end half of a Unicode word boundary. That is, this matches
      * a position at either the end of the haystack or where the following
@@ -696,12 +745,14 @@ public sealed class Dot {
      * This is equivalent to `(? su:.)` and also `\p{any}`.
      */
     public data object AnyChar : Dot()
+
     /**
      * Matches any byte value.
      *
      * This is equivalent to `(? s - u:.)` and also `(?-u:[\x00-\xFF])`.
      */
     public data object AnyByte : Dot()
+
     /**
      * Matches the UTF-8 encoding of any Unicode scalar value except for the
      * `char` given.
@@ -715,13 +766,17 @@ public sealed class Dot {
      * (This and `AnyCharExceptLF` both exist because of legacy reasons.
      * `AnyCharExceptLF` will be dropped in the next breaking change release.)
      */
-    public data class AnyCharExcept(public var value: UInt) : Dot()
+    public data class AnyCharExcept(
+        public var value: UInt,
+    ) : Dot()
+
     /**
      * Matches the UTF-8 encoding of any Unicode scalar value except for `\n`.
      *
      * This is equivalent to `(? u - s:.)` and also `[\p{any}--\n]`.
      */
     public data object AnyCharExceptLF : Dot()
+
     /**
      * Matches the UTF-8 encoding of any Unicode scalar value except for `\r`
      * and `\n`.
@@ -729,6 +784,7 @@ public sealed class Dot {
      * This is equivalent to `(? uR - s:.)` and also `[\p{any}--\r\n]`.
      */
     public data object AnyCharExceptCRLF : Dot()
+
     /**
      * Matches any byte value except for the `UByte` given.
      *
@@ -741,13 +797,17 @@ public sealed class Dot {
      * (This and `AnyByteExceptLF` both exist because of legacy reasons.
      * `AnyByteExceptLF` will be dropped in the next breaking change release.)
      */
-    public data class AnyByteExcept(public var value: UByte) : Dot()
+    public data class AnyByteExcept(
+        public var value: UByte,
+    ) : Dot()
+
     /**
      * Matches any byte value except for `\n`.
      *
      * This is equivalent to `(? - su:.)` and also `(?-u:[[\x00-\xFF]--\n])`.
      */
     public data object AnyByteExceptLF : Dot()
+
     /**
      * Matches any byte value except for `\r` and `\n`.
      *

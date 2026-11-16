@@ -7,9 +7,9 @@ import io.github.kotlinmania.regexsyntax.ast.ClassSet
 import io.github.kotlinmania.regexsyntax.ast.ClassSetBinaryOp
 import io.github.kotlinmania.regexsyntax.ast.ClassSetBinaryOpKind
 import io.github.kotlinmania.regexsyntax.ast.ClassSetItem
+import io.github.kotlinmania.rustlang.core.result.Result
 import io.github.kotlinmania.regexsyntax.ast.Group as AstGroup
 import io.github.kotlinmania.regexsyntax.ast.Repetition as AstRepetition
-import io.github.kotlinmania.rustlang.core.result.Result
 
 /**
  * A trait for visiting an abstract syntax tree (AST) in depth first order.
@@ -142,10 +142,11 @@ internal class HeapVisitor(
                 is Result.Err -> return res
                 is Result.Ok -> {}
             }
-            val inducted = when (val res = this.induct(ast1, visitor)) {
-                is Result.Err -> return res
-                is Result.Ok -> res.value
-            }
+            val inducted =
+                when (val res = this.induct(ast1, visitor)) {
+                    is Result.Err -> return res
+                    is Result.Ok -> res.value
+                }
             if (inducted != null) {
                 val child = inducted.child()
                 this.stack.add(Pair(ast1, inducted))
@@ -207,26 +208,27 @@ internal class HeapVisitor(
      * return an error which will be passed on here.
      */
     internal fun <Output, Err, V : Visitor<Output, Err>> induct(ast: Ast, visitor: V): Result<Frame?, Err> {
-        val frame: Frame? = when (ast) {
-            is Ast.ClassBracketed -> {
-                when (val res = this.visitClass(ast.value, visitor)) {
-                    is Result.Err -> return res
-                    is Result.Ok -> {}
+        val frame: Frame? =
+            when (ast) {
+                is Ast.ClassBracketed -> {
+                    when (val res = this.visitClass(ast.value, visitor)) {
+                        is Result.Err -> return res
+                        is Result.Ok -> {}
+                    }
+                    null
                 }
-                null
+                is Ast.Repetition -> Frame.Repetition(ast.value)
+                is Ast.Group -> Frame.Group(ast.value)
+                is Ast.Concat -> {
+                    val asts = ast.value.asts
+                    if (asts.isEmpty()) null else Frame.Concat(head = asts[0], tail = asts.subList(1, asts.size))
+                }
+                is Ast.Alternation -> {
+                    val asts = ast.value.asts
+                    if (asts.isEmpty()) null else Frame.Alternation(head = asts[0], tail = asts.subList(1, asts.size))
+                }
+                else -> null
             }
-            is Ast.Repetition -> Frame.Repetition(ast.value)
-            is Ast.Group -> Frame.Group(ast.value)
-            is Ast.Concat -> {
-                val asts = ast.value.asts
-                if (asts.isEmpty()) null else Frame.Concat(head = asts[0], tail = asts.subList(1, asts.size))
-            }
-            is Ast.Alternation -> {
-                val asts = ast.value.asts
-                if (asts.isEmpty()) null else Frame.Alternation(head = asts[0], tail = asts.subList(1, asts.size))
-            }
-            else -> null
-        }
         return Result.Ok(frame)
     }
 
@@ -384,22 +386,35 @@ internal sealed class Frame {
      * A stack frame allocated just before descending into a repetition
      * operator's child node.
      */
-    internal data class Repetition(internal var value: AstRepetition) : Frame()
+    internal data class Repetition(
+        internal var value: AstRepetition,
+    ) : Frame()
+
     /**
      * A stack frame allocated just before descending into a group's child
      * node.
      */
-    internal data class Group(internal var value: AstGroup) : Frame()
+    internal data class Group(
+        internal var value: AstGroup,
+    ) : Frame()
+
     /**
      * The stack frame used while visiting every child node of a concatenation
      * of expressions.
      */
-    internal data class Concat(internal var head: Ast, internal var tail: List<Ast>) : Frame()
+    internal data class Concat(
+        internal var head: Ast,
+        internal var tail: List<Ast>,
+    ) : Frame()
+
     /**
      * The stack frame used while visiting every child node of an alternation
      * of expressions.
      */
-    internal data class Alternation(internal var head: Ast, internal var tail: List<Ast>) : Frame()
+    internal data class Alternation(
+        internal var head: Ast,
+        internal var tail: List<Ast>,
+    ) : Frame()
 
     /**
      * Perform the next inductive step on this frame and return the next
@@ -423,21 +438,36 @@ internal sealed class ClassFrame {
      * The stack frame used while visiting every child node of a union of
      * character class items.
      */
-    internal data class Union(internal var head: ClassSetItem, internal var tail: List<ClassSetItem>) : ClassFrame()
+    internal data class Union(
+        internal var head: ClassSetItem,
+        internal var tail: List<ClassSetItem>,
+    ) : ClassFrame()
+
     /**
      * The stack frame used while a binary class operation.
      */
-    internal data class Binary(internal var op: ClassSetBinaryOp) : ClassFrame()
+    internal data class Binary(
+        internal var op: ClassSetBinaryOp,
+    ) : ClassFrame()
+
     /**
      * A stack frame allocated just before descending into a binary operator's
      * left hand child node.
      */
-    internal data class BinaryLHS(internal var op: ClassSetBinaryOp, internal var lhs: ClassSet, internal var rhs: ClassSet) : ClassFrame()
+    internal data class BinaryLHS(
+        internal var op: ClassSetBinaryOp,
+        internal var lhs: ClassSet,
+        internal var rhs: ClassSet,
+    ) : ClassFrame()
+
     /**
      * A stack frame allocated just before descending into a binary operator's
      * right hand child node.
      */
-    internal data class BinaryRHS(internal var op: ClassSetBinaryOp, internal var rhs: ClassSet) : ClassFrame()
+    internal data class BinaryRHS(
+        internal var op: ClassSetBinaryOp,
+        internal var rhs: ClassSet,
+    ) : ClassFrame()
 
     /**
      * Perform the next inductive step on this frame and return the next
@@ -475,8 +505,12 @@ internal sealed class ClassFrame {
  * syntax, which is not possible.)
  */
 internal sealed class ClassInduct {
-    internal data class Item(internal var value: ClassSetItem) : ClassInduct()
-    internal data class BinaryOp(internal var value: ClassSetBinaryOp) : ClassInduct()
+    internal data class Item(
+        internal var value: ClassSetItem,
+    ) : ClassInduct()
+    internal data class BinaryOp(
+        internal var value: ClassSetBinaryOp,
+    ) : ClassInduct()
 
     internal fun fmt(f: StringBuilder) {
         val x =

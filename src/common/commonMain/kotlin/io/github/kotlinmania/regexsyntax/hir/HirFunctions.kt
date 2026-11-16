@@ -137,7 +137,7 @@ internal fun liftCommonPrefix(hirs: MutableList<Hir>): Result<Hir, MutableList<H
     }
     val len = prefix.size
     check(0 != len)
-    var prefixConcat = mutableListOf<Hir>()
+    var prefixConcat: List<Hir>? = null
     val suffixAlts = mutableListOf<Hir>()
     for (h in hirs) {
         val concat =
@@ -149,10 +149,9 @@ internal fun liftCommonPrefix(hirs: MutableList<Hir>): Result<Hir, MutableList<H
                 else -> error("unreachable")
             }
         suffixAlts.add(Hir.concat(concat.subList(len, concat.size).toList()))
-        if (prefixConcat.isEmpty()) {
-            prefixConcat = concat.subList(0, len).toMutableList()
+        if (prefixConcat == null) {
+            prefixConcat = concat.subList(0, len)
         }
     }
-    prefixConcat.add(Hir.alternation(suffixAlts))
-    return Result.Ok(Hir.concat(prefixConcat))
+    return Result.Ok(Hir.concat(prefixConcat.orEmpty() + Hir.alternation(suffixAlts)))
 }

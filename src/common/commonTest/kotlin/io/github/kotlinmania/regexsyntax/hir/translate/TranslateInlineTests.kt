@@ -43,13 +43,37 @@ public open class TestError(
 
 public fun Error.eq(other: TestError): Boolean = this.span == other.span && this.kind == other.kind
 
-public fun parse(pattern: String): Ast = ParserBuilder.new().octal(true).build().parse(pattern).unwrap()
+public fun parse(pattern: String): Ast =
+    ParserBuilder
+        .new()
+        .octal(true)
+        .build()
+        .parse(pattern)
+        .unwrap()
 
-public fun t(pattern: String): Hir = TranslatorBuilder.new().utf8(true).build().translate(pattern, parse(pattern)).unwrap()
+public fun t(pattern: String): Hir =
+    TranslatorBuilder
+        .new()
+        .utf8(true)
+        .build()
+        .translate(pattern, parse(pattern))
+        .unwrap()
 
-public fun tErr(pattern: String): Error = TranslatorBuilder.new().utf8(true).build().translate(pattern, parse(pattern)).unwrapErr()
+public fun tErr(pattern: String): Error =
+    TranslatorBuilder
+        .new()
+        .utf8(true)
+        .build()
+        .translate(pattern, parse(pattern))
+        .unwrapErr()
 
-public fun tBytes(pattern: String): Hir = TranslatorBuilder.new().utf8(false).build().translate(pattern, parse(pattern)).unwrap()
+public fun tBytes(pattern: String): Hir =
+    TranslatorBuilder
+        .new()
+        .utf8(false)
+        .build()
+        .translate(pattern, parse(pattern))
+        .unwrap()
 
 public fun props(pattern: String): Properties = t(pattern).properties().clone()
 
@@ -1003,8 +1027,26 @@ public class HirTranslateInlineTests {
     @kotlin.test.Test
     public fun regressionFuzzMatch() {
         val pat = "[(\u0006 \u0000-򯷵]  \u0000 "
-        val ast = ParserBuilder.new().octal(false).ignoreWhitespace(true).build().parse(pat).unwrap()
-        val hir = TranslatorBuilder.new().utf8(true).caseInsensitive(false).multiLine(false).dotMatchesNewLine(false).swapGreed(true).unicode(true).build().translate(pat, ast).unwrap()
+        val ast =
+            ParserBuilder
+                .new()
+                .octal(false)
+                .ignoreWhitespace(true)
+                .build()
+                .parse(pat)
+                .unwrap()
+        val hir =
+            TranslatorBuilder
+                .new()
+                .utf8(true)
+                .caseInsensitive(false)
+                .multiLine(false)
+                .dotMatchesNewLine(false)
+                .swapGreed(true)
+                .unicode(true)
+                .build()
+                .translate(pat, ast)
+                .unwrap()
         check(hir == Hir.concat(mutableListOf(hirUclass(listOf(up('\u0000', 0xafdf5u))), hirLit("\u0000"))))
     }
 

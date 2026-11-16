@@ -39,7 +39,6 @@ import io.github.kotlinmania.regexsyntax.hir.HirKind
 import io.github.kotlinmania.regexsyntax.hir.Look
 import io.github.kotlinmania.regexsyntax.scalarIsAscii
 import io.github.kotlinmania.regexsyntax.unicode.ClassQuery
-import io.github.kotlinmania.regexsyntax.unicode.Error as UnicodeError
 import io.github.kotlinmania.regexsyntax.unicode.SimpleCaseFolder
 import io.github.kotlinmania.regexsyntax.unicode.cls
 import io.github.kotlinmania.regexsyntax.unicode.perlDigit
@@ -50,6 +49,7 @@ import io.github.kotlinmania.regexsyntax.withBorrowMut
 import io.github.kotlinmania.rustlang.core.cell.Cell
 import io.github.kotlinmania.rustlang.core.cell.RefCell
 import io.github.kotlinmania.rustlang.core.result.Result
+import io.github.kotlinmania.regexsyntax.unicode.Error as UnicodeError
 
 // Defines a translator that converts an `Ast` to an `Hir`.
 
@@ -203,17 +203,27 @@ public open class Translator internal constructor(
  * created for each item in the Ast that we traverse.
  */
 internal sealed class HirFrame {
-    internal data class Expr(val value: Hir) : HirFrame()
+    internal data class Expr(
+        val value: Hir,
+    ) : HirFrame()
 
-    internal data class Literal(val value: MutableList<UByte>) : HirFrame()
+    internal data class Literal(
+        val value: MutableList<UByte>,
+    ) : HirFrame()
 
-    internal data class ClassUnicode(val value: io.github.kotlinmania.regexsyntax.hir.ClassUnicode) : HirFrame()
+    internal data class ClassUnicode(
+        val value: io.github.kotlinmania.regexsyntax.hir.ClassUnicode,
+    ) : HirFrame()
 
-    internal data class ClassBytes(val value: io.github.kotlinmania.regexsyntax.hir.ClassBytes) : HirFrame()
+    internal data class ClassBytes(
+        val value: io.github.kotlinmania.regexsyntax.hir.ClassBytes,
+    ) : HirFrame()
 
     internal data object Repetition : HirFrame()
 
-    internal data class Group(val oldFlags: Flags) : HirFrame()
+    internal data class Group(
+        val oldFlags: Flags,
+    ) : HirFrame()
 
     internal data object Concat : HirFrame()
 
@@ -711,7 +721,12 @@ internal class TranslatorI(
     internal fun error(span: Span, kind: ErrorKind): Error =
         Error(kind = kind, pattern = this.pattern, span = span)
 
-    internal fun flags(): Flags = this.trans().flags.get().copy()
+    internal fun flags(): Flags =
+        this
+            .trans()
+            .flags
+            .get()
+            .copy()
 
     internal fun setFlags(astFlags: io.github.kotlinmania.regexsyntax.ast.Flags): Flags {
         val oldFlags = this.flags()
