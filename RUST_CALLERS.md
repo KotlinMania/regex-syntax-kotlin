@@ -16,29 +16,65 @@ For every Rust crate this repo owns (under `tmp/`), this file lists every **cros
 
 | package | module | inbound use sites | distinct caller crates | distinct caller repos | codex sites |
 |---|---|---:|---:|---:|---:|
-| `regex-syntax` | `regex_syntax` | 16 | 3 | 3 | 0 |
+| `regex-syntax` | `regex_syntax` | 36 | 4 | 4 | 0 |
 
 ## `regex-syntax`
 
-### Inbound symbols (12 distinct, 16 total `use` sites)
+### Inbound symbols (16 distinct, 36 total `use` sites)
 
 Sorted by codex demand, then total demand. The first symbols are the priority queue for porting `regex-syntax`.
 
-#### `regex_syntax::hir::Hir` — 3 site(s) (0 codex, 3 other, 2 caller crates)
+#### `regex_syntax::hir::Hir` — 6 site(s) (0 codex, 6 other, 3 caller crates)
 
+- `fancy-regex-kotlin/fancy-regex` `src/byte_set.rs:1` — `use regex_syntax::hir::Hir`
+- `fancy-regex-kotlin/fancy-regex` `src/compile.rs:52` — `use regex_syntax::hir::Hir`
+- `fancy-regex-kotlin/fancy-regex` `src/to_hir.rs:41` — `use regex_syntax::hir::Hir`
 - `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::Hir`
 - `lalrpop-kotlin/lalrpop` `src/lexer/re/mod.rs:1` — `use regex_syntax::hir::Hir`
 - `logos-kotlin/logos-codegen` `src/pattern.rs:4` — `use regex_syntax::hir::Hir`
 
-#### `regex_syntax::ParserBuilder` — 2 site(s) (0 codex, 2 other, 2 caller crates)
+#### `regex_syntax::hir::HirKind` — 5 site(s) (0 codex, 5 other, 3 caller crates)
 
+- `fancy-regex-kotlin/fancy-regex` `src/byte_set.rs:1` — `use regex_syntax::hir::HirKind`
+- `fancy-regex-kotlin/fancy-regex` `src/compile.rs:1243` — `use regex_syntax::hir::HirKind`
+- `fancy-regex-kotlin/fancy-regex` `src/to_hir.rs:41` — `use regex_syntax::hir::HirKind`
+- `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::HirKind`
+- `logos-kotlin/logos-codegen` `src/pattern.rs:4` — `use regex_syntax::hir::HirKind`
+
+#### `regex_syntax::hir::ClassUnicodeRange` — 4 site(s) (0 codex, 4 other, 2 caller crates)
+
+- `fancy-regex-kotlin/fancy-regex` `src/byte_set.rs:1` — `use regex_syntax::hir::ClassUnicodeRange`
+- `fancy-regex-kotlin/fancy-regex` `src/compile.rs:975` — `use regex_syntax::hir::ClassUnicodeRange`
+- `fancy-regex-kotlin/fancy-regex` `src/vm.rs:902` — `use regex_syntax::hir::ClassUnicodeRange`
+- `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::ClassUnicodeRange`
+
+#### `regex_syntax::ParserBuilder` — 3 site(s) (0 codex, 3 other, 3 caller crates)
+
+- `fancy-regex-kotlin/fancy-regex` `src/compile.rs:1220` — `use regex_syntax::ParserBuilder`
 - `lalrpop-kotlin/lalrpop` `src/lexer/re/mod.rs:4` — `use regex_syntax::ParserBuilder`
 - `logos-kotlin/logos-codegen` `src/pattern.rs:4` — `use regex_syntax::ParserBuilder`
 
-#### `regex_syntax::hir::HirKind` — 2 site(s) (0 codex, 2 other, 2 caller crates)
+#### `regex_syntax::hir::Class` — 3 site(s) (0 codex, 3 other, 2 caller crates)
 
-- `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::HirKind`
-- `logos-kotlin/logos-codegen` `src/pattern.rs:4` — `use regex_syntax::hir::HirKind`
+- `fancy-regex-kotlin/fancy-regex` `src/byte_set.rs:1` — `use regex_syntax::hir::Class`
+- `fancy-regex-kotlin/fancy-regex` `src/compile.rs:1243` — `use regex_syntax::hir::Class`
+- `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::Class`
+
+#### `regex_syntax::hir::ClassUnicode` — 3 site(s) (0 codex, 3 other, 1 caller crates)
+
+- `fancy-regex-kotlin/fancy-regex` `src/byte_set.rs:1` — `use regex_syntax::hir::ClassUnicode`
+- `fancy-regex-kotlin/fancy-regex` `src/compile.rs:975` — `use regex_syntax::hir::ClassUnicode`
+- `fancy-regex-kotlin/fancy-regex` `src/vm.rs:902` — `use regex_syntax::hir::ClassUnicode`
+
+#### `regex_syntax::hir::Dot` — 2 site(s) (0 codex, 2 other, 2 caller crates)
+
+- `fancy-regex-kotlin/fancy-regex` `src/to_hir.rs:41` — `use regex_syntax::hir::Dot`
+- `logos-kotlin/logos-codegen` `src/pattern.rs:4` — `use regex_syntax::hir::Dot`
+
+#### `regex_syntax::hir::Repetition` — 2 site(s) (0 codex, 2 other, 2 caller crates)
+
+- `fancy-regex-kotlin/fancy-regex` `src/to_hir.rs:41` — `use regex_syntax::hir::Repetition`
+- `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::Repetition`
 
 #### `regex_syntax` — 1 site(s) (0 codex, 1 other, 1 caller crates)
 
@@ -52,26 +88,22 @@ Sorted by codex demand, then total demand. The first symbols are the priority qu
 
 - `syntect-kotlin/syntect` `src/parsing/syntax_definition.rs:10` — `use regex_syntax::escape`
 
-#### `regex_syntax::hir::Class` — 1 site(s) (0 codex, 1 other, 1 caller crates)
+#### `regex_syntax::escape_into` — 1 site(s) (0 codex, 1 other, 1 caller crates)
 
-- `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::Class`
+- `fancy-regex-kotlin/fancy-regex` `src/parse.rs:30` — `use regex_syntax::escape_into`
+
+#### `regex_syntax::hir::Capture` — 1 site(s) (0 codex, 1 other, 1 caller crates)
+
+- `fancy-regex-kotlin/fancy-regex` `src/to_hir.rs:41` — `use regex_syntax::hir::Capture`
 
 #### `regex_syntax::hir::ClassBytesRange` — 1 site(s) (0 codex, 1 other, 1 caller crates)
 
 - `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::ClassBytesRange`
 
-#### `regex_syntax::hir::ClassUnicodeRange` — 1 site(s) (0 codex, 1 other, 1 caller crates)
-
-- `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::ClassUnicodeRange`
-
-#### `regex_syntax::hir::Dot` — 1 site(s) (0 codex, 1 other, 1 caller crates)
-
-- `logos-kotlin/logos-codegen` `src/pattern.rs:4` — `use regex_syntax::hir::Dot`
-
 #### `regex_syntax::hir::Literal` — 1 site(s) (0 codex, 1 other, 1 caller crates)
 
 - `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::Literal`
 
-#### `regex_syntax::hir::Repetition` — 1 site(s) (0 codex, 1 other, 1 caller crates)
+#### `regex_syntax::hir::Look` — 1 site(s) (0 codex, 1 other, 1 caller crates)
 
-- `lalrpop-kotlin/lalrpop` `src/lexer/nfa/mod.rs:6` — `use regex_syntax::hir::Repetition`
+- `fancy-regex-kotlin/fancy-regex` `src/to_hir.rs:41` — `use regex_syntax::hir::Look`
