@@ -71,7 +71,7 @@ import io.github.kotlinmania.rustlang.core.result.Result
 
 internal typealias ParseResult<T> = Result<T, Error>
 
-private inline fun ch(c: Char): UInt = c.code.toUInt()
+private fun ch(c: Char): UInt = c.code.toUInt()
 
 /**
  * A primitive is an expression with no sub-expressions. This includes

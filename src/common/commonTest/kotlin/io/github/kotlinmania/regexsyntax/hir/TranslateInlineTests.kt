@@ -136,45 +136,41 @@ public fun classNegate(cls: Class): Hir {
     return Hir.cls(cls)
 }
 
-public fun hirUnion(expr1: Hir, expr2: Hir): Hir =
-    run {
-        val matchVal = Pair(expr1.intoKind(), expr2.intoKind())
-        when {
-            matchVal.first is HirKind.Class && (matchVal.first as HirKind.Class).value is Unicode && matchVal.second is HirKind.Class && (matchVal.second as HirKind.Class).value is Unicode -> {
-                val (c1) = (matchVal.first as HirKind.Class).value as Unicode
-                val (c2) = (matchVal.second as HirKind.Class).value as Unicode
-                c1.union(c2)
-                Hir.cls(Class.Unicode(c1))
-            }
-            matchVal.first is HirKind.Class && (matchVal.first as HirKind.Class).value is Bytes && matchVal.second is HirKind.Class && (matchVal.second as HirKind.Class).value is Bytes -> {
-                val (c11) = (matchVal.first as HirKind.Class).value as Bytes
-                val (c21) = (matchVal.second as HirKind.Class).value as Bytes
-                c11.union(c21)
-                Hir.cls(Class.Bytes(c11))
-            }
-            else -> error("cannot union non-class Hir exprs")
+public fun hirUnion(expr1: Hir, expr2: Hir): Hir {
+    val k1 = expr1.intoKind()
+    val k2 = expr2.intoKind()
+    if (k1 is HirKind.Class && k2 is HirKind.Class) {
+        val v1 = k1.value
+        val v2 = k2.value
+        if (v1 is Unicode && v2 is Unicode) {
+            v1.value.union(v2.value)
+            return Hir.cls(Class.Unicode(v1.value))
+        }
+        if (v1 is Bytes && v2 is Bytes) {
+            v1.value.union(v2.value)
+            return Hir.cls(Class.Bytes(v1.value))
         }
     }
+    error("cannot union non-class Hir exprs")
+}
 
-public fun hirDifference(expr1: Hir, expr2: Hir): Hir =
-    run {
-        val matchVal = Pair(expr1.intoKind(), expr2.intoKind())
-        when {
-            matchVal.first is HirKind.Class && (matchVal.first as HirKind.Class).value is Unicode && matchVal.second is HirKind.Class && (matchVal.second as HirKind.Class).value is Unicode -> {
-                val (c1) = (matchVal.first as HirKind.Class).value as Unicode
-                val (c2) = (matchVal.second as HirKind.Class).value as Unicode
-                c1.difference(c2)
-                Hir.cls(Class.Unicode(c1))
-            }
-            matchVal.first is HirKind.Class && (matchVal.first as HirKind.Class).value is Bytes && matchVal.second is HirKind.Class && (matchVal.second as HirKind.Class).value is Bytes -> {
-                val (c11) = (matchVal.first as HirKind.Class).value as Bytes
-                val (c21) = (matchVal.second as HirKind.Class).value as Bytes
-                c11.difference(c21)
-                Hir.cls(Class.Bytes(c11))
-            }
-            else -> error("cannot difference non-class Hir exprs")
+public fun hirDifference(expr1: Hir, expr2: Hir): Hir {
+    val k1 = expr1.intoKind()
+    val k2 = expr2.intoKind()
+    if (k1 is HirKind.Class && k2 is HirKind.Class) {
+        val v1 = k1.value
+        val v2 = k2.value
+        if (v1 is Unicode && v2 is Unicode) {
+            v1.value.difference(v2.value)
+            return Hir.cls(Class.Unicode(v1.value))
+        }
+        if (v1 is Bytes && v2 is Bytes) {
+            v1.value.difference(v2.value)
+            return Hir.cls(Class.Bytes(v1.value))
         }
     }
+    error("cannot difference non-class Hir exprs")
+}
 
 public fun hirLook(look: Look): Hir = Hir.look(look)
 

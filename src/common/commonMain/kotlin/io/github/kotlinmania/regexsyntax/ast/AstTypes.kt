@@ -857,10 +857,7 @@ public sealed class ClassSet {
      * Return true if and only if this class set is empty.
      */
     public open fun isEmpty(): Boolean =
-        when {
-            this is ClassSet.Item && (this as ClassSet.Item).value is ClassSetItem.Empty -> true
-            else -> false
-        }
+        this is ClassSet.Item && this.value is ClassSetItem.Empty
 
     /**
      * A custom `Drop` impl is used for `ClassSet` such that it uses constant
@@ -1141,13 +1138,7 @@ public sealed class RepetitionRange {
      * and its start is greater than its end.
      */
     public open fun isValid(): Boolean =
-        when {
-            this is RepetitionRange.Bounded && (this as RepetitionRange.Bounded).field0 > (this as RepetitionRange.Bounded).field1 -> {
-                val (s, e) = this as RepetitionRange.Bounded
-                false
-            }
-            else -> true
-        }
+        !(this is RepetitionRange.Bounded && this.field0 > this.field1)
 }
 
 /**
