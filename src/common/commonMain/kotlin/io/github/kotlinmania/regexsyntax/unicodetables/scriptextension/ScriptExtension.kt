@@ -49,7 +49,12 @@ internal val CHEROKEE: List<Pair<UInt, UInt>> = listOf(Pair(0x0300u, 0x0302u), P
 
 internal val CHORASMIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x10fb0u, 0x10fcbu))
 
-internal val COMMON: List<Pair<UInt, UInt>> = listOf(Pair(0x0000u, 0x0040u), Pair(0x005bu, 0x0060u), Pair(0x007bu, 0x00a9u), Pair(0x00abu, 0x00b6u), Pair(0x00b8u, 0x00b9u), Pair(0x00bbu, 0x00bfu), Pair(0x00d7u, 0x00d7u), Pair(0x00f7u, 0x00f7u), Pair(0x02b9u, 0x02bbu), Pair(0x02bdu, 0x02c6u), Pair(0x02c8u, 0x02c8u), Pair(0x02ccu, 0x02ccu), Pair(0x02ceu, 0x02d6u), Pair(0x02d8u, 0x02d8u), Pair(0x02dau, 0x02dfu), Pair(0x02e5u, 0x02e9u), Pair(0x02ecu, 0x02ffu), Pair(0x037eu, 0x037eu), Pair(0x0385u, 0x0385u), Pair(0x0387u, 0x0387u), Pair(0x0605u, 0x0605u), Pair(0x06ddu, 0x06ddu), Pair(0x08e2u, 0x08e2u), Pair(0x0e3fu, 0x0e3fu), Pair(0x0fd5u, 0x0fd8u), Pair(0x2000u, 0x200bu), Pair(0x200eu, 0x202eu), Pair(0x2030u, 0x204eu), Pair(0x2050u, 0x2059u), Pair(0x205bu, 0x205cu), Pair(0x205eu, 0x2064u), Pair(0x2066u, 0x2070u), Pair(0x2074u, 0x207eu), Pair(0x2080u, 0x208eu), Pair(0x20a0u, 0x20c0u), Pair(0x2100u, 0x2125u), Pair(0x2127u, 0x2129u), Pair(0x212cu, 0x2131u), Pair(0x2133u, 0x214du), Pair(0x214fu, 0x215fu), Pair(0x2189u, 0x218bu), Pair(0x2190u, 0x2429u), Pair(0x2440u, 0x244au), Pair(0x2460u, 0x27ffu), Pair(0x2900u, 0x2b73u), Pair(0x2b76u, 0x2b95u), Pair(0x2b97u, 0x2bffu), Pair(0x2e00u, 0x2e16u), Pair(0x2e18u, 0x2e2fu), Pair(0x2e32u, 0x2e3bu), Pair(0x2e3du, 0x2e40u), Pair(0x2e42u, 0x2e42u), Pair(0x2e44u, 0x2e5du), Pair(0x3000u, 0x3000u), Pair(0x3004u, 0x3004u), Pair(0x3012u, 0x3012u), Pair(0x3020u, 0x3020u), Pair(0x3036u, 0x3036u), Pair(0x3248u, 0x325fu), Pair(0x327fu, 0x327fu), Pair(0x32b1u, 0x32bfu), Pair(0x32ccu, 0x32cfu), Pair(0x3371u, 0x337au), Pair(0x3380u, 0x33dfu), Pair(0x33ffu, 0x33ffu), Pair(0x4dc0u, 0x4dffu), Pair(0xa708u, 0xa721u), Pair(0xa788u, 0xa78au), Pair(0xab5bu, 0xab5bu), Pair(0xab6au, 0xab6bu), Pair(0xfe10u, 0xfe19u), Pair(0xfe30u, 0xfe44u), Pair(0xfe47u, 0xfe52u), Pair(0xfe54u, 0xfe66u), Pair(0xfe68u, 0xfe6bu), Pair(0xfeffu, 0xfeffu), Pair(0xff01u, 0xff20u), Pair(0xff3bu, 0xff40u), Pair(0xff5bu, 0xff60u), Pair(0xffe0u, 0xffe6u), Pair(0xffe8u, 0xffeeu), Pair(0xfff9u, 0xfffdu), Pair(0x10190u, 0x1019cu), Pair(0x101d0u, 0x101fcu), Pair(0x1cc00u, 0x1ccf9u), Pair(0x1cd00u, 0x1ceb3u), Pair(0x1cf50u, 0x1cfc3u), Pair(0x1d000u, 0x1d0f5u), Pair(0x1d100u, 0x1d126u), Pair(0x1d129u, 0x1d166u), Pair(0x1d16au, 0x1d17au), Pair(0x1d183u, 0x1d184u), Pair(0x1d18cu, 0x1d1a9u), Pair(0x1d1aeu, 0x1d1eau), Pair(0x1d2c0u, 0x1d2d3u), Pair(0x1d2e0u, 0x1d2f3u), Pair(0x1d300u, 0x1d356u), Pair(0x1d372u, 0x1d378u), Pair(0x1d400u, 0x1d454u), Pair(0x1d456u, 0x1d49cu), Pair(0x1d49eu, 0x1d49fu), Pair(0x1d4a2u, 0x1d4a2u), Pair(0x1d4a5u, 0x1d4a6u), Pair(0x1d4a9u, 0x1d4acu), Pair(0x1d4aeu, 0x1d4b9u), Pair(0x1d4bbu, 0x1d4bbu), Pair(0x1d4bdu, 0x1d4c3u), Pair(0x1d4c5u, 0x1d505u), Pair(0x1d507u, 0x1d50au), Pair(0x1d50du, 0x1d514u), Pair(0x1d516u, 0x1d51cu), Pair(0x1d51eu, 0x1d539u), Pair(0x1d53bu, 0x1d53eu), Pair(0x1d540u, 0x1d544u), Pair(0x1d546u, 0x1d546u), Pair(0x1d54au, 0x1d550u), Pair(0x1d552u, 0x1d6a5u), Pair(0x1d6a8u, 0x1d7cbu), Pair(0x1d7ceu, 0x1d7ffu), Pair(0x1ec71u, 0x1ecb4u), Pair(0x1ed01u, 0x1ed3du), Pair(0x1f000u, 0x1f02bu), Pair(0x1f030u, 0x1f093u), Pair(0x1f0a0u, 0x1f0aeu), Pair(0x1f0b1u, 0x1f0bfu), Pair(0x1f0c1u, 0x1f0cfu), Pair(0x1f0d1u, 0x1f0f5u), Pair(0x1f100u, 0x1f1adu), Pair(0x1f1e6u, 0x1f1ffu), Pair(0x1f201u, 0x1f202u), Pair(0x1f210u, 0x1f23bu), Pair(0x1f240u, 0x1f248u), Pair(0x1f260u, 0x1f265u), Pair(0x1f300u, 0x1f6d7u), Pair(0x1f6dcu, 0x1f6ecu), Pair(0x1f6f0u, 0x1f6fcu), Pair(0x1f700u, 0x1f776u), Pair(0x1f77bu, 0x1f7d9u), Pair(0x1f7e0u, 0x1f7ebu), Pair(0x1f7f0u, 0x1f7f0u), Pair(0x1f800u, 0x1f80bu), Pair(0x1f810u, 0x1f847u), Pair(0x1f850u, 0x1f859u), Pair(0x1f860u, 0x1f887u), Pair(0x1f890u, 0x1f8adu), Pair(0x1f8b0u, 0x1f8bbu), Pair(0x1f8c0u, 0x1f8c1u), Pair(0x1f900u, 0x1fa53u), Pair(0x1fa60u, 0x1fa6du), Pair(0x1fa70u, 0x1fa7cu), Pair(0x1fa80u, 0x1fa89u), Pair(0x1fa8fu, 0x1fac6u), Pair(0x1faceu, 0x1fadcu), Pair(0x1fadfu, 0x1fae9u), Pair(0x1faf0u, 0x1faf8u), Pair(0x1fb00u, 0x1fb92u), Pair(0x1fb94u, 0x1fbf9u), Pair(0xe0001u, 0xe0001u), Pair(0xe0020u, 0xe007fu))
+internal val COMMON: List<Pair<UInt, UInt>> by lazy {
+    buildList(159) {
+        addAll(tableChunk0)
+        addAll(tableChunk1)
+    }
+}
 
 internal val COPTIC: List<Pair<UInt, UInt>> = listOf(Pair(0x00b7u, 0x00b7u), Pair(0x0300u, 0x0300u), Pair(0x0304u, 0x0305u), Pair(0x0307u, 0x0307u), Pair(0x0374u, 0x0375u), Pair(0x03e2u, 0x03efu), Pair(0x2c80u, 0x2cf3u), Pair(0x2cf9u, 0x2cffu), Pair(0x2e17u, 0x2e17u), Pair(0x102e0u, 0x102fbu))
 
@@ -179,167 +184,167 @@ internal val MASARAM_GONDI: List<Pair<UInt, UInt>> = listOf(Pair(0x0964u, 0x0965
 
 internal val MEDEFAIDRIN: List<Pair<UInt, UInt>> = listOf(Pair(0x16e40u, 0x16e9au))
 
-internal val MEETEI_MAYEK: List<Pair<UInt, UInt>> = listOf(Pair(0xaae0u, 0xaaf6u), Pair(0xabc0u, 0xabedu), Pair(0xabf0u, 0xabf9u))
+internal val MEETEI_MAYEK: List<Pair<UInt, UInt>> by lazy { tableChunk2 }
 
-internal val MENDE_KIKAKUI: List<Pair<UInt, UInt>> = listOf(Pair(0x1e800u, 0x1e8c4u), Pair(0x1e8c7u, 0x1e8d6u))
+internal val MENDE_KIKAKUI: List<Pair<UInt, UInt>> by lazy { tableChunk3 }
 
-internal val MEROITIC_CURSIVE: List<Pair<UInt, UInt>> = listOf(Pair(0x109a0u, 0x109b7u), Pair(0x109bcu, 0x109cfu), Pair(0x109d2u, 0x109ffu))
+internal val MEROITIC_CURSIVE: List<Pair<UInt, UInt>> by lazy { tableChunk4 }
 
-internal val MEROITIC_HIEROGLYPHS: List<Pair<UInt, UInt>> = listOf(Pair(0x205du, 0x205du), Pair(0x10980u, 0x1099fu))
+internal val MEROITIC_HIEROGLYPHS: List<Pair<UInt, UInt>> by lazy { tableChunk5 }
 
-internal val MIAO: List<Pair<UInt, UInt>> = listOf(Pair(0x16f00u, 0x16f4au), Pair(0x16f4fu, 0x16f87u), Pair(0x16f8fu, 0x16f9fu))
+internal val MIAO: List<Pair<UInt, UInt>> by lazy { tableChunk6 }
 
-internal val MODI: List<Pair<UInt, UInt>> = listOf(Pair(0xa830u, 0xa839u), Pair(0x11600u, 0x11644u), Pair(0x11650u, 0x11659u))
+internal val MODI: List<Pair<UInt, UInt>> by lazy { tableChunk7 }
 
-internal val MONGOLIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x1800u, 0x1819u), Pair(0x1820u, 0x1878u), Pair(0x1880u, 0x18aau), Pair(0x202fu, 0x202fu), Pair(0x3001u, 0x3002u), Pair(0x3008u, 0x300bu), Pair(0x11660u, 0x1166cu))
+internal val MONGOLIAN: List<Pair<UInt, UInt>> by lazy { tableChunk8 }
 
-internal val MRO: List<Pair<UInt, UInt>> = listOf(Pair(0x16a40u, 0x16a5eu), Pair(0x16a60u, 0x16a69u), Pair(0x16a6eu, 0x16a6fu))
+internal val MRO: List<Pair<UInt, UInt>> by lazy { tableChunk9 }
 
-internal val MULTANI: List<Pair<UInt, UInt>> = listOf(Pair(0x0a66u, 0x0a6fu), Pair(0x11280u, 0x11286u), Pair(0x11288u, 0x11288u), Pair(0x1128au, 0x1128du), Pair(0x1128fu, 0x1129du), Pair(0x1129fu, 0x112a9u))
+internal val MULTANI: List<Pair<UInt, UInt>> by lazy { tableChunk10 }
 
-internal val MYANMAR: List<Pair<UInt, UInt>> = listOf(Pair(0x1000u, 0x109fu), Pair(0xa92eu, 0xa92eu), Pair(0xa9e0u, 0xa9feu), Pair(0xaa60u, 0xaa7fu), Pair(0x116d0u, 0x116e3u))
+internal val MYANMAR: List<Pair<UInt, UInt>> by lazy { tableChunk11 }
 
-internal val NABATAEAN: List<Pair<UInt, UInt>> = listOf(Pair(0x10880u, 0x1089eu), Pair(0x108a7u, 0x108afu))
+internal val NABATAEAN: List<Pair<UInt, UInt>> by lazy { tableChunk12 }
 
 internal val NAG_MUNDARI: List<Pair<UInt, UInt>> = listOf(Pair(0x1e4d0u, 0x1e4f9u))
 
-internal val NANDINAGARI: List<Pair<UInt, UInt>> = listOf(Pair(0x0964u, 0x0965u), Pair(0x0ce6u, 0x0cefu), Pair(0x1ce9u, 0x1ce9u), Pair(0x1cf2u, 0x1cf2u), Pair(0x1cfau, 0x1cfau), Pair(0xa830u, 0xa835u), Pair(0x119a0u, 0x119a7u), Pair(0x119aau, 0x119d7u), Pair(0x119dau, 0x119e4u))
+internal val NANDINAGARI: List<Pair<UInt, UInt>> by lazy { tableChunk13 }
 
-internal val NEW_TAI_LUE: List<Pair<UInt, UInt>> = listOf(Pair(0x1980u, 0x19abu), Pair(0x19b0u, 0x19c9u), Pair(0x19d0u, 0x19dau), Pair(0x19deu, 0x19dfu))
+internal val NEW_TAI_LUE: List<Pair<UInt, UInt>> by lazy { tableChunk14 }
 
-internal val NEWA: List<Pair<UInt, UInt>> = listOf(Pair(0x11400u, 0x1145bu), Pair(0x1145du, 0x11461u))
+internal val NEWA: List<Pair<UInt, UInt>> by lazy { tableChunk15 }
 
-internal val NKO: List<Pair<UInt, UInt>> = listOf(Pair(0x060cu, 0x060cu), Pair(0x061bu, 0x061bu), Pair(0x061fu, 0x061fu), Pair(0x07c0u, 0x07fau), Pair(0x07fdu, 0x07ffu), Pair(0xfd3eu, 0xfd3fu))
+internal val NKO: List<Pair<UInt, UInt>> by lazy { tableChunk16 }
 
-internal val NUSHU: List<Pair<UInt, UInt>> = listOf(Pair(0x16fe1u, 0x16fe1u), Pair(0x1b170u, 0x1b2fbu))
+internal val NUSHU: List<Pair<UInt, UInt>> by lazy { tableChunk17 }
 
-internal val NYIAKENG_PUACHUE_HMONG: List<Pair<UInt, UInt>> = listOf(Pair(0x1e100u, 0x1e12cu), Pair(0x1e130u, 0x1e13du), Pair(0x1e140u, 0x1e149u), Pair(0x1e14eu, 0x1e14fu))
+internal val NYIAKENG_PUACHUE_HMONG: List<Pair<UInt, UInt>> by lazy { tableChunk18 }
 
-internal val OGHAM: List<Pair<UInt, UInt>> = listOf(Pair(0x1680u, 0x169cu))
+internal val OGHAM: List<Pair<UInt, UInt>> by lazy { tableChunk19 }
 
-internal val OL_CHIKI: List<Pair<UInt, UInt>> = listOf(Pair(0x1c50u, 0x1c7fu))
+internal val OL_CHIKI: List<Pair<UInt, UInt>> by lazy { tableChunk20 }
 
-internal val OL_ONAL: List<Pair<UInt, UInt>> = listOf(Pair(0x0964u, 0x0965u), Pair(0x1e5d0u, 0x1e5fau), Pair(0x1e5ffu, 0x1e5ffu))
+internal val OL_ONAL: List<Pair<UInt, UInt>> by lazy { tableChunk21 }
 
-internal val OLD_HUNGARIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x205au, 0x205au), Pair(0x205du, 0x205du), Pair(0x2e31u, 0x2e31u), Pair(0x2e41u, 0x2e41u), Pair(0x10c80u, 0x10cb2u), Pair(0x10cc0u, 0x10cf2u), Pair(0x10cfau, 0x10cffu))
+internal val OLD_HUNGARIAN: List<Pair<UInt, UInt>> by lazy { tableChunk22 }
 
-internal val OLD_ITALIC: List<Pair<UInt, UInt>> = listOf(Pair(0x10300u, 0x10323u), Pair(0x1032du, 0x1032fu))
+internal val OLD_ITALIC: List<Pair<UInt, UInt>> by lazy { tableChunk23 }
 
-internal val OLD_NORTH_ARABIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x10a80u, 0x10a9fu))
+internal val OLD_NORTH_ARABIAN: List<Pair<UInt, UInt>> by lazy { tableChunk24 }
 
-internal val OLD_PERMIC: List<Pair<UInt, UInt>> = listOf(Pair(0x00b7u, 0x00b7u), Pair(0x0300u, 0x0300u), Pair(0x0306u, 0x0308u), Pair(0x0313u, 0x0313u), Pair(0x0483u, 0x0483u), Pair(0x10350u, 0x1037au))
+internal val OLD_PERMIC: List<Pair<UInt, UInt>> by lazy { tableChunk25 }
 
-internal val OLD_PERSIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x103a0u, 0x103c3u), Pair(0x103c8u, 0x103d5u))
+internal val OLD_PERSIAN: List<Pair<UInt, UInt>> by lazy { tableChunk26 }
 
-internal val OLD_SOGDIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x10f00u, 0x10f27u))
+internal val OLD_SOGDIAN: List<Pair<UInt, UInt>> by lazy { tableChunk27 }
 
-internal val OLD_SOUTH_ARABIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x10a60u, 0x10a7fu))
+internal val OLD_SOUTH_ARABIAN: List<Pair<UInt, UInt>> by lazy { tableChunk28 }
 
-internal val OLD_TURKIC: List<Pair<UInt, UInt>> = listOf(Pair(0x205au, 0x205au), Pair(0x2e30u, 0x2e30u), Pair(0x10c00u, 0x10c48u))
+internal val OLD_TURKIC: List<Pair<UInt, UInt>> by lazy { tableChunk29 }
 
-internal val OLD_UYGHUR: List<Pair<UInt, UInt>> = listOf(Pair(0x0640u, 0x0640u), Pair(0x10af2u, 0x10af2u), Pair(0x10f70u, 0x10f89u))
+internal val OLD_UYGHUR: List<Pair<UInt, UInt>> by lazy { tableChunk30 }
 
-internal val ORIYA: List<Pair<UInt, UInt>> = listOf(Pair(0x0951u, 0x0952u), Pair(0x0964u, 0x0965u), Pair(0x0b01u, 0x0b03u), Pair(0x0b05u, 0x0b0cu), Pair(0x0b0fu, 0x0b10u), Pair(0x0b13u, 0x0b28u), Pair(0x0b2au, 0x0b30u), Pair(0x0b32u, 0x0b33u), Pair(0x0b35u, 0x0b39u), Pair(0x0b3cu, 0x0b44u), Pair(0x0b47u, 0x0b48u), Pair(0x0b4bu, 0x0b4du), Pair(0x0b55u, 0x0b57u), Pair(0x0b5cu, 0x0b5du), Pair(0x0b5fu, 0x0b63u), Pair(0x0b66u, 0x0b77u), Pair(0x1cdau, 0x1cdau), Pair(0x1cf2u, 0x1cf2u))
+internal val ORIYA: List<Pair<UInt, UInt>> by lazy { tableChunk31 }
 
-internal val OSAGE: List<Pair<UInt, UInt>> = listOf(Pair(0x0301u, 0x0301u), Pair(0x0304u, 0x0304u), Pair(0x030bu, 0x030bu), Pair(0x0358u, 0x0358u), Pair(0x104b0u, 0x104d3u), Pair(0x104d8u, 0x104fbu))
+internal val OSAGE: List<Pair<UInt, UInt>> by lazy { tableChunk32 }
 
-internal val OSMANYA: List<Pair<UInt, UInt>> = listOf(Pair(0x10480u, 0x1049du), Pair(0x104a0u, 0x104a9u))
+internal val OSMANYA: List<Pair<UInt, UInt>> by lazy { tableChunk33 }
 
-internal val PAHAWH_HMONG: List<Pair<UInt, UInt>> = listOf(Pair(0x16b00u, 0x16b45u), Pair(0x16b50u, 0x16b59u), Pair(0x16b5bu, 0x16b61u), Pair(0x16b63u, 0x16b77u), Pair(0x16b7du, 0x16b8fu))
+internal val PAHAWH_HMONG: List<Pair<UInt, UInt>> by lazy { tableChunk34 }
 
-internal val PALMYRENE: List<Pair<UInt, UInt>> = listOf(Pair(0x10860u, 0x1087fu))
+internal val PALMYRENE: List<Pair<UInt, UInt>> by lazy { tableChunk35 }
 
-internal val PAU_CIN_HAU: List<Pair<UInt, UInt>> = listOf(Pair(0x11ac0u, 0x11af8u))
+internal val PAU_CIN_HAU: List<Pair<UInt, UInt>> by lazy { tableChunk36 }
 
-internal val PHAGS_PA: List<Pair<UInt, UInt>> = listOf(Pair(0x1802u, 0x1803u), Pair(0x1805u, 0x1805u), Pair(0x202fu, 0x202fu), Pair(0x3002u, 0x3002u), Pair(0xa840u, 0xa877u))
+internal val PHAGS_PA: List<Pair<UInt, UInt>> by lazy { tableChunk37 }
 
-internal val PHOENICIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x10900u, 0x1091bu), Pair(0x1091fu, 0x1091fu))
+internal val PHOENICIAN: List<Pair<UInt, UInt>> by lazy { tableChunk38 }
 
-internal val PSALTER_PAHLAVI: List<Pair<UInt, UInt>> = listOf(Pair(0x0640u, 0x0640u), Pair(0x10b80u, 0x10b91u), Pair(0x10b99u, 0x10b9cu), Pair(0x10ba9u, 0x10bafu))
+internal val PSALTER_PAHLAVI: List<Pair<UInt, UInt>> by lazy { tableChunk39 }
 
-internal val REJANG: List<Pair<UInt, UInt>> = listOf(Pair(0xa930u, 0xa953u), Pair(0xa95fu, 0xa95fu))
+internal val REJANG: List<Pair<UInt, UInt>> by lazy { tableChunk40 }
 
-internal val RUNIC: List<Pair<UInt, UInt>> = listOf(Pair(0x16a0u, 0x16f8u))
+internal val RUNIC: List<Pair<UInt, UInt>> by lazy { tableChunk41 }
 
-internal val SAMARITAN: List<Pair<UInt, UInt>> = listOf(Pair(0x0800u, 0x082du), Pair(0x0830u, 0x083eu), Pair(0x2e31u, 0x2e31u))
+internal val SAMARITAN: List<Pair<UInt, UInt>> by lazy { tableChunk42 }
 
-internal val SAURASHTRA: List<Pair<UInt, UInt>> = listOf(Pair(0xa880u, 0xa8c5u), Pair(0xa8ceu, 0xa8d9u))
+internal val SAURASHTRA: List<Pair<UInt, UInt>> by lazy { tableChunk43 }
 
-internal val SHARADA: List<Pair<UInt, UInt>> = listOf(Pair(0x0951u, 0x0951u), Pair(0x1cd7u, 0x1cd7u), Pair(0x1cd9u, 0x1cd9u), Pair(0x1cdcu, 0x1cddu), Pair(0x1ce0u, 0x1ce0u), Pair(0xa830u, 0xa835u), Pair(0xa838u, 0xa838u), Pair(0x11180u, 0x111dfu))
+internal val SHARADA: List<Pair<UInt, UInt>> by lazy { tableChunk44 }
 
-internal val SHAVIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x00b7u, 0x00b7u), Pair(0x10450u, 0x1047fu))
+internal val SHAVIAN: List<Pair<UInt, UInt>> by lazy { tableChunk45 }
 
-internal val SIDDHAM: List<Pair<UInt, UInt>> = listOf(Pair(0x11580u, 0x115b5u), Pair(0x115b8u, 0x115ddu))
+internal val SIDDHAM: List<Pair<UInt, UInt>> by lazy { tableChunk46 }
 
-internal val SIGNWRITING: List<Pair<UInt, UInt>> = listOf(Pair(0x1d800u, 0x1da8bu), Pair(0x1da9bu, 0x1da9fu), Pair(0x1daa1u, 0x1daafu))
+internal val SIGNWRITING: List<Pair<UInt, UInt>> by lazy { tableChunk47 }
 
-internal val SINHALA: List<Pair<UInt, UInt>> = listOf(Pair(0x0964u, 0x0965u), Pair(0x0d81u, 0x0d83u), Pair(0x0d85u, 0x0d96u), Pair(0x0d9au, 0x0db1u), Pair(0x0db3u, 0x0dbbu), Pair(0x0dbdu, 0x0dbdu), Pair(0x0dc0u, 0x0dc6u), Pair(0x0dcau, 0x0dcau), Pair(0x0dcfu, 0x0dd4u), Pair(0x0dd6u, 0x0dd6u), Pair(0x0dd8u, 0x0ddfu), Pair(0x0de6u, 0x0defu), Pair(0x0df2u, 0x0df4u), Pair(0x1cf2u, 0x1cf2u), Pair(0x111e1u, 0x111f4u))
+internal val SINHALA: List<Pair<UInt, UInt>> by lazy { tableChunk48 }
 
-internal val SOGDIAN: List<Pair<UInt, UInt>> = listOf(Pair(0x0640u, 0x0640u), Pair(0x10f30u, 0x10f59u))
+internal val SOGDIAN: List<Pair<UInt, UInt>> by lazy { tableChunk49 }
 
-internal val SORA_SOMPENG: List<Pair<UInt, UInt>> = listOf(Pair(0x110d0u, 0x110e8u), Pair(0x110f0u, 0x110f9u))
+internal val SORA_SOMPENG: List<Pair<UInt, UInt>> by lazy { tableChunk50 }
 
-internal val SOYOMBO: List<Pair<UInt, UInt>> = listOf(Pair(0x11a50u, 0x11aa2u))
+internal val SOYOMBO: List<Pair<UInt, UInt>> by lazy { tableChunk51 }
 
-internal val SUNDANESE: List<Pair<UInt, UInt>> = listOf(Pair(0x1b80u, 0x1bbfu), Pair(0x1cc0u, 0x1cc7u))
+internal val SUNDANESE: List<Pair<UInt, UInt>> by lazy { tableChunk52 }
 
-internal val SUNUWAR: List<Pair<UInt, UInt>> = listOf(Pair(0x0300u, 0x0301u), Pair(0x0303u, 0x0303u), Pair(0x030du, 0x030du), Pair(0x0310u, 0x0310u), Pair(0x032du, 0x032du), Pair(0x0331u, 0x0331u), Pair(0x11bc0u, 0x11be1u), Pair(0x11bf0u, 0x11bf9u))
+internal val SUNUWAR: List<Pair<UInt, UInt>> by lazy { tableChunk53 }
 
-internal val SYLOTI_NAGRI: List<Pair<UInt, UInt>> = listOf(Pair(0x0964u, 0x0965u), Pair(0x09e6u, 0x09efu), Pair(0xa800u, 0xa82cu))
+internal val SYLOTI_NAGRI: List<Pair<UInt, UInt>> by lazy { tableChunk54 }
 
-internal val SYRIAC: List<Pair<UInt, UInt>> = listOf(Pair(0x0303u, 0x0304u), Pair(0x0307u, 0x0308u), Pair(0x030au, 0x030au), Pair(0x0320u, 0x0320u), Pair(0x0323u, 0x0325u), Pair(0x032du, 0x032eu), Pair(0x0330u, 0x0330u), Pair(0x060cu, 0x060cu), Pair(0x061bu, 0x061cu), Pair(0x061fu, 0x061fu), Pair(0x0640u, 0x0640u), Pair(0x064bu, 0x0655u), Pair(0x0670u, 0x0670u), Pair(0x0700u, 0x070du), Pair(0x070fu, 0x074au), Pair(0x074du, 0x074fu), Pair(0x0860u, 0x086au), Pair(0x1df8u, 0x1df8u), Pair(0x1dfau, 0x1dfau))
+internal val SYRIAC: List<Pair<UInt, UInt>> by lazy { tableChunk55 }
 
-internal val TAGALOG: List<Pair<UInt, UInt>> = listOf(Pair(0x1700u, 0x1715u), Pair(0x171fu, 0x171fu), Pair(0x1735u, 0x1736u))
+internal val TAGALOG: List<Pair<UInt, UInt>> by lazy { tableChunk56 }
 
-internal val TAGBANWA: List<Pair<UInt, UInt>> = listOf(Pair(0x1735u, 0x1736u), Pair(0x1760u, 0x176cu), Pair(0x176eu, 0x1770u), Pair(0x1772u, 0x1773u))
+internal val TAGBANWA: List<Pair<UInt, UInt>> by lazy { tableChunk57 }
 
-internal val TAI_LE: List<Pair<UInt, UInt>> = listOf(Pair(0x0300u, 0x0301u), Pair(0x0307u, 0x0308u), Pair(0x030cu, 0x030cu), Pair(0x1040u, 0x1049u), Pair(0x1950u, 0x196du), Pair(0x1970u, 0x1974u))
+internal val TAI_LE: List<Pair<UInt, UInt>> by lazy { tableChunk58 }
 
-internal val TAI_THAM: List<Pair<UInt, UInt>> = listOf(Pair(0x1a20u, 0x1a5eu), Pair(0x1a60u, 0x1a7cu), Pair(0x1a7fu, 0x1a89u), Pair(0x1a90u, 0x1a99u), Pair(0x1aa0u, 0x1aadu))
+internal val TAI_THAM: List<Pair<UInt, UInt>> by lazy { tableChunk59 }
 
-internal val TAI_VIET: List<Pair<UInt, UInt>> = listOf(Pair(0xaa80u, 0xaac2u), Pair(0xaadbu, 0xaadfu))
+internal val TAI_VIET: List<Pair<UInt, UInt>> by lazy { tableChunk60 }
 
-internal val TAKRI: List<Pair<UInt, UInt>> = listOf(Pair(0x0964u, 0x0965u), Pair(0xa830u, 0xa839u), Pair(0x11680u, 0x116b9u), Pair(0x116c0u, 0x116c9u))
+internal val TAKRI: List<Pair<UInt, UInt>> by lazy { tableChunk61 }
 
-internal val TAMIL: List<Pair<UInt, UInt>> = listOf(Pair(0x0951u, 0x0952u), Pair(0x0964u, 0x0965u), Pair(0x0b82u, 0x0b83u), Pair(0x0b85u, 0x0b8au), Pair(0x0b8eu, 0x0b90u), Pair(0x0b92u, 0x0b95u), Pair(0x0b99u, 0x0b9au), Pair(0x0b9cu, 0x0b9cu), Pair(0x0b9eu, 0x0b9fu), Pair(0x0ba3u, 0x0ba4u), Pair(0x0ba8u, 0x0baau), Pair(0x0baeu, 0x0bb9u), Pair(0x0bbeu, 0x0bc2u), Pair(0x0bc6u, 0x0bc8u), Pair(0x0bcau, 0x0bcdu), Pair(0x0bd0u, 0x0bd0u), Pair(0x0bd7u, 0x0bd7u), Pair(0x0be6u, 0x0bfau), Pair(0x1cdau, 0x1cdau), Pair(0xa8f3u, 0xa8f3u), Pair(0x11301u, 0x11301u), Pair(0x11303u, 0x11303u), Pair(0x1133bu, 0x1133cu), Pair(0x11fc0u, 0x11ff1u), Pair(0x11fffu, 0x11fffu))
+internal val TAMIL: List<Pair<UInt, UInt>> by lazy { tableChunk62 }
 
-internal val TANGSA: List<Pair<UInt, UInt>> = listOf(Pair(0x16a70u, 0x16abeu), Pair(0x16ac0u, 0x16ac9u))
+internal val TANGSA: List<Pair<UInt, UInt>> by lazy { tableChunk63 }
 
-internal val TANGUT: List<Pair<UInt, UInt>> = listOf(Pair(0x2ff0u, 0x2fffu), Pair(0x31efu, 0x31efu), Pair(0x16fe0u, 0x16fe0u), Pair(0x17000u, 0x187f7u), Pair(0x18800u, 0x18affu), Pair(0x18d00u, 0x18d08u))
+internal val TANGUT: List<Pair<UInt, UInt>> by lazy { tableChunk64 }
 
-internal val TELUGU: List<Pair<UInt, UInt>> = listOf(Pair(0x0951u, 0x0952u), Pair(0x0964u, 0x0965u), Pair(0x0c00u, 0x0c0cu), Pair(0x0c0eu, 0x0c10u), Pair(0x0c12u, 0x0c28u), Pair(0x0c2au, 0x0c39u), Pair(0x0c3cu, 0x0c44u), Pair(0x0c46u, 0x0c48u), Pair(0x0c4au, 0x0c4du), Pair(0x0c55u, 0x0c56u), Pair(0x0c58u, 0x0c5au), Pair(0x0c5du, 0x0c5du), Pair(0x0c60u, 0x0c63u), Pair(0x0c66u, 0x0c6fu), Pair(0x0c77u, 0x0c7fu), Pair(0x1cdau, 0x1cdau), Pair(0x1cf2u, 0x1cf2u))
+internal val TELUGU: List<Pair<UInt, UInt>> by lazy { tableChunk65 }
 
-internal val THAANA: List<Pair<UInt, UInt>> = listOf(Pair(0x060cu, 0x060cu), Pair(0x061bu, 0x061cu), Pair(0x061fu, 0x061fu), Pair(0x0660u, 0x0669u), Pair(0x0780u, 0x07b1u), Pair(0xfdf2u, 0xfdf2u), Pair(0xfdfdu, 0xfdfdu))
+internal val THAANA: List<Pair<UInt, UInt>> by lazy { tableChunk66 }
 
-internal val THAI: List<Pair<UInt, UInt>> = listOf(Pair(0x02bcu, 0x02bcu), Pair(0x02d7u, 0x02d7u), Pair(0x0303u, 0x0303u), Pair(0x0331u, 0x0331u), Pair(0x0e01u, 0x0e3au), Pair(0x0e40u, 0x0e5bu))
+internal val THAI: List<Pair<UInt, UInt>> by lazy { tableChunk67 }
 
-internal val TIBETAN: List<Pair<UInt, UInt>> = listOf(Pair(0x0f00u, 0x0f47u), Pair(0x0f49u, 0x0f6cu), Pair(0x0f71u, 0x0f97u), Pair(0x0f99u, 0x0fbcu), Pair(0x0fbeu, 0x0fccu), Pair(0x0fceu, 0x0fd4u), Pair(0x0fd9u, 0x0fdau), Pair(0x3008u, 0x300bu))
+internal val TIBETAN: List<Pair<UInt, UInt>> by lazy { tableChunk68 }
 
-internal val TIFINAGH: List<Pair<UInt, UInt>> = listOf(Pair(0x0302u, 0x0302u), Pair(0x0304u, 0x0304u), Pair(0x0307u, 0x0307u), Pair(0x0309u, 0x0309u), Pair(0x2d30u, 0x2d67u), Pair(0x2d6fu, 0x2d70u), Pair(0x2d7fu, 0x2d7fu))
+internal val TIFINAGH: List<Pair<UInt, UInt>> by lazy { tableChunk69 }
 
-internal val TIRHUTA: List<Pair<UInt, UInt>> = listOf(Pair(0x0951u, 0x0952u), Pair(0x0964u, 0x0965u), Pair(0x1cf2u, 0x1cf2u), Pair(0xa830u, 0xa839u), Pair(0x11480u, 0x114c7u), Pair(0x114d0u, 0x114d9u))
+internal val TIRHUTA: List<Pair<UInt, UInt>> by lazy { tableChunk70 }
 
-internal val TODHRI: List<Pair<UInt, UInt>> = listOf(Pair(0x0301u, 0x0301u), Pair(0x0304u, 0x0304u), Pair(0x0307u, 0x0307u), Pair(0x0311u, 0x0311u), Pair(0x0313u, 0x0313u), Pair(0x035eu, 0x035eu), Pair(0x105c0u, 0x105f3u))
+internal val TODHRI: List<Pair<UInt, UInt>> by lazy { tableChunk71 }
 
-internal val TOTO: List<Pair<UInt, UInt>> = listOf(Pair(0x02bcu, 0x02bcu), Pair(0x1e290u, 0x1e2aeu))
+internal val TOTO: List<Pair<UInt, UInt>> by lazy { tableChunk72 }
 
-internal val TULU_TIGALARI: List<Pair<UInt, UInt>> = listOf(Pair(0x0ce6u, 0x0cefu), Pair(0x1cf2u, 0x1cf2u), Pair(0x1cf4u, 0x1cf4u), Pair(0xa830u, 0xa835u), Pair(0xa8f1u, 0xa8f1u), Pair(0x11380u, 0x11389u), Pair(0x1138bu, 0x1138bu), Pair(0x1138eu, 0x1138eu), Pair(0x11390u, 0x113b5u), Pair(0x113b7u, 0x113c0u), Pair(0x113c2u, 0x113c2u), Pair(0x113c5u, 0x113c5u), Pair(0x113c7u, 0x113cau), Pair(0x113ccu, 0x113d5u), Pair(0x113d7u, 0x113d8u), Pair(0x113e1u, 0x113e2u))
+internal val TULU_TIGALARI: List<Pair<UInt, UInt>> by lazy { tableChunk73 }
 
-internal val UGARITIC: List<Pair<UInt, UInt>> = listOf(Pair(0x10380u, 0x1039du), Pair(0x1039fu, 0x1039fu))
+internal val UGARITIC: List<Pair<UInt, UInt>> by lazy { tableChunk74 }
 
-internal val VAI: List<Pair<UInt, UInt>> = listOf(Pair(0xa500u, 0xa62bu))
+internal val VAI: List<Pair<UInt, UInt>> by lazy { tableChunk75 }
 
-internal val VITHKUQI: List<Pair<UInt, UInt>> = listOf(Pair(0x10570u, 0x1057au), Pair(0x1057cu, 0x1058au), Pair(0x1058cu, 0x10592u), Pair(0x10594u, 0x10595u), Pair(0x10597u, 0x105a1u), Pair(0x105a3u, 0x105b1u), Pair(0x105b3u, 0x105b9u), Pair(0x105bbu, 0x105bcu))
+internal val VITHKUQI: List<Pair<UInt, UInt>> by lazy { tableChunk76 }
 
-internal val WANCHO: List<Pair<UInt, UInt>> = listOf(Pair(0x1e2c0u, 0x1e2f9u), Pair(0x1e2ffu, 0x1e2ffu))
+internal val WANCHO: List<Pair<UInt, UInt>> by lazy { tableChunk77 }
 
-internal val WARANG_CITI: List<Pair<UInt, UInt>> = listOf(Pair(0x118a0u, 0x118f2u), Pair(0x118ffu, 0x118ffu))
+internal val WARANG_CITI: List<Pair<UInt, UInt>> by lazy { tableChunk78 }
 
-internal val YEZIDI: List<Pair<UInt, UInt>> = listOf(Pair(0x060cu, 0x060cu), Pair(0x061bu, 0x061bu), Pair(0x061fu, 0x061fu), Pair(0x0660u, 0x0669u), Pair(0x10e80u, 0x10ea9u), Pair(0x10eabu, 0x10eadu), Pair(0x10eb0u, 0x10eb1u))
+internal val YEZIDI: List<Pair<UInt, UInt>> by lazy { tableChunk79 }
 
-internal val YI: List<Pair<UInt, UInt>> = listOf(Pair(0x3001u, 0x3002u), Pair(0x3008u, 0x3011u), Pair(0x3014u, 0x301bu), Pair(0x30fbu, 0x30fbu), Pair(0xa000u, 0xa48cu), Pair(0xa490u, 0xa4c6u), Pair(0xff61u, 0xff65u))
+internal val YI: List<Pair<UInt, UInt>> by lazy { tableChunk80 }
 
-internal val ZANABAZAR_SQUARE: List<Pair<UInt, UInt>> = listOf(Pair(0x11a00u, 0x11a47u))
+internal val ZANABAZAR_SQUARE: List<Pair<UInt, UInt>> by lazy { tableChunk81 }
 
 // DO NOT EDIT THIS FILE. IT WAS AUTOMATICALLY GENERATED BY:
 //
@@ -348,4 +353,180 @@ internal val ZANABAZAR_SQUARE: List<Pair<UInt, UInt>> = listOf(Pair(0x11a00u, 0x
 // Unicode version: 16.0.0.
 //
 // ucd-generate 0.3.1 is available on crates.io.
-internal val BY_NAME: List<Pair<String, List<Pair<UInt, UInt>>>> = listOf(Pair("Adlam", ADLAM), Pair("Ahom", AHOM), Pair("Anatolian_Hieroglyphs", ANATOLIAN_HIEROGLYPHS), Pair("Arabic", ARABIC), Pair("Armenian", ARMENIAN), Pair("Avestan", AVESTAN), Pair("Balinese", BALINESE), Pair("Bamum", BAMUM), Pair("Bassa_Vah", BASSA_VAH), Pair("Batak", BATAK), Pair("Bengali", BENGALI), Pair("Bhaiksuki", BHAIKSUKI), Pair("Bopomofo", BOPOMOFO), Pair("Brahmi", BRAHMI), Pair("Braille", BRAILLE), Pair("Buginese", BUGINESE), Pair("Buhid", BUHID), Pair("Canadian_Aboriginal", CANADIAN_ABORIGINAL), Pair("Carian", CARIAN), Pair("Caucasian_Albanian", CAUCASIAN_ALBANIAN), Pair("Chakma", CHAKMA), Pair("Cham", CHAM), Pair("Cherokee", CHEROKEE), Pair("Chorasmian", CHORASMIAN), Pair("Common", COMMON), Pair("Coptic", COPTIC), Pair("Cuneiform", CUNEIFORM), Pair("Cypriot", CYPRIOT), Pair("Cypro_Minoan", CYPRO_MINOAN), Pair("Cyrillic", CYRILLIC), Pair("Deseret", DESERET), Pair("Devanagari", DEVANAGARI), Pair("Dives_Akuru", DIVES_AKURU), Pair("Dogra", DOGRA), Pair("Duployan", DUPLOYAN), Pair("Egyptian_Hieroglyphs", EGYPTIAN_HIEROGLYPHS), Pair("Elbasan", ELBASAN), Pair("Elymaic", ELYMAIC), Pair("Ethiopic", ETHIOPIC), Pair("Garay", GARAY), Pair("Georgian", GEORGIAN), Pair("Glagolitic", GLAGOLITIC), Pair("Gothic", GOTHIC), Pair("Grantha", GRANTHA), Pair("Greek", GREEK), Pair("Gujarati", GUJARATI), Pair("Gunjala_Gondi", GUNJALA_GONDI), Pair("Gurmukhi", GURMUKHI), Pair("Gurung_Khema", GURUNG_KHEMA), Pair("Han", HAN), Pair("Hangul", HANGUL), Pair("Hanifi_Rohingya", HANIFI_ROHINGYA), Pair("Hanunoo", HANUNOO), Pair("Hatran", HATRAN), Pair("Hebrew", HEBREW), Pair("Hiragana", HIRAGANA), Pair("Imperial_Aramaic", IMPERIAL_ARAMAIC), Pair("Inherited", INHERITED), Pair("Inscriptional_Pahlavi", INSCRIPTIONAL_PAHLAVI), Pair("Inscriptional_Parthian", INSCRIPTIONAL_PARTHIAN), Pair("Javanese", JAVANESE), Pair("Kaithi", KAITHI), Pair("Kannada", KANNADA), Pair("Katakana", KATAKANA), Pair("Kawi", KAWI), Pair("Kayah_Li", KAYAH_LI), Pair("Kharoshthi", KHAROSHTHI), Pair("Khitan_Small_Script", KHITAN_SMALL_SCRIPT), Pair("Khmer", KHMER), Pair("Khojki", KHOJKI), Pair("Khudawadi", KHUDAWADI), Pair("Kirat_Rai", KIRAT_RAI), Pair("Lao", LAO), Pair("Latin", LATIN), Pair("Lepcha", LEPCHA), Pair("Limbu", LIMBU), Pair("Linear_A", LINEAR_A), Pair("Linear_B", LINEAR_B), Pair("Lisu", LISU), Pair("Lycian", LYCIAN), Pair("Lydian", LYDIAN), Pair("Mahajani", MAHAJANI), Pair("Makasar", MAKASAR), Pair("Malayalam", MALAYALAM), Pair("Mandaic", MANDAIC), Pair("Manichaean", MANICHAEAN), Pair("Marchen", MARCHEN), Pair("Masaram_Gondi", MASARAM_GONDI), Pair("Medefaidrin", MEDEFAIDRIN), Pair("Meetei_Mayek", MEETEI_MAYEK), Pair("Mende_Kikakui", MENDE_KIKAKUI), Pair("Meroitic_Cursive", MEROITIC_CURSIVE), Pair("Meroitic_Hieroglyphs", MEROITIC_HIEROGLYPHS), Pair("Miao", MIAO), Pair("Modi", MODI), Pair("Mongolian", MONGOLIAN), Pair("Mro", MRO), Pair("Multani", MULTANI), Pair("Myanmar", MYANMAR), Pair("Nabataean", NABATAEAN), Pair("Nag_Mundari", NAG_MUNDARI), Pair("Nandinagari", NANDINAGARI), Pair("New_Tai_Lue", NEW_TAI_LUE), Pair("Newa", NEWA), Pair("Nko", NKO), Pair("Nushu", NUSHU), Pair("Nyiakeng_Puachue_Hmong", NYIAKENG_PUACHUE_HMONG), Pair("Ogham", OGHAM), Pair("Ol_Chiki", OL_CHIKI), Pair("Ol_Onal", OL_ONAL), Pair("Old_Hungarian", OLD_HUNGARIAN), Pair("Old_Italic", OLD_ITALIC), Pair("Old_North_Arabian", OLD_NORTH_ARABIAN), Pair("Old_Permic", OLD_PERMIC), Pair("Old_Persian", OLD_PERSIAN), Pair("Old_Sogdian", OLD_SOGDIAN), Pair("Old_South_Arabian", OLD_SOUTH_ARABIAN), Pair("Old_Turkic", OLD_TURKIC), Pair("Old_Uyghur", OLD_UYGHUR), Pair("Oriya", ORIYA), Pair("Osage", OSAGE), Pair("Osmanya", OSMANYA), Pair("Pahawh_Hmong", PAHAWH_HMONG), Pair("Palmyrene", PALMYRENE), Pair("Pau_Cin_Hau", PAU_CIN_HAU), Pair("Phags_Pa", PHAGS_PA), Pair("Phoenician", PHOENICIAN), Pair("Psalter_Pahlavi", PSALTER_PAHLAVI), Pair("Rejang", REJANG), Pair("Runic", RUNIC), Pair("Samaritan", SAMARITAN), Pair("Saurashtra", SAURASHTRA), Pair("Sharada", SHARADA), Pair("Shavian", SHAVIAN), Pair("Siddham", SIDDHAM), Pair("SignWriting", SIGNWRITING), Pair("Sinhala", SINHALA), Pair("Sogdian", SOGDIAN), Pair("Sora_Sompeng", SORA_SOMPENG), Pair("Soyombo", SOYOMBO), Pair("Sundanese", SUNDANESE), Pair("Sunuwar", SUNUWAR), Pair("Syloti_Nagri", SYLOTI_NAGRI), Pair("Syriac", SYRIAC), Pair("Tagalog", TAGALOG), Pair("Tagbanwa", TAGBANWA), Pair("Tai_Le", TAI_LE), Pair("Tai_Tham", TAI_THAM), Pair("Tai_Viet", TAI_VIET), Pair("Takri", TAKRI), Pair("Tamil", TAMIL), Pair("Tangsa", TANGSA), Pair("Tangut", TANGUT), Pair("Telugu", TELUGU), Pair("Thaana", THAANA), Pair("Thai", THAI), Pair("Tibetan", TIBETAN), Pair("Tifinagh", TIFINAGH), Pair("Tirhuta", TIRHUTA), Pair("Todhri", TODHRI), Pair("Toto", TOTO), Pair("Tulu_Tigalari", TULU_TIGALARI), Pair("Ugaritic", UGARITIC), Pair("Vai", VAI), Pair("Vithkuqi", VITHKUQI), Pair("Wancho", WANCHO), Pair("Warang_Citi", WARANG_CITI), Pair("Yezidi", YEZIDI), Pair("Yi", YI), Pair("Zanabazar_Square", ZANABAZAR_SQUARE))
+internal val BY_NAME: List<Pair<String, List<Pair<UInt, UInt>>>> by lazy {
+    buildList(170) {
+        addAll(tableChunk82)
+        addAll(tableChunk83)
+        addAll(tableChunk84)
+    }
+}
+
+private val tableChunk0: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0000u, 0x0040u), Pair(0x005bu, 0x0060u), Pair(0x007bu, 0x00a9u), Pair(0x00abu, 0x00b6u), Pair(0x00b8u, 0x00b9u), Pair(0x00bbu, 0x00bfu), Pair(0x00d7u, 0x00d7u), Pair(0x00f7u, 0x00f7u), Pair(0x02b9u, 0x02bbu), Pair(0x02bdu, 0x02c6u), Pair(0x02c8u, 0x02c8u), Pair(0x02ccu, 0x02ccu), Pair(0x02ceu, 0x02d6u), Pair(0x02d8u, 0x02d8u), Pair(0x02dau, 0x02dfu), Pair(0x02e5u, 0x02e9u), Pair(0x02ecu, 0x02ffu), Pair(0x037eu, 0x037eu), Pair(0x0385u, 0x0385u), Pair(0x0387u, 0x0387u), Pair(0x0605u, 0x0605u), Pair(0x06ddu, 0x06ddu), Pair(0x08e2u, 0x08e2u), Pair(0x0e3fu, 0x0e3fu), Pair(0x0fd5u, 0x0fd8u), Pair(0x2000u, 0x200bu), Pair(0x200eu, 0x202eu), Pair(0x2030u, 0x204eu), Pair(0x2050u, 0x2059u), Pair(0x205bu, 0x205cu), Pair(0x205eu, 0x2064u), Pair(0x2066u, 0x2070u), Pair(0x2074u, 0x207eu), Pair(0x2080u, 0x208eu), Pair(0x20a0u, 0x20c0u), Pair(0x2100u, 0x2125u), Pair(0x2127u, 0x2129u), Pair(0x212cu, 0x2131u), Pair(0x2133u, 0x214du), Pair(0x214fu, 0x215fu), Pair(0x2189u, 0x218bu), Pair(0x2190u, 0x2429u), Pair(0x2440u, 0x244au), Pair(0x2460u, 0x27ffu), Pair(0x2900u, 0x2b73u), Pair(0x2b76u, 0x2b95u), Pair(0x2b97u, 0x2bffu), Pair(0x2e00u, 0x2e16u), Pair(0x2e18u, 0x2e2fu), Pair(0x2e32u, 0x2e3bu), Pair(0x2e3du, 0x2e40u), Pair(0x2e42u, 0x2e42u), Pair(0x2e44u, 0x2e5du), Pair(0x3000u, 0x3000u), Pair(0x3004u, 0x3004u), Pair(0x3012u, 0x3012u), Pair(0x3020u, 0x3020u), Pair(0x3036u, 0x3036u), Pair(0x3248u, 0x325fu), Pair(0x327fu, 0x327fu), Pair(0x32b1u, 0x32bfu), Pair(0x32ccu, 0x32cfu), Pair(0x3371u, 0x337au), Pair(0x3380u, 0x33dfu), Pair(0x33ffu, 0x33ffu), Pair(0x4dc0u, 0x4dffu), Pair(0xa708u, 0xa721u), Pair(0xa788u, 0xa78au), Pair(0xab5bu, 0xab5bu), Pair(0xab6au, 0xab6bu), Pair(0xfe10u, 0xfe19u), Pair(0xfe30u, 0xfe44u), Pair(0xfe47u, 0xfe52u), Pair(0xfe54u, 0xfe66u), Pair(0xfe68u, 0xfe6bu), Pair(0xfeffu, 0xfeffu), Pair(0xff01u, 0xff20u), Pair(0xff3bu, 0xff40u), Pair(0xff5bu, 0xff60u), Pair(0xffe0u, 0xffe6u)) }
+
+private val tableChunk1: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0xffe8u, 0xffeeu), Pair(0xfff9u, 0xfffdu), Pair(0x10190u, 0x1019cu), Pair(0x101d0u, 0x101fcu), Pair(0x1cc00u, 0x1ccf9u), Pair(0x1cd00u, 0x1ceb3u), Pair(0x1cf50u, 0x1cfc3u), Pair(0x1d000u, 0x1d0f5u), Pair(0x1d100u, 0x1d126u), Pair(0x1d129u, 0x1d166u), Pair(0x1d16au, 0x1d17au), Pair(0x1d183u, 0x1d184u), Pair(0x1d18cu, 0x1d1a9u), Pair(0x1d1aeu, 0x1d1eau), Pair(0x1d2c0u, 0x1d2d3u), Pair(0x1d2e0u, 0x1d2f3u), Pair(0x1d300u, 0x1d356u), Pair(0x1d372u, 0x1d378u), Pair(0x1d400u, 0x1d454u), Pair(0x1d456u, 0x1d49cu), Pair(0x1d49eu, 0x1d49fu), Pair(0x1d4a2u, 0x1d4a2u), Pair(0x1d4a5u, 0x1d4a6u), Pair(0x1d4a9u, 0x1d4acu), Pair(0x1d4aeu, 0x1d4b9u), Pair(0x1d4bbu, 0x1d4bbu), Pair(0x1d4bdu, 0x1d4c3u), Pair(0x1d4c5u, 0x1d505u), Pair(0x1d507u, 0x1d50au), Pair(0x1d50du, 0x1d514u), Pair(0x1d516u, 0x1d51cu), Pair(0x1d51eu, 0x1d539u), Pair(0x1d53bu, 0x1d53eu), Pair(0x1d540u, 0x1d544u), Pair(0x1d546u, 0x1d546u), Pair(0x1d54au, 0x1d550u), Pair(0x1d552u, 0x1d6a5u), Pair(0x1d6a8u, 0x1d7cbu), Pair(0x1d7ceu, 0x1d7ffu), Pair(0x1ec71u, 0x1ecb4u), Pair(0x1ed01u, 0x1ed3du), Pair(0x1f000u, 0x1f02bu), Pair(0x1f030u, 0x1f093u), Pair(0x1f0a0u, 0x1f0aeu), Pair(0x1f0b1u, 0x1f0bfu), Pair(0x1f0c1u, 0x1f0cfu), Pair(0x1f0d1u, 0x1f0f5u), Pair(0x1f100u, 0x1f1adu), Pair(0x1f1e6u, 0x1f1ffu), Pair(0x1f201u, 0x1f202u), Pair(0x1f210u, 0x1f23bu), Pair(0x1f240u, 0x1f248u), Pair(0x1f260u, 0x1f265u), Pair(0x1f300u, 0x1f6d7u), Pair(0x1f6dcu, 0x1f6ecu), Pair(0x1f6f0u, 0x1f6fcu), Pair(0x1f700u, 0x1f776u), Pair(0x1f77bu, 0x1f7d9u), Pair(0x1f7e0u, 0x1f7ebu), Pair(0x1f7f0u, 0x1f7f0u), Pair(0x1f800u, 0x1f80bu), Pair(0x1f810u, 0x1f847u), Pair(0x1f850u, 0x1f859u), Pair(0x1f860u, 0x1f887u), Pair(0x1f890u, 0x1f8adu), Pair(0x1f8b0u, 0x1f8bbu), Pair(0x1f8c0u, 0x1f8c1u), Pair(0x1f900u, 0x1fa53u), Pair(0x1fa60u, 0x1fa6du), Pair(0x1fa70u, 0x1fa7cu), Pair(0x1fa80u, 0x1fa89u), Pair(0x1fa8fu, 0x1fac6u), Pair(0x1faceu, 0x1fadcu), Pair(0x1fadfu, 0x1fae9u), Pair(0x1faf0u, 0x1faf8u), Pair(0x1fb00u, 0x1fb92u), Pair(0x1fb94u, 0x1fbf9u), Pair(0xe0001u, 0xe0001u), Pair(0xe0020u, 0xe007fu)) }
+
+private val tableChunk2: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0xaae0u, 0xaaf6u), Pair(0xabc0u, 0xabedu), Pair(0xabf0u, 0xabf9u)) }
+
+private val tableChunk3: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1e800u, 0x1e8c4u), Pair(0x1e8c7u, 0x1e8d6u)) }
+
+private val tableChunk4: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x109a0u, 0x109b7u), Pair(0x109bcu, 0x109cfu), Pair(0x109d2u, 0x109ffu)) }
+
+private val tableChunk5: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x205du, 0x205du), Pair(0x10980u, 0x1099fu)) }
+
+private val tableChunk6: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x16f00u, 0x16f4au), Pair(0x16f4fu, 0x16f87u), Pair(0x16f8fu, 0x16f9fu)) }
+
+private val tableChunk7: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0xa830u, 0xa839u), Pair(0x11600u, 0x11644u), Pair(0x11650u, 0x11659u)) }
+
+private val tableChunk8: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1800u, 0x1819u), Pair(0x1820u, 0x1878u), Pair(0x1880u, 0x18aau), Pair(0x202fu, 0x202fu), Pair(0x3001u, 0x3002u), Pair(0x3008u, 0x300bu), Pair(0x11660u, 0x1166cu)) }
+
+private val tableChunk9: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x16a40u, 0x16a5eu), Pair(0x16a60u, 0x16a69u), Pair(0x16a6eu, 0x16a6fu)) }
+
+private val tableChunk10: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0a66u, 0x0a6fu), Pair(0x11280u, 0x11286u), Pair(0x11288u, 0x11288u), Pair(0x1128au, 0x1128du), Pair(0x1128fu, 0x1129du), Pair(0x1129fu, 0x112a9u)) }
+
+private val tableChunk11: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1000u, 0x109fu), Pair(0xa92eu, 0xa92eu), Pair(0xa9e0u, 0xa9feu), Pair(0xaa60u, 0xaa7fu), Pair(0x116d0u, 0x116e3u)) }
+
+private val tableChunk12: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10880u, 0x1089eu), Pair(0x108a7u, 0x108afu)) }
+
+private val tableChunk13: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0964u, 0x0965u), Pair(0x0ce6u, 0x0cefu), Pair(0x1ce9u, 0x1ce9u), Pair(0x1cf2u, 0x1cf2u), Pair(0x1cfau, 0x1cfau), Pair(0xa830u, 0xa835u), Pair(0x119a0u, 0x119a7u), Pair(0x119aau, 0x119d7u), Pair(0x119dau, 0x119e4u)) }
+
+private val tableChunk14: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1980u, 0x19abu), Pair(0x19b0u, 0x19c9u), Pair(0x19d0u, 0x19dau), Pair(0x19deu, 0x19dfu)) }
+
+private val tableChunk15: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x11400u, 0x1145bu), Pair(0x1145du, 0x11461u)) }
+
+private val tableChunk16: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x060cu, 0x060cu), Pair(0x061bu, 0x061bu), Pair(0x061fu, 0x061fu), Pair(0x07c0u, 0x07fau), Pair(0x07fdu, 0x07ffu), Pair(0xfd3eu, 0xfd3fu)) }
+
+private val tableChunk17: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x16fe1u, 0x16fe1u), Pair(0x1b170u, 0x1b2fbu)) }
+
+private val tableChunk18: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1e100u, 0x1e12cu), Pair(0x1e130u, 0x1e13du), Pair(0x1e140u, 0x1e149u), Pair(0x1e14eu, 0x1e14fu)) }
+
+private val tableChunk19: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1680u, 0x169cu)) }
+
+private val tableChunk20: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1c50u, 0x1c7fu)) }
+
+private val tableChunk21: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0964u, 0x0965u), Pair(0x1e5d0u, 0x1e5fau), Pair(0x1e5ffu, 0x1e5ffu)) }
+
+private val tableChunk22: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x205au, 0x205au), Pair(0x205du, 0x205du), Pair(0x2e31u, 0x2e31u), Pair(0x2e41u, 0x2e41u), Pair(0x10c80u, 0x10cb2u), Pair(0x10cc0u, 0x10cf2u), Pair(0x10cfau, 0x10cffu)) }
+
+private val tableChunk23: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10300u, 0x10323u), Pair(0x1032du, 0x1032fu)) }
+
+private val tableChunk24: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10a80u, 0x10a9fu)) }
+
+private val tableChunk25: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x00b7u, 0x00b7u), Pair(0x0300u, 0x0300u), Pair(0x0306u, 0x0308u), Pair(0x0313u, 0x0313u), Pair(0x0483u, 0x0483u), Pair(0x10350u, 0x1037au)) }
+
+private val tableChunk26: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x103a0u, 0x103c3u), Pair(0x103c8u, 0x103d5u)) }
+
+private val tableChunk27: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10f00u, 0x10f27u)) }
+
+private val tableChunk28: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10a60u, 0x10a7fu)) }
+
+private val tableChunk29: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x205au, 0x205au), Pair(0x2e30u, 0x2e30u), Pair(0x10c00u, 0x10c48u)) }
+
+private val tableChunk30: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0640u, 0x0640u), Pair(0x10af2u, 0x10af2u), Pair(0x10f70u, 0x10f89u)) }
+
+private val tableChunk31: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0951u, 0x0952u), Pair(0x0964u, 0x0965u), Pair(0x0b01u, 0x0b03u), Pair(0x0b05u, 0x0b0cu), Pair(0x0b0fu, 0x0b10u), Pair(0x0b13u, 0x0b28u), Pair(0x0b2au, 0x0b30u), Pair(0x0b32u, 0x0b33u), Pair(0x0b35u, 0x0b39u), Pair(0x0b3cu, 0x0b44u), Pair(0x0b47u, 0x0b48u), Pair(0x0b4bu, 0x0b4du), Pair(0x0b55u, 0x0b57u), Pair(0x0b5cu, 0x0b5du), Pair(0x0b5fu, 0x0b63u), Pair(0x0b66u, 0x0b77u), Pair(0x1cdau, 0x1cdau), Pair(0x1cf2u, 0x1cf2u)) }
+
+private val tableChunk32: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0301u, 0x0301u), Pair(0x0304u, 0x0304u), Pair(0x030bu, 0x030bu), Pair(0x0358u, 0x0358u), Pair(0x104b0u, 0x104d3u), Pair(0x104d8u, 0x104fbu)) }
+
+private val tableChunk33: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10480u, 0x1049du), Pair(0x104a0u, 0x104a9u)) }
+
+private val tableChunk34: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x16b00u, 0x16b45u), Pair(0x16b50u, 0x16b59u), Pair(0x16b5bu, 0x16b61u), Pair(0x16b63u, 0x16b77u), Pair(0x16b7du, 0x16b8fu)) }
+
+private val tableChunk35: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10860u, 0x1087fu)) }
+
+private val tableChunk36: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x11ac0u, 0x11af8u)) }
+
+private val tableChunk37: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1802u, 0x1803u), Pair(0x1805u, 0x1805u), Pair(0x202fu, 0x202fu), Pair(0x3002u, 0x3002u), Pair(0xa840u, 0xa877u)) }
+
+private val tableChunk38: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10900u, 0x1091bu), Pair(0x1091fu, 0x1091fu)) }
+
+private val tableChunk39: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0640u, 0x0640u), Pair(0x10b80u, 0x10b91u), Pair(0x10b99u, 0x10b9cu), Pair(0x10ba9u, 0x10bafu)) }
+
+private val tableChunk40: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0xa930u, 0xa953u), Pair(0xa95fu, 0xa95fu)) }
+
+private val tableChunk41: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x16a0u, 0x16f8u)) }
+
+private val tableChunk42: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0800u, 0x082du), Pair(0x0830u, 0x083eu), Pair(0x2e31u, 0x2e31u)) }
+
+private val tableChunk43: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0xa880u, 0xa8c5u), Pair(0xa8ceu, 0xa8d9u)) }
+
+private val tableChunk44: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0951u, 0x0951u), Pair(0x1cd7u, 0x1cd7u), Pair(0x1cd9u, 0x1cd9u), Pair(0x1cdcu, 0x1cddu), Pair(0x1ce0u, 0x1ce0u), Pair(0xa830u, 0xa835u), Pair(0xa838u, 0xa838u), Pair(0x11180u, 0x111dfu)) }
+
+private val tableChunk45: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x00b7u, 0x00b7u), Pair(0x10450u, 0x1047fu)) }
+
+private val tableChunk46: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x11580u, 0x115b5u), Pair(0x115b8u, 0x115ddu)) }
+
+private val tableChunk47: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1d800u, 0x1da8bu), Pair(0x1da9bu, 0x1da9fu), Pair(0x1daa1u, 0x1daafu)) }
+
+private val tableChunk48: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0964u, 0x0965u), Pair(0x0d81u, 0x0d83u), Pair(0x0d85u, 0x0d96u), Pair(0x0d9au, 0x0db1u), Pair(0x0db3u, 0x0dbbu), Pair(0x0dbdu, 0x0dbdu), Pair(0x0dc0u, 0x0dc6u), Pair(0x0dcau, 0x0dcau), Pair(0x0dcfu, 0x0dd4u), Pair(0x0dd6u, 0x0dd6u), Pair(0x0dd8u, 0x0ddfu), Pair(0x0de6u, 0x0defu), Pair(0x0df2u, 0x0df4u), Pair(0x1cf2u, 0x1cf2u), Pair(0x111e1u, 0x111f4u)) }
+
+private val tableChunk49: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0640u, 0x0640u), Pair(0x10f30u, 0x10f59u)) }
+
+private val tableChunk50: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x110d0u, 0x110e8u), Pair(0x110f0u, 0x110f9u)) }
+
+private val tableChunk51: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x11a50u, 0x11aa2u)) }
+
+private val tableChunk52: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1b80u, 0x1bbfu), Pair(0x1cc0u, 0x1cc7u)) }
+
+private val tableChunk53: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0300u, 0x0301u), Pair(0x0303u, 0x0303u), Pair(0x030du, 0x030du), Pair(0x0310u, 0x0310u), Pair(0x032du, 0x032du), Pair(0x0331u, 0x0331u), Pair(0x11bc0u, 0x11be1u), Pair(0x11bf0u, 0x11bf9u)) }
+
+private val tableChunk54: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0964u, 0x0965u), Pair(0x09e6u, 0x09efu), Pair(0xa800u, 0xa82cu)) }
+
+private val tableChunk55: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0303u, 0x0304u), Pair(0x0307u, 0x0308u), Pair(0x030au, 0x030au), Pair(0x0320u, 0x0320u), Pair(0x0323u, 0x0325u), Pair(0x032du, 0x032eu), Pair(0x0330u, 0x0330u), Pair(0x060cu, 0x060cu), Pair(0x061bu, 0x061cu), Pair(0x061fu, 0x061fu), Pair(0x0640u, 0x0640u), Pair(0x064bu, 0x0655u), Pair(0x0670u, 0x0670u), Pair(0x0700u, 0x070du), Pair(0x070fu, 0x074au), Pair(0x074du, 0x074fu), Pair(0x0860u, 0x086au), Pair(0x1df8u, 0x1df8u), Pair(0x1dfau, 0x1dfau)) }
+
+private val tableChunk56: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1700u, 0x1715u), Pair(0x171fu, 0x171fu), Pair(0x1735u, 0x1736u)) }
+
+private val tableChunk57: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1735u, 0x1736u), Pair(0x1760u, 0x176cu), Pair(0x176eu, 0x1770u), Pair(0x1772u, 0x1773u)) }
+
+private val tableChunk58: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0300u, 0x0301u), Pair(0x0307u, 0x0308u), Pair(0x030cu, 0x030cu), Pair(0x1040u, 0x1049u), Pair(0x1950u, 0x196du), Pair(0x1970u, 0x1974u)) }
+
+private val tableChunk59: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1a20u, 0x1a5eu), Pair(0x1a60u, 0x1a7cu), Pair(0x1a7fu, 0x1a89u), Pair(0x1a90u, 0x1a99u), Pair(0x1aa0u, 0x1aadu)) }
+
+private val tableChunk60: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0xaa80u, 0xaac2u), Pair(0xaadbu, 0xaadfu)) }
+
+private val tableChunk61: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0964u, 0x0965u), Pair(0xa830u, 0xa839u), Pair(0x11680u, 0x116b9u), Pair(0x116c0u, 0x116c9u)) }
+
+private val tableChunk62: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0951u, 0x0952u), Pair(0x0964u, 0x0965u), Pair(0x0b82u, 0x0b83u), Pair(0x0b85u, 0x0b8au), Pair(0x0b8eu, 0x0b90u), Pair(0x0b92u, 0x0b95u), Pair(0x0b99u, 0x0b9au), Pair(0x0b9cu, 0x0b9cu), Pair(0x0b9eu, 0x0b9fu), Pair(0x0ba3u, 0x0ba4u), Pair(0x0ba8u, 0x0baau), Pair(0x0baeu, 0x0bb9u), Pair(0x0bbeu, 0x0bc2u), Pair(0x0bc6u, 0x0bc8u), Pair(0x0bcau, 0x0bcdu), Pair(0x0bd0u, 0x0bd0u), Pair(0x0bd7u, 0x0bd7u), Pair(0x0be6u, 0x0bfau), Pair(0x1cdau, 0x1cdau), Pair(0xa8f3u, 0xa8f3u), Pair(0x11301u, 0x11301u), Pair(0x11303u, 0x11303u), Pair(0x1133bu, 0x1133cu), Pair(0x11fc0u, 0x11ff1u), Pair(0x11fffu, 0x11fffu)) }
+
+private val tableChunk63: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x16a70u, 0x16abeu), Pair(0x16ac0u, 0x16ac9u)) }
+
+private val tableChunk64: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x2ff0u, 0x2fffu), Pair(0x31efu, 0x31efu), Pair(0x16fe0u, 0x16fe0u), Pair(0x17000u, 0x187f7u), Pair(0x18800u, 0x18affu), Pair(0x18d00u, 0x18d08u)) }
+
+private val tableChunk65: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0951u, 0x0952u), Pair(0x0964u, 0x0965u), Pair(0x0c00u, 0x0c0cu), Pair(0x0c0eu, 0x0c10u), Pair(0x0c12u, 0x0c28u), Pair(0x0c2au, 0x0c39u), Pair(0x0c3cu, 0x0c44u), Pair(0x0c46u, 0x0c48u), Pair(0x0c4au, 0x0c4du), Pair(0x0c55u, 0x0c56u), Pair(0x0c58u, 0x0c5au), Pair(0x0c5du, 0x0c5du), Pair(0x0c60u, 0x0c63u), Pair(0x0c66u, 0x0c6fu), Pair(0x0c77u, 0x0c7fu), Pair(0x1cdau, 0x1cdau), Pair(0x1cf2u, 0x1cf2u)) }
+
+private val tableChunk66: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x060cu, 0x060cu), Pair(0x061bu, 0x061cu), Pair(0x061fu, 0x061fu), Pair(0x0660u, 0x0669u), Pair(0x0780u, 0x07b1u), Pair(0xfdf2u, 0xfdf2u), Pair(0xfdfdu, 0xfdfdu)) }
+
+private val tableChunk67: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x02bcu, 0x02bcu), Pair(0x02d7u, 0x02d7u), Pair(0x0303u, 0x0303u), Pair(0x0331u, 0x0331u), Pair(0x0e01u, 0x0e3au), Pair(0x0e40u, 0x0e5bu)) }
+
+private val tableChunk68: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0f00u, 0x0f47u), Pair(0x0f49u, 0x0f6cu), Pair(0x0f71u, 0x0f97u), Pair(0x0f99u, 0x0fbcu), Pair(0x0fbeu, 0x0fccu), Pair(0x0fceu, 0x0fd4u), Pair(0x0fd9u, 0x0fdau), Pair(0x3008u, 0x300bu)) }
+
+private val tableChunk69: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0302u, 0x0302u), Pair(0x0304u, 0x0304u), Pair(0x0307u, 0x0307u), Pair(0x0309u, 0x0309u), Pair(0x2d30u, 0x2d67u), Pair(0x2d6fu, 0x2d70u), Pair(0x2d7fu, 0x2d7fu)) }
+
+private val tableChunk70: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0951u, 0x0952u), Pair(0x0964u, 0x0965u), Pair(0x1cf2u, 0x1cf2u), Pair(0xa830u, 0xa839u), Pair(0x11480u, 0x114c7u), Pair(0x114d0u, 0x114d9u)) }
+
+private val tableChunk71: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0301u, 0x0301u), Pair(0x0304u, 0x0304u), Pair(0x0307u, 0x0307u), Pair(0x0311u, 0x0311u), Pair(0x0313u, 0x0313u), Pair(0x035eu, 0x035eu), Pair(0x105c0u, 0x105f3u)) }
+
+private val tableChunk72: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x02bcu, 0x02bcu), Pair(0x1e290u, 0x1e2aeu)) }
+
+private val tableChunk73: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x0ce6u, 0x0cefu), Pair(0x1cf2u, 0x1cf2u), Pair(0x1cf4u, 0x1cf4u), Pair(0xa830u, 0xa835u), Pair(0xa8f1u, 0xa8f1u), Pair(0x11380u, 0x11389u), Pair(0x1138bu, 0x1138bu), Pair(0x1138eu, 0x1138eu), Pair(0x11390u, 0x113b5u), Pair(0x113b7u, 0x113c0u), Pair(0x113c2u, 0x113c2u), Pair(0x113c5u, 0x113c5u), Pair(0x113c7u, 0x113cau), Pair(0x113ccu, 0x113d5u), Pair(0x113d7u, 0x113d8u), Pair(0x113e1u, 0x113e2u)) }
+
+private val tableChunk74: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10380u, 0x1039du), Pair(0x1039fu, 0x1039fu)) }
+
+private val tableChunk75: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0xa500u, 0xa62bu)) }
+
+private val tableChunk76: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x10570u, 0x1057au), Pair(0x1057cu, 0x1058au), Pair(0x1058cu, 0x10592u), Pair(0x10594u, 0x10595u), Pair(0x10597u, 0x105a1u), Pair(0x105a3u, 0x105b1u), Pair(0x105b3u, 0x105b9u), Pair(0x105bbu, 0x105bcu)) }
+
+private val tableChunk77: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x1e2c0u, 0x1e2f9u), Pair(0x1e2ffu, 0x1e2ffu)) }
+
+private val tableChunk78: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x118a0u, 0x118f2u), Pair(0x118ffu, 0x118ffu)) }
+
+private val tableChunk79: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x060cu, 0x060cu), Pair(0x061bu, 0x061bu), Pair(0x061fu, 0x061fu), Pair(0x0660u, 0x0669u), Pair(0x10e80u, 0x10ea9u), Pair(0x10eabu, 0x10eadu), Pair(0x10eb0u, 0x10eb1u)) }
+
+private val tableChunk80: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x3001u, 0x3002u), Pair(0x3008u, 0x3011u), Pair(0x3014u, 0x301bu), Pair(0x30fbu, 0x30fbu), Pair(0xa000u, 0xa48cu), Pair(0xa490u, 0xa4c6u), Pair(0xff61u, 0xff65u)) }
+
+private val tableChunk81: List<Pair<UInt, UInt>> by lazy { listOf(Pair(0x11a00u, 0x11a47u)) }
+
+private val tableChunk82: List<Pair<String, List<Pair<UInt, UInt>>>> by lazy { listOf(Pair("Adlam", ADLAM), Pair("Ahom", AHOM), Pair("Anatolian_Hieroglyphs", ANATOLIAN_HIEROGLYPHS), Pair("Arabic", ARABIC), Pair("Armenian", ARMENIAN), Pair("Avestan", AVESTAN), Pair("Balinese", BALINESE), Pair("Bamum", BAMUM), Pair("Bassa_Vah", BASSA_VAH), Pair("Batak", BATAK), Pair("Bengali", BENGALI), Pair("Bhaiksuki", BHAIKSUKI), Pair("Bopomofo", BOPOMOFO), Pair("Brahmi", BRAHMI), Pair("Braille", BRAILLE), Pair("Buginese", BUGINESE), Pair("Buhid", BUHID), Pair("Canadian_Aboriginal", CANADIAN_ABORIGINAL), Pair("Carian", CARIAN), Pair("Caucasian_Albanian", CAUCASIAN_ALBANIAN), Pair("Chakma", CHAKMA), Pair("Cham", CHAM), Pair("Cherokee", CHEROKEE), Pair("Chorasmian", CHORASMIAN), Pair("Common", COMMON), Pair("Coptic", COPTIC), Pair("Cuneiform", CUNEIFORM), Pair("Cypriot", CYPRIOT), Pair("Cypro_Minoan", CYPRO_MINOAN), Pair("Cyrillic", CYRILLIC), Pair("Deseret", DESERET), Pair("Devanagari", DEVANAGARI), Pair("Dives_Akuru", DIVES_AKURU), Pair("Dogra", DOGRA), Pair("Duployan", DUPLOYAN), Pair("Egyptian_Hieroglyphs", EGYPTIAN_HIEROGLYPHS), Pair("Elbasan", ELBASAN), Pair("Elymaic", ELYMAIC), Pair("Ethiopic", ETHIOPIC), Pair("Garay", GARAY), Pair("Georgian", GEORGIAN), Pair("Glagolitic", GLAGOLITIC), Pair("Gothic", GOTHIC), Pair("Grantha", GRANTHA), Pair("Greek", GREEK), Pair("Gujarati", GUJARATI), Pair("Gunjala_Gondi", GUNJALA_GONDI), Pair("Gurmukhi", GURMUKHI), Pair("Gurung_Khema", GURUNG_KHEMA), Pair("Han", HAN), Pair("Hangul", HANGUL), Pair("Hanifi_Rohingya", HANIFI_ROHINGYA), Pair("Hanunoo", HANUNOO), Pair("Hatran", HATRAN), Pair("Hebrew", HEBREW), Pair("Hiragana", HIRAGANA), Pair("Imperial_Aramaic", IMPERIAL_ARAMAIC), Pair("Inherited", INHERITED), Pair("Inscriptional_Pahlavi", INSCRIPTIONAL_PAHLAVI), Pair("Inscriptional_Parthian", INSCRIPTIONAL_PARTHIAN), Pair("Javanese", JAVANESE), Pair("Kaithi", KAITHI), Pair("Kannada", KANNADA), Pair("Katakana", KATAKANA), Pair("Kawi", KAWI), Pair("Kayah_Li", KAYAH_LI), Pair("Kharoshthi", KHAROSHTHI), Pair("Khitan_Small_Script", KHITAN_SMALL_SCRIPT), Pair("Khmer", KHMER), Pair("Khojki", KHOJKI), Pair("Khudawadi", KHUDAWADI), Pair("Kirat_Rai", KIRAT_RAI), Pair("Lao", LAO), Pair("Latin", LATIN), Pair("Lepcha", LEPCHA), Pair("Limbu", LIMBU), Pair("Linear_A", LINEAR_A), Pair("Linear_B", LINEAR_B), Pair("Lisu", LISU), Pair("Lycian", LYCIAN)) }
+
+private val tableChunk83: List<Pair<String, List<Pair<UInt, UInt>>>> by lazy { listOf(Pair("Lydian", LYDIAN), Pair("Mahajani", MAHAJANI), Pair("Makasar", MAKASAR), Pair("Malayalam", MALAYALAM), Pair("Mandaic", MANDAIC), Pair("Manichaean", MANICHAEAN), Pair("Marchen", MARCHEN), Pair("Masaram_Gondi", MASARAM_GONDI), Pair("Medefaidrin", MEDEFAIDRIN), Pair("Meetei_Mayek", MEETEI_MAYEK), Pair("Mende_Kikakui", MENDE_KIKAKUI), Pair("Meroitic_Cursive", MEROITIC_CURSIVE), Pair("Meroitic_Hieroglyphs", MEROITIC_HIEROGLYPHS), Pair("Miao", MIAO), Pair("Modi", MODI), Pair("Mongolian", MONGOLIAN), Pair("Mro", MRO), Pair("Multani", MULTANI), Pair("Myanmar", MYANMAR), Pair("Nabataean", NABATAEAN), Pair("Nag_Mundari", NAG_MUNDARI), Pair("Nandinagari", NANDINAGARI), Pair("New_Tai_Lue", NEW_TAI_LUE), Pair("Newa", NEWA), Pair("Nko", NKO), Pair("Nushu", NUSHU), Pair("Nyiakeng_Puachue_Hmong", NYIAKENG_PUACHUE_HMONG), Pair("Ogham", OGHAM), Pair("Ol_Chiki", OL_CHIKI), Pair("Ol_Onal", OL_ONAL), Pair("Old_Hungarian", OLD_HUNGARIAN), Pair("Old_Italic", OLD_ITALIC), Pair("Old_North_Arabian", OLD_NORTH_ARABIAN), Pair("Old_Permic", OLD_PERMIC), Pair("Old_Persian", OLD_PERSIAN), Pair("Old_Sogdian", OLD_SOGDIAN), Pair("Old_South_Arabian", OLD_SOUTH_ARABIAN), Pair("Old_Turkic", OLD_TURKIC), Pair("Old_Uyghur", OLD_UYGHUR), Pair("Oriya", ORIYA), Pair("Osage", OSAGE), Pair("Osmanya", OSMANYA), Pair("Pahawh_Hmong", PAHAWH_HMONG), Pair("Palmyrene", PALMYRENE), Pair("Pau_Cin_Hau", PAU_CIN_HAU), Pair("Phags_Pa", PHAGS_PA), Pair("Phoenician", PHOENICIAN), Pair("Psalter_Pahlavi", PSALTER_PAHLAVI), Pair("Rejang", REJANG), Pair("Runic", RUNIC), Pair("Samaritan", SAMARITAN), Pair("Saurashtra", SAURASHTRA), Pair("Sharada", SHARADA), Pair("Shavian", SHAVIAN), Pair("Siddham", SIDDHAM), Pair("SignWriting", SIGNWRITING), Pair("Sinhala", SINHALA), Pair("Sogdian", SOGDIAN), Pair("Sora_Sompeng", SORA_SOMPENG), Pair("Soyombo", SOYOMBO), Pair("Sundanese", SUNDANESE), Pair("Sunuwar", SUNUWAR), Pair("Syloti_Nagri", SYLOTI_NAGRI), Pair("Syriac", SYRIAC), Pair("Tagalog", TAGALOG), Pair("Tagbanwa", TAGBANWA), Pair("Tai_Le", TAI_LE), Pair("Tai_Tham", TAI_THAM), Pair("Tai_Viet", TAI_VIET), Pair("Takri", TAKRI), Pair("Tamil", TAMIL), Pair("Tangsa", TANGSA), Pair("Tangut", TANGUT), Pair("Telugu", TELUGU), Pair("Thaana", THAANA), Pair("Thai", THAI), Pair("Tibetan", TIBETAN), Pair("Tifinagh", TIFINAGH), Pair("Tirhuta", TIRHUTA), Pair("Todhri", TODHRI)) }
+
+private val tableChunk84: List<Pair<String, List<Pair<UInt, UInt>>>> by lazy { listOf(Pair("Toto", TOTO), Pair("Tulu_Tigalari", TULU_TIGALARI), Pair("Ugaritic", UGARITIC), Pair("Vai", VAI), Pair("Vithkuqi", VITHKUQI), Pair("Wancho", WANCHO), Pair("Warang_Citi", WARANG_CITI), Pair("Yezidi", YEZIDI), Pair("Yi", YI), Pair("Zanabazar_Square", ZANABAZAR_SQUARE)) }

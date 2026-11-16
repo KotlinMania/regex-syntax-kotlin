@@ -101,6 +101,14 @@ public open class Error(
 }
 
 /**
+ * The constituent parts returned by [Hir.intoParts].
+ */
+public data class HirParts(
+    public val kind: HirKind,
+    public val properties: Properties,
+)
+
+/**
  * A high-level intermediate representation (HIR) for a regular expression.
  *
  * An HIR value is a combination of a [HirKind] and a set of [Properties].
@@ -203,12 +211,12 @@ public open class Hir(
      * This is useful because `val Hir { kind, props } = hir;` does not work
      * because of `Hir`s custom `Drop` implementation.
      */
-    public open fun intoParts(): Pair<HirKind, Properties> {
+    public open fun intoParts(): HirParts {
         val k = this.kind
         val p = this.props
         this.kind = HirKind.Empty
         this.props = Properties.empty()
-        return Pair(k, p)
+        return HirParts(k, p)
     }
 
     public open fun fmt(f: StringBuilder) {

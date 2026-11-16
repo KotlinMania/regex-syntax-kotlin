@@ -301,7 +301,7 @@ public fun anything() {
     check(inexact(listOf(I("a")), listOf(I("z"))) == e("a.z"))
 }
 
-// Like the 'anything' test, but it uses smaller limits in order to test
+// Like the `anything` test, but it uses smaller limits in order to test
 // the logic for effectively aborting literal extraction when the seqs get
 // too big.
 @kotlin.test.Test

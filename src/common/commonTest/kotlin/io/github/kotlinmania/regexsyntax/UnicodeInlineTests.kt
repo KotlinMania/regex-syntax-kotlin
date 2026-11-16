@@ -26,7 +26,7 @@ public fun simpleFoldA() {
     check(xs1 == listOf('a'.code.toUInt()))
 }
 
-// Upstream `simple_fold_disabled` guards `#[cfg(not(feature = "unicode-case"))]`; unicode-case is always enabled in KMP.
+// Upstream unicode-case disabled test omitted because unicode-case is always enabled in KMP.
 
 @kotlin.test.Test
 public fun rangeContains() {

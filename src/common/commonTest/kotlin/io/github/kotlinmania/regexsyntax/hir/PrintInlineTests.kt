@@ -181,10 +181,10 @@ public fun regressionRepetitionAlternation() {
 // peculiarity of how the HIR is represented and how the printer writes it
 // out. Like the other regression, this one is also rooted in the fact that
 // you can't produce the peculiar HIR from the concrete syntax. Namely, you
-// just can't have a concat(a, alt(b, c))' because the 'alt' will normally
+// just can't have a `concat(a, alt(b, c))` because the `alt` will normally
 // be in (at least) a non-capturing group. Why? Because the '|' has very
-// low precedence (lower that concatenation), and so something like ab|c'
-// is actually alt(ab, c)'.
+// low precedence (lower that concatenation), and so something like `ab|c`
+// is actually `alt(ab, c)`.
 //
 // See: https://github.com/rust-lang/regex/issues/516
 @kotlin.test.Test
