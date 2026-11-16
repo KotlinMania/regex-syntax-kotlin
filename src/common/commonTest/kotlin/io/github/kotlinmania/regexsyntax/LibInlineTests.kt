@@ -155,28 +155,30 @@ package io.github.kotlinmania.regexsyntax
 //  crate. Namely, it implements the `Arbitrary` trait from that crate for the
 //  [`Ast`](ast.Ast) type. This feature is disabled by default.
 
-@kotlin.test.Test
-public fun escapeMeta() {
-    check(escape("\\.+*?()|[]{}^\$#&-~") == "\\\\\\.\\+\\*\\?\\(\\)\\|\\[\\]\\{\\}\\^\\\$\\#\\&\\-\\~")
-}
+public class LibInlineTests {
+    @kotlin.test.Test
+    public fun escapeMeta() {
+        check(escape("\\.+*?()|[]{}^\$#&-~") == "\\\\\\.\\+\\*\\?\\(\\)\\|\\[\\]\\{\\}\\^\\\$\\#\\&\\-\\~")
+    }
 
-@kotlin.test.Test
-public fun wordByte() {
-    check(isWordByte(97u))
-    check(!isWordByte(45u))
-}
+    @kotlin.test.Test
+    public fun wordByte() {
+        check(isWordByte(97u))
+        check(!isWordByte(45u))
+    }
 
-@kotlin.test.Test
-public fun wordChar() {
-    check(isWordCharacter('a'.code.toUInt())) { "ASCII" }
-    check(isWordCharacter('\u00e0'.code.toUInt())) { "Latin-1" }
-    check(isWordCharacter('\u03b2'.code.toUInt())) { "Greek" }
-    check(isWordCharacter(0x11011u)) { "Brahmi (Unicode 6.0)" }
-    check(isWordCharacter(0x11611u)) { "Modi (Unicode 7.0)" }
-    check(isWordCharacter(0x11711u)) { "Ahom (Unicode 8.0)" }
-    check(isWordCharacter(0x17828u)) { "Tangut (Unicode 9.0)" }
-    check(isWordCharacter(0x1b1b1u)) { "Nushu (Unicode 10.0)" }
-    check(isWordCharacter(0x16e40u)) { "Medefaidrin (Unicode 11.0)" }
-    check(!isWordCharacter('-'.code.toUInt()))
-    check(!isWordCharacter('\u2603'.code.toUInt()))
+    @kotlin.test.Test
+    public fun wordChar() {
+        check(isWordCharacter('a'.code.toUInt())) { "ASCII" }
+        check(isWordCharacter('\u00e0'.code.toUInt())) { "Latin-1" }
+        check(isWordCharacter('\u03b2'.code.toUInt())) { "Greek" }
+        check(isWordCharacter(0x11011u)) { "Brahmi (Unicode 6.0)" }
+        check(isWordCharacter(0x11611u)) { "Modi (Unicode 7.0)" }
+        check(isWordCharacter(0x11711u)) { "Ahom (Unicode 8.0)" }
+        check(isWordCharacter(0x17828u)) { "Tangut (Unicode 9.0)" }
+        check(isWordCharacter(0x1b1b1u)) { "Nushu (Unicode 10.0)" }
+        check(isWordCharacter(0x16e40u)) { "Medefaidrin (Unicode 11.0)" }
+        check(!isWordCharacter('-'.code.toUInt()))
+        check(!isWordCharacter('\u2603'.code.toUInt()))
+    }
 }
